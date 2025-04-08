@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_mooch_res_config_settings_view_form_inherit" model="ir.ui.view">
+        <field name="name">product.mooch.res.config.settings.form.inherit</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/> <!-- ID correcto de la vista base -->
+        <field name="arch" type="xml">
+            <!-- Insertar los campos después del bloque product_general_settings -->
+            <xpath expr="//block[@name='product_setting_container']" position="inside">
+                <setting id="profit_margin_list_setting" string="Porcentaje de Utilidad Venta">
+                    <field name="profit_margin_list" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
+                <setting id="profit_margin_cred_setting" string="Porcentaje de Utilidad Crédito">
+                    <field name="profit_margin_cred" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

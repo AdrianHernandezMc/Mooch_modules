@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_barcode_parameter_tree" model="ir.ui.view">
+        <field name="name">barcode.parameter.tree</field>
+        <field name="model">barcode.parameter</field>
+        <field name="arch" type="xml">
+            <tree string="Parámetros de Nomenclatura" create="true" delete="false">
+                <field name="name"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Vista Formulario para barcode.parameter -->
+    <record id="view_barcode_parameter_form" model="ir.ui.view">
+        <field name="name">barcode.parameter.form</field>
+        <field name="model">barcode.parameter</field>
+        <field name="arch" type="xml">
+            <form string="Configuración de: " create="false" delete="false">
+                <header>
+                    <field name="name" readonly="1" class="o_inline"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name" readonly="1" class="o_field_nolabel"/>
+                    </group>
+                    <notebook>
+                        <page string="Líneas de Configuración">
+                            <field name="line_ids" widget="one2many_list" nolabel="1" editable="bottom">
+                                <tree editable="bottom">
+                                    <field name="nombre"/>
+                                    <field name="codigo" readonly="1"/>
+                                    <field name="department_line_ids" widget="many2many_tags"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

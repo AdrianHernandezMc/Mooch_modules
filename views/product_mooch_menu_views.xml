@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Acción para abrir la vista de configuración de nomenclatura -->
+    <record id="action_generate_barcode" model="ir.actions.act_window">
+        <field name="name">Configuración del Código de Barras</field>
+        <field name="res_model">barcode.parameter</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_barcode_parameter_tree"/>
+        <field name="context">{}</field>
+        <field name="groups_id" eval="[(4, ref('group_inventory_product_view'))]"/>
+    </record>
+
+    <!-- Menú de configuración del código de producto -->
+    <menuitem id="menu_product_code_config"
+              name="Configuración del Código de Producto"
+              parent="stock.menu_product_in_config_stock"
+              sequence="99"
+              groups="group_inventory_product_edit"/>
+
+    <!-- Submenú para gestionar la nomenclatura de códigos de barras -->
+    <menuitem id="menu_inventory_product_config"
+              name="Generar Código de Barras"
+              parent="menu_product_code_config"
+              action="action_generate_barcode"
+              sequence="5"
+              groups="group_inventory_product_edit"/>
+</odoo>

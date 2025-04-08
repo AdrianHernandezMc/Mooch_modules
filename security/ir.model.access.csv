@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_barcode_parameter,barcode.parameter.access,product_mooch.model_barcode_parameter,product_mooch.group_inventory_product_view,1,0,0,0
+access_barcode_parameter_edit,barcode.parameter.edit,product_mooch.model_barcode_parameter,product_mooch.group_inventory_product_edit,1,1,1,0
+
+access_barcode_parameter_line,barcode.parameter.line.access,product_mooch.model_barcode_parameter_line,product_mooch.group_inventory_product_view,1,0,0,0
+access_barcode_parameter_line_edit,barcode.parameter.line.edit,product_mooch.model_barcode_parameter_line,product_mooch.group_inventory_product_edit,1,1,1,0

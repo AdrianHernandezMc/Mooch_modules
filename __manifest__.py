@@ -1,0 +1,20 @@
+{
+    'name': 'Product Moooch',
+    'version': '17.0.1.1.0',
+    'author': ['Alejandro Rodriguez','Adrian Hernandez'],
+    'category': 'Inventory',
+    'summary': 'Campos y adecuaciones en productos para Mooch',
+    'depends': ['base','product','stock','sale'],
+    'license': 'Other proprietary',
+    'data': [
+        'security/product_mooch_security.xml',
+        'security/ir.model.access.csv',
+        'views/inherit_product_views.xml',
+        'views/product_barcode_views.xml',
+        'views/product_mooch_menu_views.xml',
+        'views/res_config_settings_views.xml',
+        'data/barcode_parameter_data.xml',
+    ],
+    'installable': True,
+    'application': True,
+}
