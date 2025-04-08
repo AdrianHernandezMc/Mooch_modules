@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Grupo de usuarios que solo pueden ver -->
+    <record id="group_inventory_product_view" model="res.groups">
+        <field name="name">Solo Ver Productos</field>
+        <field name="category_id" ref="base.module_category_inventory_inventory"/>
+    </record>
+
+    <!-- Grupo de usuarios que pueden ver y editar -->
+    <record id="group_inventory_product_edit" model="res.groups">
+        <field name="name">Editar Productos</field>
+        <field name="category_id" ref="base.module_category_inventory_inventory"/>
+    </record>
+</odoo>
