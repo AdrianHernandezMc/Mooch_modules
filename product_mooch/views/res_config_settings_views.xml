@@ -13,6 +13,15 @@
                 <setting id="profit_margin_cred_setting" string="Porcentaje de Utilidad Crédito">
                     <field name="profit_margin_cred" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
+                <setting id="sale_type_basic_setting" string="Porcentaje de venta de productos basicos">
+                    <field name="sale_type_basic" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
+                <setting id="sale_type_trend_setting" string="Porcentaje de venta de productos moda">
+                    <field name="sale_type_trend" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
+                <setting id="sale_type_home_setting" string="Porcentaje de venta de productos hogar">
+                    <field name="sale_type_home" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
             </xpath>
         </field>
     </record>

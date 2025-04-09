@@ -7,16 +7,16 @@
         <field name="inherit_id" ref="product.product_template_only_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='expense_policy']" position="attributes">
-                <attribute name="invisible">True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//field[@name='allow_negative_stock']" position="attributes">
-                <attribute name="invisible">True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="(//div[contains(@class,'fst-italic') and contains(@class, 'text-muted')])[1]" position="attributes">
-                <attribute name="invisible">True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="(//div[contains(@class,'fst-italic') and contains(@class, 'text-muted')])[2]" position="attributes">
-                <attribute name="invisible">True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//field[@name='invoice_policy']" position="attributes">
                 <attribute name="invisible">True</attribute>
@@ -28,19 +28,22 @@
                 <attribute name="invisible" >True</attribute>
             </xpath>
             <xpath expr="//field[@name='uom_id']" position="attributes">
-                <attribute name="invisible" >True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//field[@name='uom_po_id']" position="attributes">
-                <attribute name="invisible" >True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//field[@name='standard_price']" position="attributes">
-                <attribute name="readonly">1</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
+            </xpath>
+            <xpath expr="//div[@name='standard_price_uom']/span" position="attributes">
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//field[@name='taxes_id']" position="attributes">
-                <attribute name="invisible" >True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//field[@name='product_tag_ids']" position="attributes">
-                <attribute name="invisible" >True</attribute>
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
             <xpath expr="//group[@name='group_standard_price']//div[@name='pricing']" position="after">
                 <label for="credit_price"/>
@@ -55,6 +58,7 @@
                        field_id="list_price_0"/>
                     <span class="ms-2"/><field name="tax_string" field_id="tax_string_0"/>
                 </div>
+                <field name="sale_type"/>
             </xpath>
             <xpath expr="//group[@name='group_standard_price']//field[@name='default_code']" position="before">
                 <field name="partner_reference" string="Referencia Proveedor"/>
@@ -81,6 +85,21 @@
                         </group>
                     </group>
                 </page>
+            </xpath>
+            <xpath expr="//page[@name='variants']" position="attributes">
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
+            </xpath>
+            <xpath expr="//page[@name='sales']" position="attributes">
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
+            </xpath>
+            <xpath expr="//page[@name='purchase']" position="attributes">
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
+            </xpath>
+            <xpath expr="//page[@name='inventory']" position="attributes">
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
+            </xpath>
+            <xpath expr="//page[@name='invoicing']" position="attributes">
+                <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
             </xpath>
         </field>
     </record>
