@@ -6,6 +6,9 @@ class ResConfigSettings(models.TransientModel):
 
     profit_margin_list = fields.Float(string='Porcentaje de Utilidad Contado', help="Porcentaje de ganancia sobre el costo")
     profit_margin_cred = fields.Float(string='Porcentaje de Utilidad Crédito', help="Porcentaje de ganancia sobre el costo")
+    sale_type_basic = fields.Float(string='Tipo de Compra Basico', help="Porcentaje de venta de productos basicos")
+    sale_type_trend = fields.Float(string='Tipo de Compra Moda', help="Porcentaje de venta de productos moda")
+    sale_type_home = fields.Float(string='Tipo de Compra Hogar', help="Porcentaje de venta de productos hogar")
 
     @api.model
     def set_values(self):
@@ -13,6 +16,9 @@ class ResConfigSettings(models.TransientModel):
         super(ResConfigSettings, self).set_values()
         self.env['ir.config_parameter'].set_param('product_mooch.profit_margin_list', self.profit_margin_list)
         self.env['ir.config_parameter'].set_param('product_mooch.profit_margin_cred', self.profit_margin_cred)
+        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_basic', self.sale_type_basic)
+        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_trend',self.sale_type_trend)
+        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_home',self.sale_type_home)
 
     @api.model
     def get_values(self):
@@ -21,5 +27,8 @@ class ResConfigSettings(models.TransientModel):
         res.update(
             profit_margin_list=self.env['ir.config_parameter'].sudo().get_param('product_mooch.profit_margin_list', default=0.0),
             profit_margin_cred=self.env['ir.config_parameter'].sudo().get_param('product_mooch.profit_margin_cred', default=0.0),
+            sale_type_basic=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_basic', default=0.0),
+            sale_type_trend=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_trend', default=0.0),
+            sale_type_home=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_home', default=0.0)
         )
         return res
