@@ -9,6 +9,7 @@ class ResConfigSettings(models.TransientModel):
     sale_type_basic = fields.Float(string='Tipo de Compra Basico', help="Porcentaje de venta de productos basicos")
     sale_type_trend = fields.Float(string='Tipo de Compra Moda', help="Porcentaje de venta de productos moda")
     sale_type_home = fields.Float(string='Tipo de Compra Hogar', help="Porcentaje de venta de productos hogar")
+    sale_type_season = fields.Float(string='Tipo de Compra Temporada', help='Porcentaje de venta de productos temporada')
 
     @api.model
     def set_values(self):
@@ -19,6 +20,7 @@ class ResConfigSettings(models.TransientModel):
         self.env['ir.config_parameter'].set_param('product_mooch.sale_type_basic', self.sale_type_basic)
         self.env['ir.config_parameter'].set_param('product_mooch.sale_type_trend',self.sale_type_trend)
         self.env['ir.config_parameter'].set_param('product_mooch.sale_type_home',self.sale_type_home)
+        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_season', self.sale_type_season)
 
     @api.model
     def get_values(self):
@@ -29,6 +31,7 @@ class ResConfigSettings(models.TransientModel):
             profit_margin_cred=self.env['ir.config_parameter'].sudo().get_param('product_mooch.profit_margin_cred', default=0.0),
             sale_type_basic=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_basic', default=0.0),
             sale_type_trend=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_trend', default=0.0),
-            sale_type_home=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_home', default=0.0)
+            sale_type_home=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_home', default=0.0),
+            sale_type_season=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_season', default=0.0)
         )
         return res

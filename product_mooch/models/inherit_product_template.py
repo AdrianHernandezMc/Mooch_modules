@@ -17,7 +17,7 @@ class ProductMooch(models.Model):
         help="Porcentaje de ganancia sobre el costo"
     )
     list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',default=1)
-    credit_price = fields.Integer(string='Precio Crédito',
+    credit_price = fields.Float(string='Precio Crédito',
                                   help='Precio de venta a crédito de Mooch',
                                   compute='_compute_prices_cred',
                                   default=1)
@@ -42,7 +42,8 @@ class ProductMooch(models.Model):
         selection=[
             ('sale_type_basic', _('Tipo de Compra Básico')),
             ('sale_type_trend', _('Tipo de Compra Moda')),
-            ('sale_type_home', _('Tipo de Compra Hogar'))
+            ('sale_type_home', _('Tipo de Compra Hogar')),
+            ('sale_type_season', _('Tipo de Compra Temporada'))
         ],
         string='Tipo de Compra',
         default='sale_type_basic',
@@ -155,7 +156,6 @@ class ProductMooch(models.Model):
             
     @api.depends('standard_price', 'profit_margin_list', 'sale_type')
     def _compute_prices_list(self):
-        # Usaremos ir.config_parameter para obtener el valor del porcentaje según la opción seleccionada.
         param_obj = self.env['ir.config_parameter'].sudo()
         for product in self:
             # Obtener el porcentaje configurado según el tipo de venta
@@ -165,6 +165,8 @@ class ProductMooch(models.Model):
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_trend', default=0.0))
             elif product.sale_type == 'sale_type_home':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
+            elif product.sale_type == 'sale_type_season':
+                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
             else:
                 sale_type_value = 0.0
 
@@ -173,7 +175,7 @@ class ProductMooch(models.Model):
 
             if product.standard_price:
                 profit_factor = 1 + (total_percentage / 100)
-                product.list_price = product.standard_price * profit_factor
+                product.list_price = round(product.standard_price * profit_factor,0)
             else:
                 product.list_price = 0.0
 
@@ -194,6 +196,8 @@ class ProductMooch(models.Model):
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_trend', default=0.0))
             elif product.sale_type == 'sale_type_home':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
+            elif product.sale_type == 'sale_type_season':
+                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
             else:
                 sale_type_value = 0.0
 
@@ -202,7 +206,7 @@ class ProductMooch(models.Model):
 
             if product.standard_price:
                 profit_factor = 1 + (total_percentage / 100)
-                product.credit_price = product.standard_price * profit_factor
+                product.credit_price = round(product.standard_price * profit_factor,0)
             else:
                 product.credit_price = 0.0
 
@@ -217,6 +221,8 @@ class ProductMooch(models.Model):
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_trend', default=0.0))
             elif product.sale_type == 'sale_type_home':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
+            elif product.sale_type == 'sale_type_season':
+                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
             else:
                 sale_type_value = 0.0
 
