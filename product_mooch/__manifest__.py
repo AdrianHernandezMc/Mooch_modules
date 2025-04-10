@@ -1,6 +1,6 @@
 {
     'name': 'Product Moooch',
-    'version': '17.0.1.1.0',
+    'version': '17.0.2.1.0',
     'author': ['Alejandro Rodriguez','Adrian Hernandez'],
     'category': 'Inventory',
     'summary': 'Campos y adecuaciones en productos para Mooch',
