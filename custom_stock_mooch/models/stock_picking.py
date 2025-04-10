@@ -6,7 +6,8 @@ class StockPicking(models.Model):
 
     who_transfers = fields.Many2one(
         comodel_name='hr.employee',
-        string='Traslada')
+        string='Traslada'
+    )
     who_receive =  fields.Many2one(
         comodel_name='hr.employee',
         string='Recibe'
@@ -14,4 +15,10 @@ class StockPicking(models.Model):
     driver = fields.Many2one(
         comodel_name='hr.employee',
         string='Chofer'
+    )
+    plates = fields.Char(
+        string='Placas'
+    )
+    unity = fields.Char(
+        string='Unidad'
     )
