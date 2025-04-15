@@ -5,6 +5,7 @@ class BarcodeParameterLine(models.Model):
     _name = 'barcode.parameter.line'
     _description = 'Línea de Configuración para Parámetro de Código de Barras'
     _rec_name = 'nombre'
+    _order = 'orden_departamento_id, codigo'
 
     parameter_id = fields.Many2one('barcode.parameter', string="Parámetro", required=True, ondelete="cascade")
     nombre = fields.Char(string="Nombre", required=True)
@@ -26,6 +27,13 @@ class BarcodeParameterLine(models.Model):
         'product.unspsc.code',
         string='Código UNSPSC',
         help='Código estándar UNSPSC asociado a esta línea.'
+    )
+    orden_departamento_id = fields.Many2one(
+        'barcode.parameter.line',
+        string='Departamento Principal para Orden',
+        domain="[('parameter_id.name', '=', 'Departamento')]",
+        compute='_compute_orden_departamento',
+        store=True
     )
 
     @api.depends('parameter_id.name')
@@ -101,3 +109,8 @@ class BarcodeParameterLine(models.Model):
         vals['codigo'] = new_code_str
 
         return super().create(vals)
+    
+    @api.depends('department_line_ids')
+    def _compute_orden_departamento(self):
+        for rec in self:
+            rec.orden_departamento_id = rec.department_line_ids[:1].id if rec.department_line_ids else False
