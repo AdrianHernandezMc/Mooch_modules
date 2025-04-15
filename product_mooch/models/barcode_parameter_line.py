@@ -22,6 +22,11 @@ class BarcodeParameterLine(models.Model):
         compute="_compute_show_department_line",
         store=True
     )
+    unspsc_code_id = fields.Many2one(
+        'product.unspsc.code',
+        string='Código UNSPSC',
+        help='Código estándar UNSPSC asociado a esta línea.'
+    )
 
     @api.depends('parameter_id.name')
     def _compute_show_department_line(self):

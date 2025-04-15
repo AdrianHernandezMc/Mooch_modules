@@ -30,6 +30,7 @@
                                     <field name="nombre"/>
                                     <field name="codigo" readonly="1"/>
                                     <field name="department_line_ids" widget="many2many_tags"/>
+                                    <field name="unspsc_code_id" attrs="{'invisible': [('parameter_id.name', '!=', 'Tipo de Producto')]}"/>
                                 </tree>
                             </field>
                         </page>
