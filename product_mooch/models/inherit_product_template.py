@@ -49,6 +49,11 @@ class ProductMooch(models.Model):
         default='sale_type_basic',
         help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado"
     )
+    unspsc_code_id = fields.Many2one(
+        'product.unspsc.code',
+        string="Categoría de UNSPSC",
+        domain="[('applies_to', '=', 'product')]"
+    )
 
     @api.depends('default_code')
     def _compute_is_locked(self):
@@ -232,3 +237,11 @@ class ProductMooch(models.Model):
                 product.final_sale_price = product.standard_price * (1 + (total_percentage / 100))
             else:
                 product.final_sale_price = 0.0
+
+    @api.onchange('type_id')
+    def _onchange_type_id_set_unspsc(self):
+        for product in self:
+            if product.type_id.unspsc_code_id:
+                product.unspsc_code_id = product.type_id.unspsc_code_id
+            else:
+                product.unspsc_code_id = False
