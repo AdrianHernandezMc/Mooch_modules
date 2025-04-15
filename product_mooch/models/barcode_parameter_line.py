@@ -1,5 +1,5 @@
 from odoo import models, fields, api
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 
 class BarcodeParameterLine(models.Model):
     _name = 'barcode.parameter.line'
@@ -32,13 +32,18 @@ class BarcodeParameterLine(models.Model):
     def _check_department_required(self):
         for rec in self:
             if rec.parameter_id.name in ['Talla'] and not rec.department_line_ids:
-                raise ValidationError("El departamento debe de estar Relacionado y es obligatorio para el parametro ''Talla''.")
+                raise UserError("El departamento debe de estar Relacionado y es obligatorio para el parámetro 'Talla'.")
 
     @api.model
     def create(self, vals):
-        """Genera el código incremental basado en la longitud (digits) del parámetro.
-           Si el parámetro es 'Departamento', el incremento será de 10,
-           de lo contrario será de 1.
+        """
+        Genera el código incremental basado en la longitud (digits) del parámetro.
+        Si el parámetro es 'Departamento', el incremento será de 10,
+        de lo contrario será de 1.
+
+        Para los parámetros 'Tipo de Producto' y 'Talla', si se envía 
+        información en department_line_ids, se filtra la búsqueda del último código por
+        esos departamentos.
         """
         if not vals.get('parameter_id'):
             return super().create(vals)
@@ -46,13 +51,37 @@ class BarcodeParameterLine(models.Model):
         param = self.env['barcode.parameter'].browse(vals['parameter_id'])
         digits = param.digits  # Longitud máxima definida en el padre
 
-        # Obtener la última línea creada para este parámetro, ordenando por código desc
-        last_line = self.search([('parameter_id', '=', param.id)], order='codigo desc', limit=1)
+        # Definir dominio base: todos los registros para este parámetro.
+        domain = [('parameter_id', '=', param.id)]
+
+        # Para "Tipo de Producto" y "Talla", si se envía información en department_line_ids, filtrar por ellos
+        if param.name in ['Tipo de Producto', 'Talla']:
+            dept_ids = []
+            if vals.get('department_line_ids'):
+                # Los comandos en Many2many pueden venir en distintos formatos: 
+                # Por ejemplo, (6, 0, [ids]) o (4, id).
+                for command in vals.get('department_line_ids'):
+                    # Si es un comando de tipo (6, 0, [ids]), extraer la lista de IDs
+                    if isinstance(command, (list, tuple)) and command[0] == 6:
+                        dept_ids.extend(command[2])
+                    # Si es un comando de tipo (4, id), extraer el id
+                    elif isinstance(command, (list, tuple)) and command[0] in (4, 5) and command[1]:
+                        dept_ids.append(command[1])
+                    elif isinstance(command, int):
+                        dept_ids.append(command)
+            if dept_ids:
+                domain.append(('department_line_ids', 'in', dept_ids))
+
+        # Buscar el último registro para este parámetro (y, si aplica, filtrado por los departamentos)
+        last_line = self.search(domain, order='codigo desc', limit=1)
         last_code_int = 0
         if last_line and last_line.codigo:
-            last_code_int = int(last_line.codigo)
+            try:
+                last_code_int = int(last_line.codigo)
+            except ValueError:
+                last_code_int = 0
 
-        # Determinar el paso de incremento
+        # Paso de incremento: de 10 si el parámetro es 'Departamento', sino 1.
         step = 10 if param.name == 'Departamento' else 1
         new_code_int = last_code_int + step
 
@@ -60,11 +89,9 @@ class BarcodeParameterLine(models.Model):
         max_value = (10 ** digits) - 1
         if new_code_int > max_value:
             raise UserError(
-                f"Se alcanzó el límite de códigos para el parámetro '{param.name}' "
-                f"(máximo {digits} dígitos)."
+                f"Se alcanzó el límite de códigos para el parámetro '{param.name}' (máximo {digits} dígitos)."
             )
 
-        # Formatear con ceros a la izquierda
         new_code_str = str(new_code_int).zfill(digits)
         vals['codigo'] = new_code_str
 
