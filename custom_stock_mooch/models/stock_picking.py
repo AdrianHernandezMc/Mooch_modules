@@ -22,3 +22,7 @@ class StockPicking(models.Model):
     unity = fields.Char(
         string='Unidad'
     )
+    box_quantity = fields.Integer(
+        string='Cantidad de cajas',
+        default=0
+    )
