@@ -46,8 +46,8 @@ class ProductMooch(models.Model):
             ('sale_type_season', _('Tipo de Compra Temporada'))
         ],
         string='Tipo de Compra',
-        default='sale_type_basic',
-        help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado"
+        help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado",
+        required=True
     )
     unspsc_code_id = fields.Many2one(
         'product.unspsc.code',
