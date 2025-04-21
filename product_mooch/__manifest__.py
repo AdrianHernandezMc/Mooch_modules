@@ -4,7 +4,7 @@
     'author': ['Alejandro Rodriguez','Adrian Hernandez'],
     'category': 'Inventory',
     'summary': 'Campos y adecuaciones en productos para Mooch',
-    'depends': ['base','product','stock','sale', 'stock_no_negative', 'point_of_sale'],
+    'depends': ['base','product','stock','sale', 'stock_no_negative', 'point_of_sale', 'stock_barcode'],
     'license': 'Other proprietary',
     'data': [
         'security/product_mooch_security.xml',

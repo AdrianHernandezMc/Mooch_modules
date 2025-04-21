@@ -1,9 +1,9 @@
 <odoo>
     <data>
         <template id="report_simple_label2x7_inherit" inherit_id="product.report_simple_label2x7">
-<!--            <t t-set="company" t-value="product.company_id or user.company_id"/>-->
-            <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' o_label_name ')]" position="replace">
-                <img t-att-src="'data:image/png;base64,' + company.logo.decode('utf-8')" style="max-width: 20mm; max-height: 10mm; float: right"/>
+            <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' o_label_name ')]" position="inside">
+                 <img t-att-src="'data:image/png;base64,' + (product.company_id.logo or user.company_id.logo).decode('utf-8')"
+                      style="max-width: 20mm; max-height: 10mm; float: right"/>
             </xpath>
             <xpath expr="//span[contains(concat(' ', normalize-space(@class), ' '), ' text-nowrap ')]" position="replace"/>
             <xpath expr="//span[contains(concat(' ', normalize-space(@class), ' '), ' text-center ')]" position="after">
