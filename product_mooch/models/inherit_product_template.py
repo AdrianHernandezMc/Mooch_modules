@@ -18,9 +18,9 @@ class ProductMooch(models.Model):
     )
     list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',default=1)
     credit_price = fields.Float(string='Precio Crédito',
-                                  help='Precio de venta a crédito de Mooch',
-                                  compute='_compute_prices_cred',
-                                  default=1)
+                                help='Precio de venta a crédito de Mooch',
+                                compute='_compute_prices_cred',
+                                default=1)
     partner_reference = fields.Char(string='Referencia Proveedor',
                                     help='Código del producto del proveedor')
 
