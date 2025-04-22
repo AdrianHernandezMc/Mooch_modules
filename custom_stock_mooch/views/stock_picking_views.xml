@@ -11,6 +11,7 @@
                     <field name="driver" string="Chofer: "/>
                     <field name="plates" string="Placas: "/>
                     <field name="unity" string="Unidad: "/>
+                    <field name="box_quantity" string="Cantidad Cajas"/>
                 </group>
             </xpath>
         </field>

@@ -1,6 +1,6 @@
 {
     'name': 'Custom Stock Move',
-    'version': '17.0.0.0.0',
+    'version': '17.0.0.1.0',
     'author': ['Baruc Alvarez'],
     'category': 'Inventory',
     'summary': 'Campos traslados para Mooch',
