@@ -5,9 +5,9 @@ class BarcodeParameter(models.Model):
     _name = 'barcode.parameter'
     _description = 'Parámetro de Nomenclatura de Código de Barras'
 
-    name = fields.Char(string="Parámetro", required=True)
-    digits = fields.Integer(string="Longitud Máxima", required=True, default=2)
-    line_ids = fields.One2many('barcode.parameter.line', 'parameter_id', string="Líneas de Configuración")
+    name = fields.Char(string="Parámetro", required=True, store=True)
+    digits = fields.Integer(string="Longitud Máxima", required=True, default=2, store=True)
+    line_ids = fields.One2many('barcode.parameter.line', 'parameter_id', string="Líneas de Configuración",store=True)
 
     @api.model
     def create(self, vals):
