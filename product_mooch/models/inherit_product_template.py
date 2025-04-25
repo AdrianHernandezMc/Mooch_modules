@@ -1,5 +1,7 @@
 from odoo import fields, models, api, _
 from odoo.exceptions import ValidationError
+import logging
+_logger = logging.getLogger(__name__)
 
 class ProductMooch(models.Model):
     _inherit = 'product.template'
@@ -24,7 +26,12 @@ class ProductMooch(models.Model):
     partner_reference = fields.Char(string='Referencia Proveedor',
                                     help='Código del producto del proveedor')
 
-    department_id = fields.Many2one('barcode.parameter.line', string="Departamento", domain="[('parameter_id.name', '=', 'Departamento')]")
+    department_id = fields.Many2one(
+        'barcode.parameter.line',
+        string="Departamento",
+        domain="[('parameter_id.name', '=', 'Departamento')]",
+        default=lambda self: self._get_default_department(),
+    )
     color_id = fields.Many2one('barcode.parameter.line', string="Color", domain="[('parameter_id.name', '=', 'Color')]")
     type_id = fields.Many2one('barcode.parameter.line', string="Tipo de Producto", domain="[('parameter_id.name', '=', 'Tipo de Producto'), ('department_line_ids', 'in', [department_id])]")
     size_id = fields.Many2one('barcode.parameter.line', string="Talla", domain="[('parameter_id.name', '=', 'Talla'), ('department_line_ids', 'in', [department_id])]")
@@ -64,6 +71,10 @@ class ProductMooch(models.Model):
     @api.model
     def create(self, vals):
         """ Genera el código automáticamente solo si todos los campos están completos """
+        if not vals.get('department_id'):
+            default_dep = self._get_default_department()
+            if default_dep:
+                vals['department_id'] = default_dep
         vals['available_in_pos'] = True
         vals['detailed_type'] = 'product'
         if self._is_classification_complete(vals):
@@ -163,6 +174,7 @@ class ProductMooch(models.Model):
     def _compute_prices_list(self):
         param_obj = self.env['ir.config_parameter'].sudo()
         for product in self:
+            
             # Obtener el porcentaje configurado según el tipo de venta
             if product.sale_type == 'sale_type_basic':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_basic', default=0.0))
@@ -245,3 +257,46 @@ class ProductMooch(models.Model):
                 product.unspsc_code_id = product.type_id.unspsc_code_id
             else:
                 product.unspsc_code_id = False
+
+    @api.model
+    def _get_default_department(self):
+        # 1) Trae al empleado y su departamento
+        employee = self.env['hr.employee'].search(
+            [('user_id', '=', self.env.uid)],
+            limit=1
+        )
+        if not employee or not employee.department_id:
+            #_logger.warning("🔴 Sin empleado o sin depto para user %s", self.env.uid)
+            return False
+
+        dept_name = (employee.department_id.name or '').strip()
+        #_logger.info("🟢 Dept HR detectado: '%s'", dept_name)
+
+        # 2) Busca el parámetro “Departamento”
+        param_lines = self.env['barcode.parameter.line'].search([
+            ('parameter_id.name', '=', 'Departamento'),
+        ]),
+        _logger.info("🟢 Param-lines disponibles (campo nombre): %s",
+                     param_lines.mapped('nombre'))
+
+        # 3) Match exacto sobre 'nombre' (case-insensitive)
+        for line in param_lines:
+            if line.nombre and line.nombre.strip().lower() == dept_name.lower():
+               #_logger.info("🟢 Match exacto: '%s' → '%s'", dept_name, line.nombre)
+                return line.id
+
+        # 4) Match parcial (substring) sobre 'nombre'
+        for line in param_lines:
+            if line.nombre and dept_name.lower() in line.nombre.strip().lower():
+                #_logger.info("🟢 Match parcial: '%s' in '%s'", dept_name, line.nombre)
+                return line.id
+
+        #_logger.warning("🔴 No encontré param-line para '%s'", dept_name)
+        return False
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        if 'department_id' in fields_list and not res.get('department_id'):
+            res['department_id'] = self._get_default_department() or False
+        return res
