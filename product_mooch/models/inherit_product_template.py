@@ -297,3 +297,16 @@ class ProductMooch(models.Model):
         if 'department_id' in fields_list and not res.get('department_id'):
             res['department_id'] = self._get_default_department() or False
         return res
+
+    @api.onchange('department_id')
+    def _clear_fields_on_change_department(self):
+        self.type_id = False
+        self.color_id = False
+        self.size_id = False
+        return {
+            'domain': {
+                'type_id': [],
+                'color_id': [],
+                'size_id': [],
+            }
+        }
