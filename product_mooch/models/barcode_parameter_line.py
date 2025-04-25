@@ -7,7 +7,7 @@ class BarcodeParameterLine(models.Model):
     _rec_name = 'nombre'
     _order = 'orden_departamento_id, codigo'
 
-    name = fields.Char(string='Nombre', required=True)
+    name = fields.Char(string='Nombre')
     parameter_id = fields.Many2one('barcode.parameter', string="Parámetro", required=True, ondelete="cascade")
     nombre = fields.Char(string="Nombre", required=True, store=True)
     codigo = fields.Char(string="Código", readonly=True, store=True)
