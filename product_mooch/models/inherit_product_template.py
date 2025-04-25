@@ -143,7 +143,6 @@ class ProductMooch(models.Model):
             'default_code': False,
             'barcode': False,
             'consecutive': False,
-            'department_id': False,
             'color_id': False,
             'type_id': False,
             'size_id': False
