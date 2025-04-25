@@ -47,6 +47,8 @@ class BarcodeParameterLine(models.Model):
         for rec in self:
             if rec.parameter_id.name in ['Talla'] and not rec.department_line_ids:
                 raise UserError("El departamento debe de estar Relacionado y es obligatorio para el parámetro 'Talla'.")
+            if rec.parameter_id.name in ['Tipo de Producto'] and not rec.department_line_ids:
+                raise UserError("El departamento debe de estar Relacionado y es obligatorio para el parámetro 'Tipo de Producto'.")
 
     @api.model
     def create(self, vals):

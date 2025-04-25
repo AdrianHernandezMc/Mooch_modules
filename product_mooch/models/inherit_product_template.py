@@ -276,8 +276,6 @@ class ProductMooch(models.Model):
         param_lines = self.env['barcode.parameter.line'].search([
             ('parameter_id.name', '=', 'Departamento'),
         ]),
-        _logger.info("🟢 Param-lines disponibles (campo nombre): %s",
-                     param_lines.mapped('nombre'))
 
         # 3) Match exacto sobre 'nombre' (case-insensitive)
         for line in param_lines:

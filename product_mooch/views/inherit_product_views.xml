@@ -73,12 +73,12 @@
                     </p>
                     <group>
                         <group>
-                            <field name="department_id" placeholder="Seleccione un Departamento"/>
-                            <field name="color_id" placeholder="Seleccione un Color"/>
+                            <field name="department_id" placeholder="Seleccione un Departamento" options="{'no_open': True}"/>
+                            <field name="color_id" placeholder="Seleccione un Color" options="{'no_open': True}"/>
                         </group>
                         <group>
-                            <field name="type_id" placeholder="Seleccione un Tipo de Producto"/>
-                            <field name="size_id" placeholder="Seleccione una Talla"/>
+                            <field name="type_id" placeholder="Seleccione un Tipo de Producto" options="{'no_open': True}"/>
+                            <field name="size_id" placeholder="Seleccione una Talla" options="{'no_open': True}"/>
                         </group>
                         <group>
                             <field name="consecutive" readonly="1"/>
