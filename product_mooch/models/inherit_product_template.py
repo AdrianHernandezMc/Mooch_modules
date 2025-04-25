@@ -275,7 +275,7 @@ class ProductMooch(models.Model):
         # 2) Busca el parámetro “Departamento”
         param_lines = self.env['barcode.parameter.line'].search([
             ('parameter_id.name', '=', 'Departamento'),
-        ]),
+        ],limit=1),
 
         # 3) Match exacto sobre 'nombre' (case-insensitive)
         for line in param_lines:
