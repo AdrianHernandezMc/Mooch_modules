@@ -19,7 +19,7 @@
 
     <!-- Submenú para gestionar la nomenclatura de códigos de barras -->
     <menuitem id="menu_inventory_product_config"
-              name="Generar Código de Barras"
+              name="Configuración del Código de Barras"
               parent="menu_product_code_config"
               action="action_generate_barcode"
               sequence="5"
