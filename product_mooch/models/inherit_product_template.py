@@ -6,6 +6,12 @@ _logger = logging.getLogger(__name__)
 class ProductMooch(models.Model):
     _inherit = 'product.template'
 
+    name = fields.Char(
+        string="Nombre del Producto",
+        compute="_compute_product_name",
+        store=True,
+        readonly=False
+    )
     profit_margin_list = fields.Float(
         string='Porcentaje de Utilidad Precio Lista',
         compute='_compute_profit_margins',
@@ -23,8 +29,8 @@ class ProductMooch(models.Model):
                                 help='Precio de venta a crédito de Mooch',
                                 compute='_compute_prices_cred',
                                 default=1)
-    partner_name = fields.Char(string='Nombre Proveedor',
-                                    help='Nombre del producto del proveedor')
+    partner_name = fields.Many2one('barcode.parameter.line', string='Nombre Proveedor',
+                                    help='Nombre del producto del proveedor', domain="[('parameter_id.name', '=', 'Proveedor')]")
     partner_code = fields.Char(string='Codigo Proveedor',
                                     help='Código del producto del proveedor')
 
@@ -72,7 +78,8 @@ class ProductMooch(models.Model):
 
     @api.model
     def create(self, vals):
-        """ Genera el código automáticamente solo si todos los campos están completos """
+        """ Genera el nombre del producto automáticamente al crear """
+        # Verificar si el departamento está en los valores
         if not vals.get('department_id'):
             default_dep = self._get_default_department()
             if default_dep:
@@ -105,9 +112,17 @@ class ProductMooch(models.Model):
         return super(ProductMooch, self).create(vals)
 
     def write(self, vals):
-        """ Al actualizar un producto existente, genera código si todos los campos están completos """
+        """ Al actualizar un producto existente, genera el nombre y el código si es necesario """
         # Obtener el departamento desde los valores o desde el registro actual
         department_id = vals.get('department_id', self.department_id.id)
+
+        # Verificar si alguno de los campos relevantes ha cambiado para actualizar el nombre
+        fields_to_check = ['type_id', 'color_id', 'size_id', 'partner_name', 'partner_code']
+        if any(field in vals for field in fields_to_check):
+            # Combinar los valores actuales con los nuevos
+            new_vals = self._merge_existing_values(vals)
+            # Generar el nuevo nombre del producto
+            vals['name'] = self._generate_product_name(new_vals)
 
         # Verificar si el campo department_id está en los valores actualizados
         if any(field in vals for field in ['department_id']):
@@ -379,3 +394,30 @@ class ProductMooch(models.Model):
                 'size_id': [],
             }
         }
+
+    @api.depends('type_id', 'color_id', 'size_id', 'partner_name', 'partner_code')
+    def _compute_product_name(self):
+        """
+        Genera el nombre del producto dinámicamente en función de los campos seleccionados.
+        """
+        for product in self:
+            parts = []
+
+            # Obtener los valores de los campos y añadirlos a la lista solo si existen
+            if product.type_id:
+                parts.append(product.type_id.nombre)
+
+            if product.color_id:
+                parts.append(product.color_id.nombre)
+
+            if product.size_id:
+                parts.append(product.size_id.nombre)
+
+            if product.partner_name:
+                parts.append(product.partner_name.nombre)
+
+            if product.partner_code:
+                parts.append(product.partner_code)
+
+            # Generar el nombre concatenando los valores con espacios
+            product.name = " ".join(filter(None, parts))
