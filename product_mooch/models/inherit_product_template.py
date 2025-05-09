@@ -75,46 +75,103 @@ class ProductMooch(models.Model):
             default_dep = self._get_default_department()
             if default_dep:
                 vals['department_id'] = default_dep
+
+        # Obtener el ID del departamento desde los valores
+        department_id = vals.get('department_id')
+
+        # Verificar si el departamento está presente después de los valores predeterminados
+        if not department_id:
+            raise ValidationError("El departamento no está definido para este producto.")
+
+        # Asegurar otros valores predeterminados
         vals['available_in_pos'] = True
         vals['detailed_type'] = 'product'
+
+        # Verificar si la clasificación está completa para generar el código
         if self._is_classification_complete(vals):
-            vals['consecutive'] = self._generate_consecutive()
+            # Generar el consecutivo puro (solo número) por departamento
+            consecutive = self._generate_consecutive(department_id)
+
+            # Guardar el consecutivo limpio en los valores
+            vals['consecutive'] = consecutive
+
+            # Generar el código de producto concatenando el prefijo y el consecutivo puro
             vals['default_code'] = self._generate_product_code(vals)
+            # Asignar el código de barras igual al código interno
             vals['barcode'] = vals['default_code']
+
         return super(ProductMooch, self).create(vals)
 
     def write(self, vals):
         """ Al actualizar un producto existente, genera código si todos los campos están completos """
-        if any(field in vals for field in ['department_id', 'color_id', 'type_id', 'size_id']):
+        # Obtener el departamento desde los valores o desde el registro actual
+        department_id = vals.get('department_id', self.department_id.id)
+
+        # Verificar si el campo department_id está en los valores actualizados
+        if any(field in vals for field in ['department_id']):
+            # Combinar los valores existentes con los nuevos
             new_vals = self._merge_existing_values(vals)
+
+            # Verificar si la clasificación está completa y no tiene código aún
             if self._is_classification_complete(new_vals) and not self.default_code:
-                vals['consecutive'] = self._generate_consecutive()
+                # Generar el consecutivo por departamento
+                vals['consecutive'] = self._generate_consecutive(department_id)
+                # Generar el código de producto
                 vals['default_code'] = self._generate_product_code(vals)
+                # Asignar el código de barras igual al código interno
                 vals['barcode'] = vals['default_code']
+
         return super(ProductMooch, self).write(vals)
+
 
     def _is_classification_complete(self, vals):
         """ Verifica si todos los campos de clasificación están llenos """
-        return all(vals.get(field) for field in ['department_id', 'color_id', 'type_id', 'size_id'])
+        return all(vals.get(field) for field in ['department_id'])
 
     def _merge_existing_values(self, vals):
         """ Completa los valores faltantes con los datos actuales del producto """
         merged_vals = vals.copy()
-        for field in ['department_id', 'color_id', 'type_id', 'size_id']:
+        for field in ['department_id']:
             if not merged_vals.get(field):
                 merged_vals[field] = getattr(self, field).id
         return merged_vals
 
-    def _generate_consecutive(self):
-        """ Genera un consecutivo incremental global sin importar el departamento """
-        last_product = self.search([('consecutive', '!=', False)], order="consecutive desc", limit=1)
+    def _generate_consecutive(self, department_id):
+        """
+        Genera un consecutivo incremental por departamento usando ir.sequence.
+        """
+        if not department_id:
+            raise ValidationError("El departamento no está definido para este producto.")
 
-        if last_product and last_product.consecutive.isdigit():
-            last_code = int(last_product.consecutive)
-        else:
-            last_code = 0  # Si no hay productos, inicia en 1
+        # Definir un código de secuencia único para cada departamento
+        sequence_code = f'product_mooch.department_{department_id}_sequence'
 
-        new_code = str(last_code + 1).zfill(6)  # Se llena con ceros hasta 6 dígitos
+        # Buscar si ya existe una secuencia para el departamento
+        sequence = self.env['ir.sequence'].sudo().search([('code', '=', sequence_code)], limit=1)
+
+        # Crear la secuencia si no existe
+        if not sequence:
+            sequence = self.env['ir.sequence'].sudo().create({
+                'name': f'Secuencia Departamento {department_id}',
+                'code': sequence_code,
+                'padding': 10,  # Generar solo el número puro de 10 dígitos
+                'implementation': 'no_gap',
+                'prefix': '',   # Garantizar que no tenga prefijo
+                'suffix': '',   # Sin sufijo
+                'number_next': 1,
+                'number_increment': 1,
+            })
+
+        # Obtener el siguiente número puro (sin prefijo)
+        new_code = str(sequence.number_next_actual).zfill(10)
+
+        # Incrementar manualmente el número en la secuencia para evitar prefijos
+        sequence.sudo().write({'number_next': sequence.number_next_actual + 1})
+
+        # Verificación adicional para asegurar que el código sea solo numérico y de 10 dígitos
+        if not new_code.isdigit() or len(new_code) != 10:
+            raise ValidationError(f"Consecutivo inválido: {new_code}")
+
         return new_code
 
     def _generate_product_code(self, vals):
@@ -124,13 +181,19 @@ class ProductMooch(models.Model):
             """ Obtiene el código asignado a cada categoría """
             return self.env['barcode.parameter.line'].browse(vals.get(field_name)).codigo if vals.get(field_name) else default
 
+        # Obtener el código del departamento como prefijo de 2 dígitos
         department_code = get_code('department_id', '00')
-        color_code = get_code('color_id', '000')
-        type_code = get_code('type_id', '000')
-        size_code = get_code('size_id', '000')
-        consecutive_code = vals.get('consecutive', '000000')
+        consecutive_code = vals.get('consecutive', '0000000000')
 
-        return f"{department_code}{type_code}{color_code}{size_code}{consecutive_code}"
+        # Verificar si el consecutivo ya contiene el prefijo y corregirlo
+        if consecutive_code.startswith(department_code):
+            # Eliminar el prefijo redundante para evitar duplicación
+            consecutive_code = consecutive_code[len(department_code):]
+
+        # Concatenar el prefijo y el número puro
+        return f"{department_code}{consecutive_code}"
+
+
 
     def copy(self, default=None):
         """ Al duplicar un producto, se eliminan los valores que generan el código """
@@ -259,36 +322,40 @@ class ProductMooch(models.Model):
 
     @api.model
     def _get_default_department(self):
-        # 1) Trae al empleado y su departamento
+        """
+        Obtiene el departamento predeterminado del empleado conectado.
+        """
+        # 1) Obtener el empleado actual
         employee = self.env['hr.employee'].search(
             [('user_id', '=', self.env.uid)],
             limit=1
         )
         if not employee or not employee.department_id:
-            #_logger.warning("🔴 Sin empleado o sin depto para user %s", self.env.uid)
+            _logger.warning("🔴 No se encontró el empleado o el departamento para el usuario %s", self.env.uid)
             return False
 
+        # Obtener el nombre del departamento del empleado actual
         dept_name = (employee.department_id.name or '').strip()
-        #_logger.info("🟢 Dept HR detectado: '%s'", dept_name)
+        _logger.info("🟢 Departamento detectado del empleado: '%s'", dept_name)
 
-        # 2) Busca el parámetro “Departamento”
+        # 2) Buscar todas las líneas de parámetros relacionadas con "Departamento"
         param_lines = self.env['barcode.parameter.line'].search([
-            ('parameter_id.name', '=', 'Departamento'),
-        ],limit=1),
+            ('parameter_id.name', '=', 'Departamento')
+        ])
 
-        # 3) Match exacto sobre 'nombre' (case-insensitive)
+        # 3) Búsqueda exacta (case-insensitive) del nombre del departamento
         for line in param_lines:
             if line.nombre and line.nombre.strip().lower() == dept_name.lower():
-               #_logger.info("🟢 Match exacto: '%s' → '%s'", dept_name, line.nombre)
+                _logger.info("🟢 Match exacto: '%s' → '%s'", dept_name, line.nombre)
                 return line.id
 
-        # 4) Match parcial (substring) sobre 'nombre'
+        # 4) Búsqueda parcial (si el nombre está contenido en el valor)
         for line in param_lines:
             if line.nombre and dept_name.lower() in line.nombre.strip().lower():
-                #_logger.info("🟢 Match parcial: '%s' in '%s'", dept_name, line.nombre)
+                _logger.info("🟢 Match parcial: '%s' in '%s'", dept_name, line.nombre)
                 return line.id
 
-        #_logger.warning("🔴 No encontré param-line para '%s'", dept_name)
+        _logger.warning("🔴 No se encontró una línea de parámetro para el departamento '%s'", dept_name)
         return False
 
     @api.model
