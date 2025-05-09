@@ -23,7 +23,9 @@ class ProductMooch(models.Model):
                                 help='Precio de venta a crédito de Mooch',
                                 compute='_compute_prices_cred',
                                 default=1)
-    partner_reference = fields.Char(string='Referencia Proveedor',
+    partner_name = fields.Char(string='Nombre Proveedor',
+                                    help='Nombre del producto del proveedor')
+    partner_code = fields.Char(string='Codigo Proveedor',
                                     help='Código del producto del proveedor')
 
     department_id = fields.Many2one(

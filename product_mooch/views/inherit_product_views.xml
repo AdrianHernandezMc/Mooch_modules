@@ -60,9 +60,6 @@
                 </div>
                 <field name="sale_type"/>
             </xpath>
-            <xpath expr="//group[@name='group_standard_price']//field[@name='default_code']" position="before">
-                <field name="partner_reference" string="Referencia Proveedor"/>
-            </xpath>
             <xpath expr="//page[@name='general_information']" position="after">
                 <page name="product_codes"
                       string="Clasificación del Producto"
@@ -75,13 +72,18 @@
                         <group>
                             <field name="department_id" placeholder="Seleccione un Departamento" options="{'no_open': True, 'no_create': True}"/>
                             <field name="color_id" placeholder="Seleccione un Color" options="{'no_open': True, 'no_create': True}"/>
+                            <field name="partner_name" string="Nombre Proveedor" placeholder="Ingresar Nombre proveedor" />
                         </group>
                         <group>
                             <field name="type_id" placeholder="Seleccione un Tipo de Producto" options="{'no_open': True, 'no_create': True}"/>
                             <field name="size_id" placeholder="Seleccione una Talla" options="{'no_open': True, 'no_create': True}"/>
+                            <field name="partner_code" string="Codigo Proveedor" placeholder="Ingresar codigo proveedor" />
                         </group>
                         <group>
                             <field name="consecutive" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="unspsc_code_id" placeholder="Seleccione una Categoria SAT" options="{'no_open': True, 'no_create': True}" required="1"/>
                         </group>
                     </group>
                 </page>
