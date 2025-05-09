@@ -116,16 +116,15 @@ class ProductMooch(models.Model):
         # Obtener el departamento desde los valores o desde el registro actual
         department_id = vals.get('department_id', self.department_id.id)
 
-        # Verificar si alguno de los campos relevantes ha cambiado para actualizar el nombre
+        # Verificar si alguno de los campos relacionados con el nombre ha cambiado
         fields_to_check = ['type_id', 'color_id', 'size_id', 'partner_name', 'partner_code']
         if any(field in vals for field in fields_to_check):
             # Combinar los valores actuales con los nuevos
             new_vals = self._merge_existing_values(vals)
-            # Generar el nuevo nombre del producto
-            vals['name'] = self._generate_product_name(new_vals)
+            # No se genera el nombre manualmente, se deja al método computado
 
         # Verificar si el campo department_id está en los valores actualizados
-        if any(field in vals for field in ['department_id']):
+        if 'department_id' in vals:
             # Combinar los valores existentes con los nuevos
             new_vals = self._merge_existing_values(vals)
 
