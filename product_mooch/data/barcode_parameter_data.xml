@@ -4,6 +4,10 @@
         <field name="name">Departamento</field>
         <field name="digits">2</field>
     </record>
+        <record id="barcode_parameter_sub_department" model="barcode.parameter">
+        <field name="name">Sub Departamento</field>
+        <field name="digits">2</field>
+    </record>
     <record id="barcode_parameter_color" model="barcode.parameter">
         <field name="name">Color</field>
         <field name="digits">3</field>

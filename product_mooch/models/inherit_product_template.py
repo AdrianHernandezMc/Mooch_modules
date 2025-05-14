@@ -40,6 +40,11 @@ class ProductMooch(models.Model):
         domain="[('parameter_id.name', '=', 'Departamento')]",
         default=lambda self: self._get_default_department(),
     )
+    sub_department_id = fields.Many2one(
+        'barcode.parameter.line',
+        string="Sub Departamento",
+        domain="[('parameter_id.name', '=', 'Sub Departamento'),('department_line_ids', 'in', [department_id])] ",
+    )
     color_id = fields.Many2one('barcode.parameter.line', string="Color", domain="[('parameter_id.name', '=', 'Color')]")
     type_id = fields.Many2one('barcode.parameter.line', string="Tipo de Producto", domain="[('parameter_id.name', '=', 'Tipo de Producto'), ('department_line_ids', 'in', [department_id])]")
     size_id = fields.Many2one('barcode.parameter.line', string="Talla", domain="[('parameter_id.name', '=', 'Talla'), ('department_line_ids', 'in', [department_id])]")
@@ -78,36 +83,32 @@ class ProductMooch(models.Model):
 
     @api.model
     def create(self, vals):
-        """ Genera el nombre del producto automáticamente al crear """
-        # Verificar si el departamento está en los valores
+        """ Genera el nombre del producto automáticamente al crear y asegura coherencia de tipos """
+        # Establecer departamento predeterminado si no está presente
         if not vals.get('department_id'):
             default_dep = self._get_default_department()
             if default_dep:
                 vals['department_id'] = default_dep
 
-        # Obtener el ID del departamento desde los valores
+        # Verificar que el departamento esté presente
         department_id = vals.get('department_id')
-
-        # Verificar si el departamento está presente después de los valores predeterminados
         if not department_id:
             raise ValidationError("El departamento no está definido para este producto.")
 
-        # Asegurar otros valores predeterminados
+        # Establecer valores por defecto obligatorios de Odoo
         vals['available_in_pos'] = True
-        vals['detailed_type'] = 'product'
+        vals['detailed_type'] = 'product'  # necesario para que Odoo no falle en validaciones internas
+        vals['type'] = 'product'           # asegúrate de que coincida con detailed_type
 
-        # Verificar si la clasificación está completa para generar el código
+        # Verificar si se tiene lo necesario para generar código
         if self._is_classification_complete(vals):
-            # Generar el consecutivo puro (solo número) por departamento
+            # Generar consecutivo puro por departamento
             consecutive = self._generate_consecutive(department_id)
-
-            # Guardar el consecutivo limpio en los valores
             vals['consecutive'] = consecutive
 
-            # Generar el código de producto concatenando el prefijo y el consecutivo puro
+            # Generar código interno basado en prefijo + consecutivo
             vals['default_code'] = self._generate_product_code(vals)
-            # Asignar el código de barras igual al código interno
-            vals['barcode'] = vals['default_code']
+            vals['barcode'] = vals['default_code']  # copiar código interno como código de barras
 
         return super(ProductMooch, self).create(vals)
 
@@ -117,7 +118,7 @@ class ProductMooch(models.Model):
         department_id = vals.get('department_id', self.department_id.id)
 
         # Verificar si alguno de los campos relacionados con el nombre ha cambiado
-        fields_to_check = ['type_id', 'color_id', 'size_id', 'partner_name', 'partner_code']
+        fields_to_check = ['type_id', 'color_id', 'size_id','sub_department_id', 'partner_name', 'partner_code']
         if any(field in vals for field in fields_to_check):
             # Combinar los valores actuales con los nuevos
             new_vals = self._merge_existing_values(vals)
@@ -394,7 +395,7 @@ class ProductMooch(models.Model):
             }
         }
 
-    @api.depends('type_id', 'color_id', 'size_id', 'partner_name', 'partner_code')
+    @api.depends('type_id', 'color_id', 'size_id','sub_department_id' ,'partner_name', 'partner_code')
     def _compute_product_name(self):
         """
         Genera el nombre del producto dinámicamente en función de los campos seleccionados.
@@ -411,6 +412,9 @@ class ProductMooch(models.Model):
 
             if product.size_id:
                 parts.append(product.size_id.nombre)
+
+            if product.sub_department_id:
+                parts.append(product.sub_department_id.nombre)
 
             if product.partner_name:
                 parts.append(product.partner_name.nombre)
