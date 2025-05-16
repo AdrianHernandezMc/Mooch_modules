@@ -92,7 +92,7 @@ class ProductMooch(models.Model):
 
         # Verificar que el departamento esté presente
         department_id = vals.get('department_id')
-        if not department_id:
+        if not self.env.context.get('install_mode') and not department_id:
             raise ValidationError("El departamento no está definido para este producto.")
 
         # Establecer valores por defecto obligatorios de Odoo
