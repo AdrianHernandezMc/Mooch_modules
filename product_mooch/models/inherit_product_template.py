@@ -424,3 +424,6 @@ class ProductMooch(models.Model):
 
             # Generar el nombre concatenando los valores con espacios
             product.name = " ".join(filter(None, parts))
+
+    def action_print_labels(self):
+        return self.env.ref('product_mooch.action_report_product_labels').report_action(self)

@@ -9,6 +9,7 @@
     'data': [
         'security/product_mooch_security.xml',
         'security/ir.model.access.csv',
+        "reports/product_label_qweb.xml",
         'views/inherit_product_views.xml',
         'views/product_barcode_views.xml',
         'views/product_mooch_menu_views.xml',

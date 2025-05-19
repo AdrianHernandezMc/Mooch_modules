@@ -4,3 +4,4 @@ access_barcode_parameter_edit,barcode.parameter.edit,product_mooch.model_barcode
 
 access_barcode_parameter_line,barcode.parameter.line.access,product_mooch.model_barcode_parameter_line,product_mooch.group_inventory_product_view,1,0,0,0
 access_barcode_parameter_line_edit,barcode.parameter.line.edit,product_mooch.model_barcode_parameter_line,product_mooch.group_inventory_product_edit,1,1,1,0
+access_product_template_edit,product.template.edit,model_product_template,product_mooch.group_inventory_product_edit,1,1,1,0
