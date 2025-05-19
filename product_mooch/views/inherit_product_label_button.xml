@@ -1,0 +1,20 @@
+<!-- product_mooch/views/inherit_product_views.xml -->
+<odoo>
+  <record id="inherit_product_views_form" model="ir.ui.view">
+    <field name="name">product.template.form.inherit.print.labels</field>
+    <field name="model">product.template</field>
+    <field name="inherit_id" ref="product.product_template_only_form_view"/>
+    <field name="arch" type="xml">
+      <xpath expr="//header" position="inside">
+        <!--
+          type="object" invoca al método Python action_print_labels
+        -->
+        <button name="action_print_labels"
+                string="Imprimir etiquetas"
+                type="object"
+                class="btn-primary o_form_button"
+                groups="base.group_user"/>
+      </xpath>
+    </field>
+  </record>
+</odoo>
