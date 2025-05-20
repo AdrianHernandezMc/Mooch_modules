@@ -25,6 +25,9 @@
                 <setting id="sale_type_home_setting" string="Porcentaje de venta de productos temporada">
                     <field name="sale_type_season" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
+                <setting id="sale_type_home_setting" string="Porcentaje de venta de productos de calzado">
+                    <field name="sale_type_shoe" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
             </xpath>
         </field>
     </record>
