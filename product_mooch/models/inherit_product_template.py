@@ -63,6 +63,7 @@ class ProductMooch(models.Model):
             ('sale_type_basic', _('Tipo de Compra Básico')),
             ('sale_type_trend', _('Tipo de Compra Moda')),
             ('sale_type_home', _('Tipo de Compra Hogar')),
+            ('sale_type_shoe', _('Tipo de Compra Calzado')),
             ('sale_type_season', _('Tipo de Compra Temporada'))
         ],
         string='Tipo de Compra',
@@ -263,6 +264,8 @@ class ProductMooch(models.Model):
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
             elif product.sale_type == 'sale_type_season':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
+            elif product.sale_type == 'sale_type_shoe':
+                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_shoe', default=0.0))
             else:
                 sale_type_value = 0.0
 
@@ -294,6 +297,8 @@ class ProductMooch(models.Model):
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
             elif product.sale_type == 'sale_type_season':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
+            elif product.sale_type == 'sale_type_shoe':
+                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_shoe', default=0.0))
             else:
                 sale_type_value = 0.0
 
@@ -319,6 +324,8 @@ class ProductMooch(models.Model):
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
             elif product.sale_type == 'sale_type_season':
                 sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
+            elif product.sale_type == 'sale_type_shoe':
+                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_shoe', default=0.0))
             else:
                 sale_type_value = 0.0
 
