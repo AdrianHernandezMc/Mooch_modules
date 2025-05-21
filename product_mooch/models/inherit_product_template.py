@@ -24,11 +24,11 @@ class ProductMooch(models.Model):
         store=False,
         help="Porcentaje de ganancia sobre el costo"
     )
-    list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',store=True)
+    list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',default=1)
     credit_price = fields.Float(string='Precio Crédito',
                                 help='Precio de venta a crédito de Mooch',
                                 compute='_compute_prices_cred',
-                                store=True)
+                                default=1)
     partner_name = fields.Many2one('barcode.parameter.line', string='Nombre Proveedor',
                                     help='Nombre del producto del proveedor', domain="[('parameter_id.name', '=', 'Proveedor')]")
     partner_code = fields.Char(string='Codigo Proveedor',
