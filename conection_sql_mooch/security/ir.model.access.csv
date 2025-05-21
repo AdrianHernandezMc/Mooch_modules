@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sql_server_importer_user,access.sql.server.importer.user,model_sql_server_importer,base.group_user,1,1,1,1
+access_sql_exporter_user,access.sql.exporter.user,model_sql_exporter,base.group_user,1,1,1,1

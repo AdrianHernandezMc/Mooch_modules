@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="view_sql_server_importer_form" model="ir.ui.view">
+        <field name="name">sql.server.importer.form</field>
+        <field name="model">sql.server.importer</field>
+        <field name="arch" type="xml">
+            <form string="SQL Server Importer" create="False" edit="False">
+                <sheet>
+                    <p>
+                        Botón para importar los registros de ERP Mooch, en caso de que ya existan estos
+                        valores solo se actualizarán las líneas de credito de las cuentas de los clientes
+                        <br/>
+                        Para visualizar los clientes, hay que dirigirse a la pestaña de clientes -> Clientes Mooch
+                    </p>
+                    <group>
+                        <button name="importar_datos_clientes"
+                                string="MOOCH"
+                                type="object"
+                                class="btn-primary"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sql_server_importer" model="ir.actions.act_window">
+        <field name="name">Importar SQL Server</field>
+        <field name="res_model">sql.server.importer</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem id="menu_sql_server_root" parent="base.menu_custom" name="Sync Mooch Clients" sequence="120"/>
+    <menuitem id="menu_sql_server_importer" name="Importar Clientes y Créditos" parent="menu_sql_server_root" action="action_sql_server_importer" sequence="121"/>
+</odoo>

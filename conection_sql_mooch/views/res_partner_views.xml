@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <record id="mooch_account_res_partner_inherit" model="ir.ui.view">
+            <field name="name">mooch.account.res.partner.inherit</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='ref']" position="after">
+                    <field name="cuenta_cliente_mooch"/>
+                    <field name="cuenta_adicional_mooch"/>
+                    <field name="nombre_mooch"/>
+                    <field name="paterno_mooch"/>
+                    <field name="materno_mooch"/>
+                    <field name="limcred_mooch"/>
+                    <field name="saldo_disponible_mooch"/>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
