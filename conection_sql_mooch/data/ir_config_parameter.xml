@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="param_sqlserver_server" model="ir.config_parameter">
+            <field name="key">sqlserver.server</field>
+            <field name="value">192.168.3.2\SQLSERVERTLAJO</field>
+        </record>
+        <record id="param_sqlserver_database" model="ir.config_parameter">
+            <field name="key">sqlserver.database</field>
+            <field name="value">dbCreditoTerra</field>
+        </record>
+        <record id="param_sqlserver_username" model="ir.config_parameter">
+            <field name="key">sqlserver.username</field>
+            <field name="value">aplicaciones</field>
+        </record>
+        <record id="param_sqlserver_password" model="ir.config_parameter">
+            <field name="key">sqlserver.password</field>
+            <field name="value">mooch98_33</field>
+        </record>
+    </data>
+</odoo>

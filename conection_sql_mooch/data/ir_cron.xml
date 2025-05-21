@@ -1,0 +1,13 @@
+<odoo>
+    <record id="ir_cron_update_mooch_conection" model="ir.cron">
+        <field name="name">Actualizar Clientes Mooch</field>
+        <field name="model_id" ref="model_sql_server_importer"/>
+        <field name="state">code</field>
+        <field name="code">model.importar_datos_clientes()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
