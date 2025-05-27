@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
   <data>
-    <record id="view_purchase_order_form_inherit_invoice_id" model="ir.ui.view">
-      <field name="name">purchase.order.form.inherit.invoice.id</field>
+    <record id="view_purchase_order_form_inherit_invoice_tags" model="ir.ui.view">
+      <field name="name">purchase.order.form.inherit.invoice.tags</field>
       <field name="model">purchase.order</field>
       <field name="inherit_id" ref="purchase.purchase_order_form"/>
       <field name="arch" type="xml">
         <xpath expr="//field[@name='partner_ref']" position="after">
-          <field name="invoice_id" string="Número de factura proveedor"/>
+          <field name="invoice_tag_ids"
+                 widget="many2many_tags"
+                 options="{'no_create': False}"
+                 placeholder="Añadir número de factura…"/>
         </xpath>
       </field>
     </record>

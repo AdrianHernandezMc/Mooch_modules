@@ -4,8 +4,11 @@ from odoo.exceptions import UserError
 class purchase_order (models.Model):
   _inherit = 'purchase.order'
 
-  invoice_id =fields.Char(String="Numero de factura proveedor",
-                          help="Ingresar numero de fectura de porveedor",
-                          store=True,
-                          tracking=True,
-                          )
+  invoice_tag_ids = fields.Many2many(
+      'purchase.invoice.tag',
+      'purchase_order_invoice_tag_rel',
+      'order_id',
+      'tag_id',
+      string="Facturas Proveedor",
+      help="Añade aquí tantas referencias de factura como necesites",
+  )
