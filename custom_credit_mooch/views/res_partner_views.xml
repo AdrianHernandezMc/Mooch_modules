@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+    <record id="view_partner_credit_form" model="ir.ui.view">
+      <field name="name">res.partner.credit.form</field>
+      <field name="model">res.partner</field>
+      <field name="inherit_id" ref="base.view_partner_form"/>
+      <field name="arch" type="xml">
+        <!-- Buscamos el notebook existente y añadimos una nueva página -->
+        <xpath expr="//notebook" position="inside">
+          <page string="Crédito">
+            <group>
+              <field name="credit_limit"/>
+              <field name="credit_balance" readonly="1"/>
+              <field name="credit_available" readonly="1"/>
+            </group>
+          </page>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

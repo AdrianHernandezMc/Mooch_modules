@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+    <!-- Crédito Cliente tras el campo partner_id -->
+    <record id="view_sale_order_form_credit" model="ir.ui.view">
+      <field name="name">sale.order.credit.limit</field>
+      <field name="model">sale.order</field>
+      <field name="inherit_id" ref="sale.view_order_form"/>
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='partner_id']" position="after">
+          <group string="Crédito Cliente" colspan="2">
+            <field name="credit_limit" readonly="1" widget="monetary"/>
+            <field name="credit_available" readonly="1" widget="monetary"/>
+          </group>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

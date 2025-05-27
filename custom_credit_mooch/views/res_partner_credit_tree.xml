@@ -1,0 +1,19 @@
+<odoo>
+  <data>
+    <record id="view_partner_credit_tree" model="ir.ui.view">
+      <field name="name">res.partner.credit.tree</field>
+      <field name="model">res.partner</field>
+      <field name="arch" type="xml">
+        <tree string="Clientes con Crédito" default_order="name" create="false">
+          <field name="name"/>
+          <field name="currency_id" invisible="1"/>
+          <field name="credit_limit" widget="monetary" options="{'currency_field': 'currency_id'}" sum="Total Límite"/>
+          <field name="credit_balance" widget="monetary" options="{'currency_field': 'currency_id'}" sum="Total Saldo"/>
+          <field name="credit_available" widget="monetary" options="{'currency_field': 'currency_id'}" sum="Total Disponible"/>
+          <field name="credit_age_months" sum="Total Meses"/>
+          <field name="credit_next_due"/>
+        </tree>
+      </field>
+    </record>
+  </data>
+</odoo>

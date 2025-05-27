@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+    <!-- Menú raíz “Crédito” -->
+    <record id="menu_credit_root" model="ir.ui.menu">
+      <field name="name">Crédito</field>
+      <field name="sequence">80</field>
+      <field name="groups_id" eval="[(4, ref('custom_credit_mooch.group_credit_user'))]"/>
+    </record>
+
+    <!-- Acción: lista de Clientes (customer_rank>0) con crédito -->
+    <record id="action_credit_partners" model="ir.actions.act_window">
+      <field name="name">Clientes con Crédito</field>
+      <field name="res_model">res.partner</field>
+      <field name="view_mode">tree,form</field>
+      <!-- usamos nuestra vista tree -->
+      <field name="view_id" ref="custom_credit_mooch.view_partner_credit_tree"/>
+      <!-- dominio que filtra solo registros marcados como clientes -->
+      <field name="domain">[('customer_rank','>',0)]</field>
+      <field name="groups_id" eval="[(4, ref('custom_credit_mooch.group_credit_user'))]"/>
+    </record>
+
+    <!-- Submenú que lanza la acción anterior -->
+    <record id="menu_credit_partners" model="ir.ui.menu">
+      <field name="name">Clientes con Crédito</field>
+      <field name="parent_id" ref="menu_credit_root"/>
+      <field name="action" ref="action_credit_partners"/>
+      <field name="sequence">10</field>
+      <field name="groups_id" eval="[(4, ref('custom_credit_mooch.group_credit_user'))]"/>
+    </record>
+  </data>
+</odoo>
