@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+    <!-- Categoría de módulo para “Crédito” -->
+    <record id="module_category_credit" model="ir.module.category">
+      <field name="name">Crédito</field>
+    </record>
+
+    <!-- Grupo para usuarios que gestionan crédito -->
+    <record id="group_credit_user" model="res.groups">
+      <field name="name">Usuario Crédito</field>
+      <!-- Referencia tu nueva categoría -->
+      <field name="category_id" ref="custom_credit_mooch.module_category_credit"/>
+    </record>
+  </data>
+</odoo>

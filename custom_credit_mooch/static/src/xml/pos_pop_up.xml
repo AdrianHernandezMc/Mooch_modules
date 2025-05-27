@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_custom_button.CustomAlertPopup" owl="1">
+        <div class="popup">
+            <div class="modal-header">
+                <h2><t t-esc="props.title"/></h2>
+            </div>
+            <div class="modal-body">
+                <p><t t-esc="props.body"/></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" t-on-click="confirm">Confirmar</button>
+                <button class="btn btn-secondary" t-on-click="cancel">Cancelar</button>
+            </div>
+        </div>
+    </t>
+</templates>
