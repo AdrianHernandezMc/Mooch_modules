@@ -99,7 +99,7 @@ class ProductMooch(models.Model):
         # Establecer valores por defecto obligatorios de Odoo
         vals['available_in_pos'] = True
         vals['detailed_type'] = 'product'  # necesario para que Odoo no falle en validaciones internas
-        vals['type'] = 'product'           # asegúrate de que coincida con detailed_type
+        vals['type'] = 'product'
 
         # Verificar si se tiene lo necesario para generar código
         if self._is_classification_complete(vals):
@@ -217,7 +217,7 @@ class ProductMooch(models.Model):
         self.ensure_one()  # si sólo copias un producto a la vez
         default = dict(default or {})
 
-        # Campos que quieres limpiar:
+        # Campos que se limpian:
         default.update({
             'detailed_type': 'product',
             'available_in_pos': True,
@@ -226,7 +226,7 @@ class ProductMooch(models.Model):
             'consecutive': False,
         })
 
-        # Campos Many2one que quieres conservar:
+        # campos many2one que se quieren conservar:
         default['color_id']         = self.color_id.id          or False
         default['type_id']          = self.type_id.id           or False
         default['size_id']          = self.size_id.id           or False
