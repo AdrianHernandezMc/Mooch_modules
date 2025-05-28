@@ -214,20 +214,26 @@ class ProductMooch(models.Model):
 
 
     def copy(self, default=None):
-        """ Al duplicar un producto, se eliminan los valores que generan el código """
+        self.ensure_one()  # si sólo copias un producto a la vez
         default = dict(default or {})
 
-        # Se eliminan los valores para que el nuevo producto sea tratado como uno nuevo
+        # Campos que quieres limpiar:
         default.update({
-            'detailed_type' : 'product',
-            'available_in_pos' : True,
+            'detailed_type': 'product',
+            'available_in_pos': True,
             'default_code': False,
             'barcode': False,
             'consecutive': False,
-            'color_id': False,
-            'type_id': False,
-            'size_id': False
         })
+
+        # Campos Many2one que quieres conservar:
+        default['color_id']         = self.color_id.id          or False
+        default['type_id']          = self.type_id.id           or False
+        default['size_id']          = self.size_id.id           or False
+        default['department_id']    = self.department_id.id     or False
+        default['sub_department_id']= self.sub_department_id.id or False
+        default['partner_name']     = self.partner_name.id      or False
+        default['partner_code']     = self.partner_code         or False
 
         return super(ProductMooch, self).copy(default)
 
