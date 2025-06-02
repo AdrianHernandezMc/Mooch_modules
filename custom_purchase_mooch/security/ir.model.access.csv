@@ -3,3 +3,5 @@ access_purchase_order_user,access.purchase.order.user,purchase.model_purchase_or
 access_purchase_order_manager,access.purchase.order.manager,purchase.model_purchase_order,purchase.group_purchase_manager,1,1,1,1
 access_purchase_invoice_tag_user,access.purchase.invoice.tag.user,custom_purchase_mooch.model_purchase_invoice_tag,base.group_user,1,1,1,1
 access_purchase_invoice_tag_manager,access.purchase.invoice.tag.manager,custom_purchase_mooch.model_purchase_invoice_tag,base.group_erp_manager,1,1,1,1
+access_product_selector_wizard,access_product_selector_wizard,model_product_selector_wizard,,1,1,1,0
+access_product_product_selector,access_product_product_selector,model_product_product_selector,,1,1,1,0
