@@ -40,3 +40,15 @@ class PurchaseOrder(models.Model):
         # Actualiza cada línea de inmediato en el formulario
         for line in self.order_line:
             line.discount = self.discount_global or 0.0
+            
+    def action_open_product_selector(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Selector de Productos',
+            'res_model': 'product.selector.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_purchase_id': self.id,
+            },
+        }
