@@ -15,6 +15,7 @@
         'views/product_mooch_menu_views.xml',
         'views/res_config_settings_views.xml',
         'data/barcode_parameter_data.xml',
+        'data/ir_cron_data.xml',
     ],
     'installable': True,
     'application': True,
