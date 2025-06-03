@@ -24,11 +24,13 @@ class ProductMooch(models.Model):
         store=False,
         help="Porcentaje de ganancia sobre el costo"
     )
-    list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',default=1)
+    standard_price = fields.Float(string="Costo",default=1)
+    list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',default=1,store=False)
     credit_price = fields.Float(string='Precio Crédito',
                                 help='Precio de venta a crédito de Mooch',
                                 compute='_compute_prices_cred',
-                                default=1)
+                                default=1,
+                                store=False)
     partner_name = fields.Many2one('barcode.parameter.line', string='Nombre Proveedor',
                                     help='Nombre del producto del proveedor', domain="[('parameter_id.name', '=', 'Proveedor')]")
     partner_code = fields.Char(string='Codigo Proveedor',
@@ -75,6 +77,9 @@ class ProductMooch(models.Model):
         string="Categoría de UNSPSC",
         domain="[('applies_to', '=', 'product')]"
     )
+    list_price_backup = fields.Float(string="Precio de Lista Guardado", store=True)
+    credit_price_backup = fields.Float(string="Precio Crédito Guardado", store= True)
+    cost_price_backup = fields.Float(string="Costo Guardado", store= True)
 
     @api.depends('default_code')
     def _compute_is_locked(self):
@@ -440,3 +445,35 @@ class ProductMooch(models.Model):
 
     def action_print_labels(self):
         return self.env.ref('product_mooch.action_report_product_labels').report_action(self)
+
+    @api.model
+    def cron_recompute_product_prices(self):
+        param_obj = self.env['ir.config_parameter'].sudo()
+        margin_list = float(param_obj.get_param('product_mooch.profit_margin_list', default=0.0))
+        margin_cred = float(param_obj.get_param('product_mooch.profit_margin_cred', default=0.0))
+
+        for product in self.search([]):
+            _logger.info("⚙️ Recalculando producto: %s", product.name)
+            # Obtener porcentaje de tipo de venta
+            sale_type_value = float(param_obj.get_param(
+                f'product_mooch.{product.sale_type}', default=0.0))
+
+            total_percentage_list = margin_list + sale_type_value
+            total_percentage_cred = margin_cred + sale_type_value
+
+            list_price = 0.0
+            credit_price = 0.0
+
+            if product.standard_price:
+                list_price = round(product.standard_price * (1 + total_percentage_list / 100), 0)
+                credit_price = round(product.standard_price * (1 + total_percentage_cred / 100), 0)
+
+            # Guardar en base de datos
+            product.write({
+                'list_price': list_price,
+                'credit_price': credit_price,
+                'list_price_backup': list_price,
+                'credit_price_backup': credit_price,
+                'cost_price_backup': product.standard_price,
+                
+            })
