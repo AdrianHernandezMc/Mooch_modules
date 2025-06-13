@@ -396,13 +396,9 @@ class ProductMooch(models.Model):
                 new_list   = round(cost * (1 + pct_cash   / 100), 0) if cost else 0.0
                 new_credit = round(cost * (1 + pct_credit / 100), 0) if cost else 0.0
                 # escribimos sobre la plantilla asociada
-                prod.write({
+                var.product_tmpl_id.write({
                     'list_price':   new_list,
                     'credit_price': new_credit,
-                    # si necesitas respaldar:
-                    'list_price_backup':   new_list,
-                    'credit_price_backup': new_credit,
-                    'cost_price_backup':   std,
                 })
                 _logger.info("⚙️ %s.%s: costo=%s → list=%s, cred=%s",
                              var.product_tmpl_id.name, var.name, cost, new_list, new_credit)
