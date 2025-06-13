@@ -384,29 +384,22 @@ class ProductMooch(models.Model):
 
     @api.model
     def cron_recompute_product_prices(self):
-        """Recalcula list_price y credit_price en todos los productos según su sale_type."""
+        """Recalcula precios tomando el costo real de cada variante."""
         params = self.env['ir.config_parameter'].sudo()
-        # itera por cada tipo de venta configurado
         for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_season', 'sale_type_shoe'):
-            cash_key   = f'product_mooch.{sale_type}_cash'
-            cred_key   = f'product_mooch.{sale_type}_credit'
-            pct_cash   = float(params.get_param(cash_key,   default=0.0))
-            pct_credit = float(params.get_param(cred_key,   default=0.0))
-
-            products = self.search([('sale_type', '=', sale_type)])
-            for prod in products:
-                std = prod.standard_price or 0.0
-                new_list   = round(std * (1 + pct_cash   / 100), 0) if std else 0.0
-                new_credit = round(std * (1 + pct_credit / 100), 0) if std else 0.0
-
-                prod.write({
+            pct_cash   = float(params.get_param(f'product_mooch.{sale_type}_cash',   default=0.0))
+            pct_credit = float(params.get_param(f'product_mooch.{sale_type}_credit', default=0.0))
+            # iteramos sobre VARIANTES, no plantillas
+            variants = self.env['product.product'].search([('product_tmpl_id.sale_type', '=', sale_type)])
+            for var in variants:
+                cost = var.standard_price or 0.0
+                new_list   = round(cost * (1 + pct_cash   / 100), 0) if cost else 0.0
+                new_credit = round(cost * (1 + pct_credit / 100), 0) if cost else 0.0
+                # escribimos sobre la plantilla asociada
+                var.product_tmpl_id.write({
                     'list_price':   new_list,
                     'credit_price': new_credit,
-                    # si necesitas respaldar:
-                    'list_price_backup':   new_list,
-                    'credit_price_backup': new_credit,
-                    'cost_price_backup':   std,
                 })
-                _logger.info("⚙️ %s: costo=%s → list=%s, cred=%s",
-                             prod.name, std, new_list, new_credit)
+                _logger.info("⚙️ %s.%s: costo=%s → list=%s, cred=%s",
+                             var.product_tmpl_id.name, var.name, cost, new_list, new_credit)
         return True
