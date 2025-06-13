@@ -402,7 +402,7 @@ class ProductMooch(models.Model):
                     # si necesitas respaldar:
                     'list_price_backup':   new_list,
                     'credit_price_backup': new_credit,
-                    'cost_price_backup':   std,
+                    'cost_price_backup':   cost,
                 })
                 _logger.info("⚙️ %s.%s: costo=%s → list=%s, cred=%s",
                              var.product_tmpl_id.name, var.name, cost, new_list, new_credit)
