@@ -3,38 +3,52 @@ from odoo.exceptions import ValidationError
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
-
-    profit_margin_list = fields.Float(string='Porcentaje de Utilidad Contado', help="Porcentaje de ganancia sobre el costo")
-    profit_margin_cred = fields.Float(string='Porcentaje de Utilidad Crédito', help="Porcentaje de ganancia sobre el costo")
-    sale_type_basic = fields.Float(string='Tipo de Compra Basico', help="Porcentaje de venta de productos basicos")
-    sale_type_trend = fields.Float(string='Tipo de Compra Moda', help="Porcentaje de venta de productos moda")
-    sale_type_home = fields.Float(string='Tipo de Compra Hogar', help="Porcentaje de venta de productos hogar")
-    sale_type_season = fields.Float(string='Tipo de Compra Temporada', help='Porcentaje de venta de productos temporada')
-    sale_type_shoe = fields.Float(string='Tipo de Compra Calzado', help='Porcentaje de venta de productos de calzado')
+    # campo solo para layout
+    dummy_break = fields.Boolean(
+        string='',
+        readonly=True,
+        help="Campo vacío para controlar saltos de línea en la vista"
+    )
+    # — Para Ropa —
+    sale_type_clothes_cash   = fields.Float(string='Moda (Contado %)',   help="Porcentaje contado para productos de moda")
+    sale_type_clothes_credit = fields.Float(string='Moda (Crédito %)', help="Porcentaje crédito para productos de moda")
+    # — Para Hogar —
+    sale_type_home_cash      = fields.Float(string='Hogar (Contado %)',   help="Porcentaje contado para productos de hogar")
+    sale_type_home_credit    = fields.Float(string='Hogar (Crédito %)',  help="Porcentaje crédito para productos de hogar")
+    # — Para Calzado —
+    sale_type_shoe_cash      = fields.Float(string='Calzado (Contado %)',   help="Porcentaje contado para productos de calzado")
+    sale_type_shoe_credit    = fields.Float(string='Calzado (Crédito %)', help="Porcentaje crédito para productos de calzado")
+    # — Para Temporada —
+    sale_type_season_cash    = fields.Float(string='Temporada (Contado %)',   help="Porcentaje contado para productos de temporada")
+    sale_type_season_credit  = fields.Float(string='Temporada (Crédito %)', help="Porcentaje crédito para productos de temporada")
 
     @api.model
     def set_values(self):
-        """ Guarda los valores de configuración en ir.config_parameter """
-        super(ResConfigSettings, self).set_values()
-        self.env['ir.config_parameter'].set_param('product_mooch.profit_margin_list', self.profit_margin_list)
-        self.env['ir.config_parameter'].set_param('product_mooch.profit_margin_cred', self.profit_margin_cred)
-        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_basic', self.sale_type_basic)
-        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_trend',self.sale_type_trend)
-        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_home',self.sale_type_home)
-        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_season', self.sale_type_season)
-        self.env['ir.config_parameter'].set_param('product_mooch.sale_type_shoe', self.sale_type_shoe)
+        super().set_values()
+        params = self.env['ir.config_parameter'].sudo()
+        params.set_param('product_mooch.sale_type_clothes_cash',   self.sale_type_clothes_cash)
+        params.set_param('product_mooch.sale_type_clothes_credit', self.sale_type_clothes_credit)
+        params.set_param('product_mooch.sale_type_home_cash',      self.sale_type_home_cash)
+        params.set_param('product_mooch.sale_type_home_credit',    self.sale_type_home_credit)
+        params.set_param('product_mooch.sale_type_shoe_cash',      self.sale_type_shoe_cash)
+        params.set_param('product_mooch.sale_type_shoe_credit',    self.sale_type_shoe_credit)
+        params.set_param('product_mooch.sale_type_season_cash',    self.sale_type_season_cash)
+        params.set_param('product_mooch.sale_type_season_credit',  self.sale_type_season_credit)
+        # dispara tu cron para que recalcule precios en los productos afectados
+        self.env['product.template'].cron_recompute_product_prices()
 
     @api.model
     def get_values(self):
-        """ Obtiene los valores de configuración desde ir.config_parameter """
-        res = super(ResConfigSettings, self).get_values()
-        res.update(
-            profit_margin_list=self.env['ir.config_parameter'].sudo().get_param('product_mooch.profit_margin_list', default=0.0),
-            profit_margin_cred=self.env['ir.config_parameter'].sudo().get_param('product_mooch.profit_margin_cred', default=0.0),
-            sale_type_basic=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_basic', default=0.0),
-            sale_type_trend=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_trend', default=0.0),
-            sale_type_home=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_home', default=0.0),
-            sale_type_season=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_season', default=0.0),
-            sale_type_shoe=self.env['ir.config_parameter'].sudo().get_param('product_mooch.sale_type_shoe', default=0.0)
-        )
+        res = super().get_values()
+        params = self.env['ir.config_parameter'].sudo()
+        res.update({
+            'sale_type_clothes_cash':   float(params.get_param('product_mooch.sale_type_clothes_cash',   default=0.0)),
+            'sale_type_clothes_credit': float(params.get_param('product_mooch.sale_type_clothes_credit', default=0.0)),
+            'sale_type_home_cash':      float(params.get_param('product_mooch.sale_type_home_cash',      default=0.0)),
+            'sale_type_home_credit':    float(params.get_param('product_mooch.sale_type_home_credit',    default=0.0)),
+            'sale_type_shoe_cash':      float(params.get_param('product_mooch.sale_type_shoe_cash',      default=0.0)),
+            'sale_type_shoe_credit':    float(params.get_param('product_mooch.sale_type_shoe_credit',    default=0.0)),
+            'sale_type_season_cash':    float(params.get_param('product_mooch.sale_type_season_cash',    default=0.0)),
+            'sale_type_season_credit':  float(params.get_param('product_mooch.sale_type_season_credit',  default=0.0)),
+        })
         return res

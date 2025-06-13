@@ -7,26 +7,35 @@
         <field name="arch" type="xml">
             <!-- Insertar los campos después del bloque product_general_settings -->
             <xpath expr="//block[@name='product_setting_container']" position="inside">
-                <setting id="profit_margin_list_setting" string="Porcentaje de Utilidad Venta">
-                    <field name="profit_margin_list" widget="float" options="{'suffix': ' %'}"/>
+                <!--inserto un campo vacío para forzar salto de línea -->
+                <setting id="dummy_break_setting" name="dummy_break"  string=""  colspan="2"/>
+                <!-- Moda -->
+                <setting id="sale_type_clothes_cash_setting" string="Porcentaje contado para productos de moda (Contado %)">
+                    <field name="sale_type_clothes_cash" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="profit_margin_cred_setting" string="Porcentaje de Utilidad Crédito">
-                    <field name="profit_margin_cred" widget="float" options="{'suffix': ' %'}"/>
+                <setting id="sale_type_clothes_credit_setting" string="Porcentaje crédito para productos de moda (Crédito %)">
+                    <field name="sale_type_clothes_credit" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="sale_type_basic_setting" string="Porcentaje de venta de productos basicos">
-                    <field name="sale_type_basic" widget="float" options="{'suffix': ' %'}"/>
+                <!-- Hogar -->
+                <setting id="sale_type_home_cash_setting" string="Porcentaje contado para productos de hogar (Contado %)">
+                    <field name="sale_type_home_cash" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="sale_type_trend_setting" string="Porcentaje de venta de productos moda">
-                    <field name="sale_type_trend" widget="float" options="{'suffix': ' %'}"/>
+                <setting id="sale_type_home_credit_setting" string="Porcentaje crédito para productos de hogar (Crédito %)">
+                    <field name="sale_type_home_credit" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="sale_type_home_setting" string="Porcentaje de venta de productos hogar">
-                    <field name="sale_type_home" widget="float" options="{'suffix': ' %'}"/>
+                <!-- Calzado -->
+                <setting id="sale_type_shoe_cash_setting" string="Porcentaje contado para productos de calzado (Contado %)">
+                    <field name="sale_type_shoe_cash" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="sale_type_home_setting" string="Porcentaje de venta de productos temporada">
-                    <field name="sale_type_season" widget="float" options="{'suffix': ' %'}"/>
+                <setting id="sale_type_shoe_credit_setting" string="Porcentaje crédito para productos de calzado (Crédito %)">
+                    <field name="sale_type_shoe_credit" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="sale_type_home_setting" string="Porcentaje de venta de productos de calzado">
-                    <field name="sale_type_shoe" widget="float" options="{'suffix': ' %'}"/>
+                <!-- Temporada -->
+                <setting id="sale_type_season_cash_setting" string="Porcentaje contado para productos de temporada (Contado %)">
+                    <field name="sale_type_season_cash" widget="float" options="{'suffix': ' %'}"/>
+                </setting>
+                <setting id="sale_type_season_credit_setting" string="Porcentaje crédito para productos de temporada (Crédito %)">
+                    <field name="sale_type_season_credit" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
             </xpath>
         </field>

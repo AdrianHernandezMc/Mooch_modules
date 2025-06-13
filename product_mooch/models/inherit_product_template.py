@@ -62,8 +62,8 @@ class ProductMooch(models.Model):
     )
     sale_type = fields.Selection(
         selection=[
-            ('sale_type_basic', _('Tipo de Compra Básico')),
-            ('sale_type_trend', _('Tipo de Compra Moda')),
+            # ('',       _('— Sin tipo —')),
+            ('sale_type_clothes', _('Tipo de Compra Ropa')),
             ('sale_type_home', _('Tipo de Compra Hogar')),
             ('sale_type_shoe', _('Tipo de Compra Calzado')),
             ('sale_type_season', _('Tipo de Compra Temporada'))
@@ -146,7 +146,6 @@ class ProductMooch(models.Model):
 
         return super(ProductMooch, self).write(vals)
 
-
     def _is_classification_complete(self, vals):
         """ Verifica si todos los campos de clasificación están llenos """
         return all(vals.get(field) for field in ['department_id'])
@@ -216,8 +215,6 @@ class ProductMooch(models.Model):
         # Concatenar el prefijo y el número puro
         return f"{department_code}{consecutive_code}"
 
-
-
     def copy(self, default=None):
         self.ensure_one()  # si sólo copias un producto a la vez
         default = dict(default or {})
@@ -242,7 +239,6 @@ class ProductMooch(models.Model):
 
         return super(ProductMooch, self).copy(default)
 
-
     def unlink(self):
         for product in self:
             if product.default_code or product.barcode:
@@ -260,92 +256,32 @@ class ProductMooch(models.Model):
         for product in self:
             product.profit_margin_list = margin_list
             product.profit_margin_cred = margin_cred
-            
+
     @api.depends('standard_price', 'profit_margin_list', 'sale_type')
     def _compute_prices_list(self):
-        param_obj = self.env['ir.config_parameter'].sudo()
+        """Precio de contado = costo * (1 + porcentaje_contado)"""
+        params = self.env['ir.config_parameter'].sudo()
         for product in self:
-            
-            # Obtener el porcentaje configurado según el tipo de venta
-            if product.sale_type == 'sale_type_basic':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_basic', default=0.0))
-            elif product.sale_type == 'sale_type_trend':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_trend', default=0.0))
-            elif product.sale_type == 'sale_type_home':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
-            elif product.sale_type == 'sale_type_season':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
-            elif product.sale_type == 'sale_type_shoe':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_shoe', default=0.0))
-            else:
-                sale_type_value = 0.0
-
-            # Sumar el porcentaje configurado (por ejemplo, 19% para hogar) con el margen de utilidad contado (por ejemplo, 5%)
-            total_percentage = product.profit_margin_list + sale_type_value
-
+            key = f'product_mooch.{product.sale_type}_cash'
+            pct = float(params.get_param(key, default=0.0))
             if product.standard_price:
-                profit_factor = 1 + (total_percentage / 100)
-                product.list_price = round(product.standard_price * profit_factor,0)
+                product.list_price = round(
+                    product.standard_price * (1 + pct / 100), 0)
             else:
                 product.list_price = 0.0
 
     @api.depends('standard_price', 'profit_margin_cred', 'sale_type')
     def _compute_prices_cred(self):
-        """
-        Calcula el precio de crédito de la siguiente forma:
-        credit_price = standard_price * (1 + ((sale_type_percentage + profit_margin_cred) / 100))
-        
-        Se suma el % configurado según el tipo de venta al margen de utilidad a crédito.
-        """
-        param_obj = self.env['ir.config_parameter'].sudo()
+        """Precio de crédito = costo * (1 + porcentaje_crédito)"""
+        params = self.env['ir.config_parameter'].sudo()
         for product in self:
-            # Obtener el porcentaje según el tipo de venta
-            if product.sale_type == 'sale_type_basic':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_basic', default=0.0))
-            elif product.sale_type == 'sale_type_trend':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_trend', default=0.0))
-            elif product.sale_type == 'sale_type_home':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
-            elif product.sale_type == 'sale_type_season':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
-            elif product.sale_type == 'sale_type_shoe':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_shoe', default=0.0))
-            else:
-                sale_type_value = 0.0
-
-            # Sumar el porcentaje de tipo de venta con el margen de utilidad de crédito
-            total_percentage = sale_type_value + product.profit_margin_cred
-
+            key = f'product_mooch.{product.sale_type}_credit'
+            pct = float(params.get_param(key, default=0.0))
             if product.standard_price:
-                profit_factor = 1 + (total_percentage / 100)
-                product.credit_price = round(product.standard_price * profit_factor,0)
+                product.credit_price = round(
+                    product.standard_price * (1 + pct / 100), 0)
             else:
                 product.credit_price = 0.0
-
-    @api.depends('standard_price', 'profit_margin_list', 'sale_type')
-    def _compute_final_sale_price(self):
-        param_obj = self.env['ir.config_parameter'].sudo()
-        for product in self:
-            # Obtén el porcentaje configurado según el tipo de venta seleccionado
-            if product.sale_type == 'sale_type_basic':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_basic', default=0.0))
-            elif product.sale_type == 'sale_type_trend':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_trend', default=0.0))
-            elif product.sale_type == 'sale_type_home':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_home', default=0.0))
-            elif product.sale_type == 'sale_type_season':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_season', default=0.0))
-            elif product.sale_type == 'sale_type_shoe':
-                sale_type_value = float(param_obj.get_param('product_mooch.sale_type_shoe', default=0.0))
-            else:
-                sale_type_value = 0.0
-
-            total_percentage = product.profit_margin_list + sale_type_value
-
-            if product.standard_price:
-                product.final_sale_price = product.standard_price * (1 + (total_percentage / 100))
-            else:
-                product.final_sale_price = 0.0
 
     @api.onchange('type_id')
     def _onchange_type_id_set_unspsc(self):
@@ -448,32 +384,29 @@ class ProductMooch(models.Model):
 
     @api.model
     def cron_recompute_product_prices(self):
-        param_obj = self.env['ir.config_parameter'].sudo()
-        margin_list = float(param_obj.get_param('product_mooch.profit_margin_list', default=0.0))
-        margin_cred = float(param_obj.get_param('product_mooch.profit_margin_cred', default=0.0))
+        """Recalcula list_price y credit_price en todos los productos según su sale_type."""
+        params = self.env['ir.config_parameter'].sudo()
+        # itera por cada tipo de venta configurado
+        for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_season', 'sale_type_shoe'):
+            cash_key   = f'product_mooch.{sale_type}_cash'
+            cred_key   = f'product_mooch.{sale_type}_credit'
+            pct_cash   = float(params.get_param(cash_key,   default=0.0))
+            pct_credit = float(params.get_param(cred_key,   default=0.0))
 
-        for product in self.search([]):
-            _logger.info("⚙️ Recalculando producto: %s", product.name)
-            # Obtener porcentaje de tipo de venta
-            sale_type_value = float(param_obj.get_param(
-                f'product_mooch.{product.sale_type}', default=0.0))
+            products = self.search([('sale_type', '=', sale_type)])
+            for prod in products:
+                std = prod.standard_price or 0.0
+                new_list   = round(std * (1 + pct_cash   / 100), 0) if std else 0.0
+                new_credit = round(std * (1 + pct_credit / 100), 0) if std else 0.0
 
-            total_percentage_list = margin_list + sale_type_value
-            total_percentage_cred = margin_cred + sale_type_value
-
-            list_price = 0.0
-            credit_price = 0.0
-
-            if product.standard_price:
-                list_price = round(product.standard_price * (1 + total_percentage_list / 100), 0)
-                credit_price = round(product.standard_price * (1 + total_percentage_cred / 100), 0)
-
-            # Guardar en base de datos
-            product.write({
-                'list_price': list_price,
-                'credit_price': credit_price,
-                'list_price_backup': list_price,
-                'credit_price_backup': credit_price,
-                'cost_price_backup': product.standard_price,
-                
-            })
+                prod.write({
+                    'list_price':   new_list,
+                    'credit_price': new_credit,
+                    # si necesitas respaldar:
+                    'list_price_backup':   new_list,
+                    'credit_price_backup': new_credit,
+                    'cost_price_backup':   std,
+                })
+                _logger.info("⚙️ %s: costo=%s → list=%s, cred=%s",
+                             prod.name, std, new_list, new_credit)
+        return True
