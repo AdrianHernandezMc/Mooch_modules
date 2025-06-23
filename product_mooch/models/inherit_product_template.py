@@ -1,5 +1,6 @@
 from odoo import fields, models, api, _
 from odoo.exceptions import ValidationError
+from odoo.tools.misc import formatLang
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -80,6 +81,13 @@ class ProductMooch(models.Model):
     list_price_backup = fields.Float(string="Precio de Lista Guardado", store=True)
     credit_price_backup = fields.Float(string="Precio Crédito Guardado", store= True)
     cost_price_backup = fields.Float(string="Costo Guardado", store= True)
+    
+    credit_price_incl = fields.Char(
+        string="Precio Crédito c/ Impuestos",
+        compute="_compute_credit_price_incl",
+        store=False,
+        readonly=True,
+    )
 
     @api.depends('default_code')
     def _compute_is_locked(self):
@@ -407,3 +415,22 @@ class ProductMooch(models.Model):
                 _logger.info("⚙️ %s.%s: costo=%s → list=%s, cred=%s",
                              var.product_tmpl_id.name, var.name, cost, new_list, new_credit)
         return True
+
+    @api.depends('credit_price', 'taxes_id')
+    def _compute_credit_price_incl(self):
+        for tmpl in self:
+            if not tmpl.credit_price or not tmpl.taxes_id:
+                tmpl.credit_price_incl = False
+                continue
+            # compute_all recibe: price_unit, currency, qty, product, partner
+            taxes_res = tmpl.taxes_id.compute_all(
+                tmpl.credit_price,
+                tmpl.currency_id,
+                1,
+                tmpl,
+                None
+            )
+            total_incl = taxes_res.get('total_included', 0.0)
+            # formateamos el total con la moneda
+            formatted = formatLang(self.env, total_incl, currency_obj=tmpl.currency_id)
+            tmpl.credit_price_incl = _("(= %s impuestos incluidos)") % formatted
