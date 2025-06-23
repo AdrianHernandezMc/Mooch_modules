@@ -54,15 +54,15 @@
             <xpath expr="//group[@name='group_standard_price']//div[@name='pricing']" position="after">
                 <label for="credit_price"/>
                 <div name="pricing_cred" class="o_row">
-                <field name="credit_price"
-                       class="oe_inline"
-                       string="Precio de Crédito"
-                       widget="monetary"
-                       options="{'currency_field': 'currency_id', 'field_digits': True}"
-                       readonly="1"
-                       on_change="1"
-                       field_id="list_price_0"/>
-                    <span class="ms-2"/><field name="tax_string" field_id="tax_string_0"/>
+                    <field name="credit_price"
+                        class="oe_inline"
+                        string="Precio de Crédito"
+                        widget="monetary"
+                        options="{'currency_field': 'currency_id', 'field_digits': True}"
+                        readonly="1"/>
+                    <span class="ms-2"/>
+                    <!-- Aquí el precio crédito + impuestos -->
+                    <field name="credit_price_incl" readonly="1"/>
                 </div>
                 <field name="sale_type"/>
             </xpath>
