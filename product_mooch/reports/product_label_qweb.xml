@@ -21,14 +21,14 @@
   <template id="product_label_qweb_template">
     <t t-call="web.basic_layout">
       <t t-set="doc" t-value="docs[0]"/>
-      <div class="page" style="width: 75mm; height: 25mm; padding: 0; margin: 0;">
-        <div style="font-size: 10px; font-weight: bold; text-align: left;">MOOCH</div>
-        <table style="font-family: Arial;">
+      <div class="page" style="width: 190mm; height: 55mm; padding: 0; margin: 0; border: none; border-collapse: collapse;">
+        <div style="font-size: 35px; font-weight: bold; text-align: left; border: none; border-collapse: collapse;">MOOCH</div>
+        <table style="font-family: Arial; border: none; border-collapse: collapse;">
           <tr>
-            <td style="text-align: left; font-size:17px; width: 80%; ">
+            <td style="text-align: left; font-size: 45px; width: 80%; border: none; border-collapse: collapse;">
               <t t-esc="doc.name"/> <t t-esc="doc.department_id.nombre"/>
             </td>
-            <td style="text-align: right; font-size: 12px; width: 100%;">
+            <td style="text-align: right; font-size: 40px; width: 110%; border: none; border-collapse: collapse;">
               <strong>
                 <t t-esc="round(doc.credit_price * 1.16, 0)"
                   t-options="{'widget':'monetary','display_currency':doc.currency_id,'precision':0}"/>
@@ -41,12 +41,12 @@
           </tr>
         </table>
         <t t-if="doc.barcode">
-          <div style="text-align:center;">
+          <div style="text-align:center; border: none; border-collapse: collapse;">
             <img t-att-src="'/report/barcode/Code128/' + str(doc.barcode)"
-                style="width: 100%; height: 8mm;"/>
+                style="width: 100%; height: 15mm;"/>
           </div>
         </t>
-        <div style="text-align:center; font-size:12px; font-weight:bold;">
+        <div style="text-align:center; font-size:38px; font-weight:bold; border: none; border-collapse: collapse;">
           <t t-esc="doc.barcode"/>
         </div>
       </div>
