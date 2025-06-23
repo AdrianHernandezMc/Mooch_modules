@@ -10,6 +10,7 @@
         'security/product_mooch_security.xml',
         'security/ir.model.access.csv',
         "reports/product_label_qweb.xml",
+        "reports/product_label_qweb_template_from_picking.xml",
         'views/inherit_product_views.xml',
         'views/product_barcode_views.xml',
         'views/product_mooch_menu_views.xml',

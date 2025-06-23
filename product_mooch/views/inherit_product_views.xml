@@ -10,8 +10,7 @@
                 <button name="action_print_labels"
                         string=" Etiquetas Mooch"
                         type="object"
-                        class="btn-primary o_form_button"
-                        groups="product_mooch.group_inventory_product_edit"/>
+                        class="btn-primary o_form_button"/>
             </xpath>
             <xpath expr="//field[@name='expense_policy']" position="attributes">
                 <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
@@ -108,6 +107,19 @@
             </xpath>
             <xpath expr="//page[@name='invoicing']" position="attributes">
                 <attribute name="groups">product_mooch.group_inventory_product_edit</attribute>
+            </xpath>
+        </field>
+    </record>
+    <record id="view_stock_picking_form_inherit_label" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.label</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+            <button name="action_print_labels"
+                    string="Etiquetas Mooch"
+                    type="object"
+                    class="btn-primary o_form_button"/>
             </xpath>
         </field>
     </record>

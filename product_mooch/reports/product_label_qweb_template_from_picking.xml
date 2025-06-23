@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+    <!-- 1) Formato de papel 50×25 mm -->
+    <record id="paperformat_label_50x25mm" model="report.paperformat">
+      <field name="name">Etiqueta 50x25mm</field>
+      <field name="default" eval="False"/>
+      <field name="format">custom</field>
+      <field name="page_height">25</field>
+      <field name="page_width">50</field>
+      <field name="orientation">Portrait</field>
+      <field name="margin_top">1</field>
+      <field name="margin_bottom">0</field>
+      <field name="margin_left">0</field>
+      <field name="margin_right">0</field>
+      <!-- <field name="dpi">300</field> -->
+    </record>
+
+    <template id="product_label_qweb_template_from_picking">
+      <t t-foreach="docs" t-as="doc">
+        <t t-call="web.basic_layout">
+          <div class="page" style="width: 75mm; height: 25mm; padding: 0; margin: 0;">
+            <div style="font-size: 10px; font-weight: bold; text-align: left;">MOOCH</div>
+            <table style="font-family: Arial;">
+              <tr>
+                <td style="text-align: left; font-size:17px; width: 80%;">
+                  <t t-esc="doc.name"/>
+                </td>
+                <td style="text-align: right; font-size: 12px; width: 100%;">
+                  <strong>
+                    <t t-esc="round(doc.credit_price * 1.16, 0)"
+                      t-options="{'widget':'monetary','display_currency':doc.currency_id,'precision':0}"/>
+                  </strong><br/>CREDITO<br/>
+                  <strong>
+                    <t t-esc="round(doc.list_price * 1.16, 0)"
+                      t-options="{'widget':'monetary','display_currency':doc.currency_id,'precision':0}"/>
+                  </strong><br/>CONTADO
+                </td>
+              </tr>
+            </table>
+            <t t-if="doc.barcode">
+              <div style="text-align:center;">
+                <img t-att-src="'/report/barcode/Code128/' + str(doc.barcode)"
+                    style="width: 100%; height: 8mm;"/>
+              </div>
+            </t>
+            <div style="text-align:center; font-size:12px; font-weight:bold;">
+              <t t-esc="doc.barcode"/>
+            </div>
+          </div>
+        </t>
+      </t>
+    </template>
+
+    <record id="action_report_product_labels_from_picking" model="ir.actions.report">
+      <field name="name">Etiquetas desde traslado</field>
+      <field name="model">product.template</field>
+      <field name="report_type">qweb-pdf</field>
+      <field name="report_name">product_mooch.product_label_qweb_template_from_picking</field>
+      <field name="report_file">product_mooch.product_label_qweb_template_from_picking</field>
+      <field name="paperformat_id" ref="product_mooch.paperformat_label_50x25mm"/>
+      <field name="print_report_name">'Etiquetas_Traslado_' + time.strftime("%Y%m%d%H%M%S")</field>
+    </record>
+  </data>
+</odoo>
