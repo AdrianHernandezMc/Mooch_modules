@@ -11,7 +11,7 @@ class StockPicking(models.Model):
             product = line.product_id.product_tmpl_id
             qty = int(line.qty_done or 0)
             if product.active and qty > 0:
-                product_templates += [product.id] * qty  # ← Usa el ID
+                product_templates += [product.id] * qty
 
         if not product_templates:
             raise UserError("No hay productos activos con cantidad válida en las líneas del traslado.")
