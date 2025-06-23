@@ -28,6 +28,10 @@
                         ]
                         }"/>
             </xpath>
+            <!-- Ocultar botón Return para no técnicos -->
+            <xpath expr="//button[@data-hotkey='k' and @type='action']" position="attributes">
+                <attribute name="groups">base.group_erp_manager</attribute>
+            </xpath>
         </field>
     </record>
 </odoo>
