@@ -88,6 +88,7 @@ class ProductMooch(models.Model):
         store=False,
         readonly=True,
     )
+    cost_base = fields.Float(string="Costo Base", store="True")
 
     _sql_constraints = [
         ('unique_product_name', 'UNIQUE(name)',
@@ -270,29 +271,29 @@ class ProductMooch(models.Model):
             product.profit_margin_list = margin_list
             product.profit_margin_cred = margin_cred
 
-    @api.depends('standard_price', 'profit_margin_list', 'sale_type')
+    @api.depends('standard_price', 'profit_margin_list', 'sale_type', 'cost_base')
     def _compute_prices_list(self):
-        """Precio de contado = costo * (1 + porcentaje_contado)"""
+        """Precio de contado = (costo base, si lo tiene, o costo real) * (1 + porcentaje_contado)"""
         params = self.env['ir.config_parameter'].sudo()
         for product in self:
+            base_cost = product.cost_base if product.cost_base and product.cost_base > 0 else product.standard_price
             key = f'product_mooch.{product.sale_type}_cash'
             pct = float(params.get_param(key, default=0.0))
-            if product.standard_price:
-                product.list_price = round(
-                    product.standard_price * (1 + pct / 100), 0)
+            if base_cost:
+                product.list_price = round(base_cost * (1 + pct / 100), 0)
             else:
                 product.list_price = 0.0
 
-    @api.depends('standard_price', 'profit_margin_cred', 'sale_type')
+    @api.depends('standard_price', 'profit_margin_cred', 'sale_type', 'cost_base')
     def _compute_prices_cred(self):
-        """Precio de crédito = costo * (1 + porcentaje_crédito)"""
+        """Precio de crédito = (costo base, si lo tiene, o costo real) * (1 + porcentaje_credito)"""
         params = self.env['ir.config_parameter'].sudo()
         for product in self:
+            base_cost = product.cost_base if product.cost_base and product.cost_base > 0 else product.standard_price
             key = f'product_mooch.{product.sale_type}_credit'
             pct = float(params.get_param(key, default=0.0))
-            if product.standard_price:
-                product.credit_price = round(
-                    product.standard_price * (1 + pct / 100), 0)
+            if base_cost:
+                product.credit_price = round(base_cost * (1 + pct / 100), 0)
             else:
                 product.credit_price = 0.0
 

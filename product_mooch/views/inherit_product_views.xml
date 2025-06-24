@@ -66,6 +66,9 @@
                 </div>
                 <field name="sale_type"/>
             </xpath>
+            <xpath expr="//field[@name='categ_id']" position="before">
+                <field name="cost_base" string="Costo Base"/>
+            </xpath>
             <xpath expr="//page[@name='general_information']" position="after">
                 <page name="product_codes"
                       string="Clasificación del Producto"
