@@ -17,8 +17,8 @@
     </record>
 
     <template id="product_label_qweb_template_from_picking">
-      <t t-foreach="docs" t-as="doc">
-        <t t-call="web.basic_layout">
+      <t t-call="web.basic_layout">
+        <t t-foreach="docs" t-as="doc">
           <div class="page" style="width: 190mm; height: 55mm; padding: 0; margin: 0; border: none; border-collapse: collapse;">
             <div style="font-size: 35px; font-weight: bold; text-align: left; border: none; border-collapse: collapse;">MOOCH</div>
             <table style="font-family: Arial; border: none; border-collapse: collapse;">

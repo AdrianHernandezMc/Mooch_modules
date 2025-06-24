@@ -89,6 +89,11 @@ class ProductMooch(models.Model):
         readonly=True,
     )
 
+    _sql_constraints = [
+        ('unique_product_name', 'UNIQUE(name)',
+         'Ya existe otro producto con este mismo nombre.'),
+    ]
+
     @api.depends('default_code')
     def _compute_is_locked(self):
         """ Bloquea los campos si el producto ya tiene código asignado """
@@ -434,3 +439,17 @@ class ProductMooch(models.Model):
             # formateamos el total con la moneda
             formatted = formatLang(self.env, total_incl, currency_obj=tmpl.currency_id)
             tmpl.credit_price_incl = _("(= %s impuestos incluidos)") % formatted
+
+    @api.constrains('name')
+    def _check_duplicate_name(self):
+        for rec in self:
+            if not rec.name:
+                continue
+            dup = self.search([
+                ('id', '!=', rec.id),
+                ('name', '=', rec.name),
+            ], limit=1)
+            if dup:
+                raise ValidationError(_(
+                    "Ya existe otro producto con el nombre:\n  «%s»"
+                ) % rec.name)
