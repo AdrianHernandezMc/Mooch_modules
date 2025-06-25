@@ -25,7 +25,18 @@ class StockPicking(models.Model):
 
         return self.env.ref('product_mooch.action_report_product_labels_from_picking').report_action(product_templates)
 
-    @api.depends('move_line_ids.qty_done')
+    @api.depends(
+        'move_ids_without_package.product_uom_qty',
+        'move_ids_without_package.move_line_ids.qty_done'
+    )
     def _compute_total_pieces(self):
         for pick in self:
-            pick.total_pieces = sum(pick.move_line_ids.mapped('qty_done'))
+            total = 0.0
+            for move in pick.move_ids_without_package:
+                if move.move_line_ids:
+                    # si ya generó líneas de operación, sumamos lo ejecutado
+                    total += sum(line.qty_done for line in move.move_line_ids)
+                else:
+                    # si todavía está en borrador, sumamos la demanda prevista
+                    total += move.product_uom_qty
+            pick.total_pieces = total
