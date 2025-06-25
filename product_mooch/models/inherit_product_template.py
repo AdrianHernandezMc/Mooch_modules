@@ -25,42 +25,97 @@ class ProductMooch(models.Model):
         store=False,
         help="Porcentaje de ganancia sobre el costo"
     )
-    standard_price = fields.Float(string="Costo",default=1)
-    list_price = fields.Float(string="Precio de Venta", compute='_compute_prices_list',default=1,store=False)
-    credit_price = fields.Float(string='Precio Crédito',
-                                help='Precio de venta a crédito de Mooch',
-                                compute='_compute_prices_cred',
-                                default=1,
-                                store=False)
-    partner_name = fields.Many2one('barcode.parameter.line', string='Nombre Proveedor',
-                                    help='Nombre del producto del proveedor', domain="[('parameter_id.name', '=', 'Proveedor')]")
-    partner_code = fields.Char(string='Codigo Proveedor',
-                                    help='Código del producto del proveedor')
+    standard_price = fields.Float(
+        string="Costo"
+        ,default=1
+        )
+
+    list_price = fields.Float(
+        string="Precio de Venta",
+        compute='_compute_prices_list',
+        default=1,
+        store=False
+        )
+
+    credit_price = fields.Float(
+        string='Precio Crédito',
+        help='Precio de venta a crédito de Mooch',
+        compute='_compute_prices_cred',
+        default=1,
+        store=False
+        )
+
+    partner_name = fields.Many2one(
+        'barcode.parameter.line',
+        string='Nombre Proveedor',
+        help='Nombre del producto del proveedor',
+        domain="[('parameter_id.name', '=', 'Proveedor')]",
+        required=True
+        )
+
+    partner_code = fields.Char(
+        string='Codigo Proveedor',
+        help='Código del producto del proveedor',
+        required=True
+        )
 
     department_id = fields.Many2one(
         'barcode.parameter.line',
         string="Departamento",
         domain="[('parameter_id.name', '=', 'Departamento')]",
         default=lambda self: self._get_default_department(),
-    )
+        required=True
+        )
+
     sub_department_id = fields.Many2one(
         'barcode.parameter.line',
         string="Sub Departamento",
         domain="[('parameter_id.name', '=', 'Sub Departamento'),('department_line_ids', 'in', [department_id])] ",
-    )
-    color_id = fields.Many2one('barcode.parameter.line', string="Color", domain="[('parameter_id.name', '=', 'Color')]")
-    type_id = fields.Many2one('barcode.parameter.line', string="Tipo de Producto", domain="[('parameter_id.name', '=', 'Tipo de Producto'), ('department_line_ids', 'in', [department_id])]")
-    size_id = fields.Many2one('barcode.parameter.line', string="Talla", domain="[('parameter_id.name', '=', 'Talla'), ('department_line_ids', 'in', [department_id])]")
-    consecutive = fields.Char(string="Consecutivo", readonly=True)
+        required=True
+        )
 
-    default_code = fields.Char(string="Código Interno", readonly=True)
-    barcode = fields.Char(string="Código de Barras", readonly=True)
+    color_id = fields.Many2one(
+        'barcode.parameter.line',
+        string="Color",
+        domain="[('parameter_id.name', '=', 'Color')]",
+        required=True
+        )
+
+    type_id = fields.Many2one(
+        'barcode.parameter.line',
+        string="Tipo de Producto",
+        domain="[('parameter_id.name', '=', 'Tipo de Producto'), ('department_line_ids', 'in', [department_id])]",
+        required=True
+        )
+
+    size_id = fields.Many2one(
+        'barcode.parameter.line',
+        string="Talla",
+        domain="[('parameter_id.name', '=', 'Talla'), ('department_line_ids', 'in', [department_id])]",
+        required=True
+        )
+
+    consecutive = fields.Char(
+        string="Consecutivo",
+        readonly=True
+        )
+
+    default_code = fields.Char(
+        string="Código Interno",
+        readonly=True
+        )
+
+    barcode = fields.Char(
+        string="Código de Barras",
+        readonly=True
+        )
 
     show_product_codes = fields.Boolean(
         string="Mostrar Clasificación",
         compute="_compute_show_product_codes",
         store=False
-    )
+        )
+
     sale_type = fields.Selection(
         selection=[
             # ('',       _('— Sin tipo —')),
@@ -73,15 +128,28 @@ class ProductMooch(models.Model):
         help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado",
         required=True
     )
+
     unspsc_code_id = fields.Many2one(
         'product.unspsc.code',
         string="Categoría de UNSPSC",
         domain="[('applies_to', '=', 'product')]"
     )
-    list_price_backup = fields.Float(string="Precio de Lista Guardado", store=True)
-    credit_price_backup = fields.Float(string="Precio Crédito Guardado", store= True)
-    cost_price_backup = fields.Float(string="Costo Guardado", store= True)
-    
+
+    list_price_backup = fields.Float(
+        string="Precio de Lista Guardado",
+        store=True
+        )
+
+    credit_price_backup = fields.Float(
+        string="Precio Crédito Guardado",
+        store= True
+        )
+
+    cost_price_backup = fields.Float(
+        string="Costo Guardado",
+        store= True
+        )
+
     credit_price_incl = fields.Char(
         string="Precio Crédito c/ Impuestos",
         compute="_compute_credit_price_incl",
