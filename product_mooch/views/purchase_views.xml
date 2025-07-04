@@ -1,0 +1,16 @@
+<odoo>
+  <record id="purchase_order_form_inherit_cost_base" model="ir.ui.view">
+      <field name="name">purchase.order.form.inherit.cost_base</field>
+      <field name="model">purchase.order</field>
+      <field name="inherit_id" ref="purchase.purchase_order_form"/>
+      <field name="arch" type="xml">
+          <!-- Dentro de la pestaña Products, en el tree de order_line, antes de price_unit -->
+          <xpath expr="//page[@name='products']/field[@name='order_line']/tree/field[@name='price_unit']" position="before">
+              <field name="cost_base"
+                    string="Costo Base"
+                    widget="monetary"
+                    options="{'currency_field': 'currency_id'}"/>
+          </xpath>
+      </field>
+  </record>
+</odoo>
