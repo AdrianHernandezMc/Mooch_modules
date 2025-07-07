@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+  <record id="view_account_budget_form_inherit_department" model="ir.ui.view">
+    <field name="name">crossovered.budget.view.form.inherit.department</field>
+    <field name="model">crossovered.budget</field>
+    <field name="inherit_id" ref="account_budget.crossovered_budget_view_form"/>
+    <field name="arch" type="xml">
+      <!-- 1) En el árbol de líneas -->
+      <xpath
+        expr="//field[@name='crossovered_budget_line']/tree/field[@name='general_budget_id']"
+        position="after">
+        <field name="department_id"/>
+      </xpath>
+      <!-- 2) En el formulario de cada línea -->
+      <xpath
+        expr="//field[@name='crossovered_budget_line']/form/group/group/field[@name='general_budget_id']"
+        position="after">
+        <field name="department_id"/>
+      </xpath>
+    </field>
+  </record>
+</odoo>

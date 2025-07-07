@@ -20,6 +20,15 @@ class PurchaseOrderLine(models.Model):
         digits=dp.get_precision('Discount'),
     )
 
+    analytic_account_id = fields.Many2one(
+        'account.analytic.account',
+        string="Cuenta Analítica",
+        help="Primera línea de la distribución analítica.",
+        compute='_compute_analytic_account_id',
+        inverse='_inverse_analytic_account_id',
+        store=True,
+    )
+
     @api.depends('order_id.discount_global')
     def _compute_global_discount(self):
         for line in self:
@@ -35,3 +44,57 @@ class PurchaseOrderLine(models.Model):
         # Guardamos el valor de discount para histórico
         for rec in self:
             rec.discount_original = rec.discount
+
+    @api.depends('analytic_distribution')
+    def _compute_analytic_account_id(self):
+        for line in self:
+            dist = line.analytic_distribution or []
+            # Si por alguna razón vino como string JSON, lo parseamos
+            if isinstance(dist, str):
+                try:
+                    dist = json.loads(dist)
+                except Exception:
+                    dist = []
+            if dist and isinstance(dist, list) and dist[0].get('account_id'):
+                # tomamos la primera línea
+                line.analytic_account_id = dist[0]['account_id']
+            else:
+                # si no hay nada, podemos caer en la del pedido (opcional)
+                line.analytic_account_id = line.order_id.analytic_account_id.id if line.order_id.analytic_account_id else False
+
+    def _inverse_analytic_account_id(self):
+        for line in self:
+            acct = line.analytic_account_id
+            if acct:
+                # escribimos un solo reparto al 100 %
+                line.analytic_distribution = [{
+                    'account_id': acct.id,
+                    'percent': 100.0,
+                }]
+            else:
+                line.analytic_distribution = []
+
+    @api.onchange('product_id')
+    def _onchange_fill_analytic_from_product(self):
+        # si al elegir producto no había distribución, proponemos la cuenta por defecto
+        for line in self:
+            if line.product_id and not line.analytic_distribution:
+                # primero try: la cuenta del pedido, luego la del producto, luego la de la categoría
+                acct = (
+                    line.order_id.analytic_account_id
+                    or getattr(line.product_id, 'analytic_account_id', False)
+                    or getattr(line.product_id.categ_id, 'computed_analytic_account_id', False)
+                )
+                if acct:
+                    line.analytic_account_id = acct.id
+
+    @api.onchange('product_id')
+    def _onchange_product_set_analytic(self):
+        for line in self:
+            # Busca la cuenta directamente en el producto o en su categoría
+            acct = (line.product_id.analytic_account_id
+                    or line.product_id.categ_id.computed_analytic_account_id
+                    or False)
+            if acct:
+                # Pone un reparto único al 100%
+                line.analytic_distribution = {acct.id: 100.0}

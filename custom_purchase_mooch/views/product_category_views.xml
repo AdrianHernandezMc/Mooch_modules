@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="custom_purchase_mooch.product_category_form_inherit_analytic" model="ir.ui.view">
+      <field name="name">product.category.form.inherit.analytic.account</field>
+      <field name="model">product.category</field>
+      <!-- Heredamos la vista de categoría estándar -->
+      <field name="inherit_id" ref="product.product_category_form_view"/>
+      <field name="arch" type="xml">
+        <!-- Insertamos tras el campo parent_id -->
+        <xpath expr="//field[@name='parent_id']" position="after">
+          <field name="analytic_account_id"
+                 groups="analytic.group_analytic_accounting"
+                 placeholder="Cuenta Analítica…"/>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>
