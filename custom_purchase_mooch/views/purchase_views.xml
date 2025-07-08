@@ -57,5 +57,29 @@
         </xpath>
       </field>
     </record>
+    <record id="view_purchase_order_form_inherit_budget" model="ir.ui.view">
+      <field name="name">purchase.order.form.inherit.budget</field>
+      <field name="model">purchase.order</field>
+      <field name="inherit_id" ref="purchase.purchase_order_form"/>
+      <field name="arch" type="xml">
+        <!-- 1) Campo oculto para que el widget lo cargue -->
+        <xpath expr="//sheet" position="inside">
+          <field name="budget_validated"/>
+          <!-- invisible="1"/> -->
+        </xpath>
+        <!-- 2) Botón “Validar Presupuesto” -->
+        <xpath expr="//button[@name='button_confirm']" position="before">
+          <button name="action_check_budget"
+                  string="Validar Presupuesto"
+                  type="object"
+                  class="btn-primary"
+                  modifiers="{'invisible': [('budget_validated','=', True)]}"/>
+        </xpath>
+        <!-- 3) Hacer invisible “Confirmar” hasta que budget_validated=True -->
+        <xpath expr="//button[@name='button_confirm']" position="attributes">
+          <attribute name="modifiers">{'invisible': [('budget_validated','=', False)]}</attribute>
+        </xpath>
+      </field>
+    </record>
   </data>
 </odoo>
