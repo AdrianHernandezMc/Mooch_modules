@@ -40,7 +40,7 @@
       <field name="arch" type="xml">
         <xpath expr="//header" position="inside">
           <button name="action_open_product_selector" type="object"
-                  string="Agregar Productos" class="oe_highlight" context="{'active_id': id}"/>
+                  string="Agregar Productos" class="oe_highlight" context="{'active_id': id}" invisible="not budget_validated or state != 'draft'"/>
         </xpath>
       </field>
     </record>
@@ -54,6 +54,26 @@
           <attribute name="options">
             {'product_field': 'product_id', 'business_domain': 'purchase_order', 'amount_field': 'price_subtotal'}
           </attribute>
+        </xpath>
+      </field>
+    </record>
+    <record id="view_purchase_order_form_inherit_budget" model="ir.ui.view">
+      <field name="name">purchase.order.form.inherit.budget</field>
+      <field name="model">purchase.order</field>
+      <field name="inherit_id" ref="purchase.purchase_order_form"/>
+      <field name="arch" type="xml">
+        <!-- 1) Campo oculto para que el widget lo cargue -->
+        <xpath expr="//sheet" position="inside">
+          <field name="budget_validated"/>
+          <!-- invisible="1"/> -->
+        </xpath>
+        <!-- 2) Botón “Validar Presupuesto” -->
+        <xpath expr="//button[@name='button_confirm']" position="before">
+            <button name="action_check_budget"
+                    string="Validar Presupuesto"
+                    type="object"
+                    class="btn-primary"
+                    invisible="budget_validated"/>
         </xpath>
       </field>
     </record>
