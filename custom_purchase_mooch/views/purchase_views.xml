@@ -40,7 +40,7 @@
       <field name="arch" type="xml">
         <xpath expr="//header" position="inside">
           <button name="action_open_product_selector" type="object"
-                  string="Agregar Productos" class="oe_highlight" context="{'active_id': id}"/>
+                  string="Agregar Productos" class="oe_highlight" context="{'active_id': id}" invisible="not budget_validated or state != 'draft'"/>
         </xpath>
       </field>
     </record>
@@ -69,15 +69,11 @@
         </xpath>
         <!-- 2) Botón “Validar Presupuesto” -->
         <xpath expr="//button[@name='button_confirm']" position="before">
-          <button name="action_check_budget"
-                  string="Validar Presupuesto"
-                  type="object"
-                  class="btn-primary"
-                  modifiers="{'invisible': [('budget_validated','=', True)]}"/>
-        </xpath>
-        <!-- 3) Hacer invisible “Confirmar” hasta que budget_validated=True -->
-        <xpath expr="//button[@name='button_confirm']" position="attributes">
-          <attribute name="modifiers">{'invisible': [('budget_validated','=', False)]}</attribute>
+            <button name="action_check_budget"
+                    string="Validar Presupuesto"
+                    type="object"
+                    class="btn-primary"
+                    invisible="budget_validated"/>
         </xpath>
       </field>
     </record>
