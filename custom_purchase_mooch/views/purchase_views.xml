@@ -40,7 +40,7 @@
       <field name="arch" type="xml">
         <xpath expr="//header" position="inside">
           <button name="action_open_product_selector" type="object"
-                  string="Agregar Productos" class="oe_highlight" context="{'active_id': id}" invisible="not budget_validated or state != 'draft'"/>
+                  string="Agregar Productos" class="oe_highlight" context="{'active_id': id}" invisible="not context.get('budget_validated', False) or state != 'draft'"/>
         </xpath>
       </field>
     </record>
