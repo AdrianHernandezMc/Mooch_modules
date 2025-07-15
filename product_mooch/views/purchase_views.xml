@@ -1,4 +1,4 @@
-<odoo>
+<!-- <odoo>
   <record id="purchase_order_form_inherit_cost_base" model="ir.ui.view">
       <field name="name">purchase.order.form.inherit.cost_base</field>
       <field name="model">purchase.order</field>
@@ -13,4 +13,6 @@
           </xpath>
       </field>
   </record>
-</odoo>
+</odoo> -->
+
+<!-- descomentar cuando sea necesario solo por Myrla. -->
