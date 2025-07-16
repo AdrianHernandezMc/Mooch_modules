@@ -4,7 +4,7 @@ from odoo.addons.decimal_precision import dp
 class PurchaseOrderLine(models.Model):
     _inherit = 'purchase.order.line'
 
-    discount_original = fields.Float(
+    discount_global = fields.Float(
         string="Descuento Original (%)",
         help="Porcentaje de descuento antes de aplicar el Descuento Global",
         digits=dp.get_precision('Discount'),
@@ -37,9 +37,10 @@ class PurchaseOrderLine(models.Model):
             line.order_id.discount_global = line.discount
 
     @api.onchange('discount')
-    def _onchange_discount_original(self):
-        for rec in self:
-            rec.discount_original = rec.discount
+    def _onchange_discount(self):
+        """Actualiza discount_global cuando cambia discount"""
+        for line in self:
+            line.discount_global = line.discount
 
     @api.depends('analytic_distribution')
     def _compute_analytic_account_id(self):

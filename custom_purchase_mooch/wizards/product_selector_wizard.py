@@ -12,25 +12,40 @@ class ProductSelectorWizard(models.TransientModel):
 
     def action_confirm(self):
         self.ensure_one()
-        # filtrar los seleccionados
         selected = self.selector_ids.filtered('x_selected')
         if not selected:
             raise UserError("Debe seleccionar al menos un producto.")
+        
         for sel in selected:
-            # 1) crear la línea (aquí Odoo aplica sus onchanges internos)
-            line = self.env['purchase.order.line'].create({
-                'order_id':    self.purchase_id.id,
-                'product_id':  sel.product_id.id,
-                'name':        sel.product_id.name,
+            # Preparar valores base
+            line_vals = {
+                'order_id': self.purchase_id.id,
+                'product_id': sel.product_id.id,
+                'name': sel.product_id.name,
                 'product_uom': sel.product_id.uom_po_id.id,
-                'price_unit':  sel.price_unit,
+                'price_unit': sel.price_unit,
                 'product_qty': sel.product_qty,
-            })
-            # 2) sobrescribir de golpe con los valores que puso el usuario
+            }
+            
+            # Lógica adaptada de _onchange_product_set_analytic
+            analytic_account = (
+                self.purchase_id.analytic_account_id or
+                getattr(sel.product_id, 'analytic_account_id', False) or
+                getattr(sel.product_id.categ_id, 'computed_analytic_account_id', False)
+            )
+            
+            if analytic_account:
+                line_vals['analytic_distribution'] = {str(analytic_account.id): 100.0}
+            
+            # Crear la línea
+            line = self.env['purchase.order.line'].create(line_vals)
+            
+            # Mantener valores específicos del usuario
             line.write({
-                'price_unit':  sel.price_unit,
+                'price_unit': sel.price_unit,
                 'product_qty': sel.product_qty,
             })
+            
         return {'type': 'ir.actions.act_window_close'}
 
     @api.model
