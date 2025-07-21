@@ -254,3 +254,60 @@ class PurchaseOrder(models.Model):
             if not po.budget_validated:
                 raise UserError(_("Debes primero “Validar Presupuesto”"))
         return super().button_confirm()
+    
+    def get_department_budget_data(self):
+        BudgetLine = self.env['crossovered.budget.lines']
+        AnalyticLine = self.env['account.analytic.line']
+        today = fields.Date.context_today(self)
+        
+        departments = self.env['hr.department'].search([])
+        
+        result = []
+        for dept in departments:
+            # Buscar cuentas analíticas asociadas al departamento
+            accounts = self.env['account.analytic.account'].search([
+                ('department_id', '=', dept.id),
+                ('active', '=', True)
+            ])
+            
+            if not accounts:
+                continue
+                
+            total_budget = 0
+            total_committed = 0
+            for account in accounts:
+                # Buscar línea de presupuesto vigente
+                bline = BudgetLine.search([
+                    ('analytic_account_id', '=', account.id),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                
+                if not bline:
+                    continue
+                    
+                # Calcular total comprometido
+                domain = [
+                    ('account_id', '=', account.id),
+                    ('date', '>=', bline.date_from),
+                    ('date', '<=', bline.date_to),
+                ]
+                analytic_lines = AnalyticLine.search(domain)
+                total_committed += sum(abs(line.amount) for line in analytic_lines)
+                total_budget += bline.planned_amount
+            
+            if total_budget <= 0:
+                continue
+                
+            available = total_budget - total_committed
+            percentage = (total_committed / total_budget * 100)
+            
+            result.append({
+                'department': dept.name,
+                'budget_total': total_budget,
+                'committed': total_committed,
+                'available': available,
+                'percentage': percentage,
+            })
+        
+        return result
