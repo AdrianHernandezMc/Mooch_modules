@@ -121,7 +121,7 @@ class ProductMooch(models.Model):
             # ('',       _('— Sin tipo —')),
             ('sale_type_clothes', _('Tipo de Compra Ropa')),
             ('sale_type_home', _('Tipo de Compra Hogar')),
-            ('sale_type_shoe', _('Tipo de Compra Calzado')),
+            ('sale_type_shoe', _('Tipo de Compra Calzado'))
             # ('sale_type_season', _('Tipo de Compra Temporada'))
         ],
         string='Tipo de Compra',
