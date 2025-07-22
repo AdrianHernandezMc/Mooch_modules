@@ -8,6 +8,6 @@ class ProductTemplate(models.Model):
         string="Cuenta Analítica",
         related='categ_id.computed_analytic_account_id',
         store=True,
-        readonly=False,
+        readonly=True,
         help="Tomada de la categoría de productos(si no tiene notificar).",
     )

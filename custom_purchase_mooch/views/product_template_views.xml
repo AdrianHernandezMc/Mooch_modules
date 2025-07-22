@@ -7,7 +7,7 @@
       <field name="inherit_id" ref="product.product_template_form_view"/>
       <field name="arch" type="xml">
         <xpath expr="//field[@name='categ_id']" position="after">
-          <field name="analytic_account_id"/>
+          <field name="analytic_account_id" readonly="1" widget="text"/>
         </xpath>
       </field>
     </record>

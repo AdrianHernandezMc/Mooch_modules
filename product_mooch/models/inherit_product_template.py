@@ -122,7 +122,7 @@ class ProductMooch(models.Model):
             ('sale_type_clothes', _('Tipo de Compra Ropa')),
             ('sale_type_home', _('Tipo de Compra Hogar')),
             ('sale_type_shoe', _('Tipo de Compra Calzado')),
-            ('sale_type_season', _('Tipo de Compra Temporada'))
+            # ('sale_type_season', _('Tipo de Compra Temporada'))
         ],
         string='Tipo de Compra',
         help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado",
@@ -468,7 +468,8 @@ class ProductMooch(models.Model):
     def cron_recompute_product_prices(self):
         """Recalcula precios tomando el costo real de cada variante."""
         params = self.env['ir.config_parameter'].sudo()
-        for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_season', 'sale_type_shoe'):
+        for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_shoe'):
+            # sale_type_season esto tenia antes de quitar el season
             pct_cash   = float(params.get_param(f'product_mooch.{sale_type}_cash',   default=0.0))
             pct_credit = float(params.get_param(f'product_mooch.{sale_type}_credit', default=0.0))
             # iteramos sobre VARIANTES, no plantillas

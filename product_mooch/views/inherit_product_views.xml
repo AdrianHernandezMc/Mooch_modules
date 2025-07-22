@@ -87,7 +87,7 @@
                         <group>
                             <field name="type_id" placeholder="Seleccione un Tipo de Producto" options="{'no_open': True, 'no_create': True}"/>
                             <field name="size_id" placeholder="Seleccione una Talla" options="{'no_open': True, 'no_create': True}" />
-                            <field name="partner_code" string="Codigo Proveedor" placeholder="Ingresar codigo proveedor" options="{'no_open': True, 'no_create': True}" />
+                            <field name="partner_code" string="Modelo Proveedor" placeholder="Ingresar modelo proveedor" options="{'no_open': True, 'no_create': True}" />
                             <field name="unspsc_code_id" placeholder="Seleccione una Categoria SAT" options="{'no_open': True, 'no_create': True}" required="1"/>
                         </group>
                         <group>
