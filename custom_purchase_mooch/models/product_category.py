@@ -13,6 +13,7 @@ class ProductCategory(models.Model):
         string="Cuenta Analítica (heredada)",
         compute='_compute_computed_analytic_account_id',
         store=True,
+        recursive=True,
         help="Cuenta propia o, si no, la de la categoría padre",
     )
 
