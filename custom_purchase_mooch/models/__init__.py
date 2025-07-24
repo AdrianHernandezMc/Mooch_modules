@@ -8,3 +8,5 @@ from . import hr_department
 from . import product_template
 from . import product_category
 from . import budget_validation_wizard
+from . import ir_attachment
+from . import account_move
