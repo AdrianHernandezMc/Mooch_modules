@@ -6,7 +6,7 @@
     </record>
         <record id="barcode_parameter_sub_department" model="barcode.parameter">
         <field name="name">Sub Departamento</field>
-        <field name="digits">2</field>
+        <field name="digits">3</field>
     </record>
     <record id="barcode_parameter_color" model="barcode.parameter">
         <field name="name">Color</field>
@@ -22,7 +22,7 @@
     </record>
     <record id="barcode_parameter_partner" model="barcode.parameter">
         <field name="name">Proveedor</field>
-        <field name="digits">2</field>
+        <field name="digits">3</field>
     </record>
     <!-- <record id="barcode_parameter_consecutive" model="barcode.parameter">
         <field name="name">Consecutivo</field>
