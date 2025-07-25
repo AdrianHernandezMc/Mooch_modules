@@ -143,7 +143,7 @@ class PurchaseOrder(models.Model):
                 if not acct.exists():
                     continue
                     
-                amt = line.price_subtotal * (percentage / 100.0)
+                amt = line.price_total  * (percentage / 100.0)
                 totals[acct] = totals.get(acct, 0.0) + amt
 
         if not totals:
