@@ -10,3 +10,4 @@ from . import product_category
 from . import budget_validation_wizard
 from . import ir_attachment
 from . import account_move
+from . import analytic_line
