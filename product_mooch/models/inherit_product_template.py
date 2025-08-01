@@ -34,7 +34,7 @@ class ProductMooch(models.Model):
         string="Precio de Venta",
         compute='_compute_prices_list',
         default=1,
-        store=False
+        store=True
         )
 
     credit_price = fields.Float(
@@ -42,7 +42,7 @@ class ProductMooch(models.Model):
         help='Precio de venta a crédito de Mooch',
         compute='_compute_prices_cred',
         default=1,
-        store=False
+        store=True
         )
 
     partner_name = fields.Many2one(
@@ -468,27 +468,35 @@ class ProductMooch(models.Model):
     def cron_recompute_product_prices(self):
         """Recalcula precios tomando el costo real de cada variante."""
         params = self.env['ir.config_parameter'].sudo()
+        _logger.info("=== INICIO cron_recompute_product_prices ===")
         for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_shoe'):
-            # sale_type_season esto tenia antes de quitar el season
             pct_cash   = float(params.get_param(f'product_mooch.{sale_type}_cash',   default=0.0))
             pct_credit = float(params.get_param(f'product_mooch.{sale_type}_credit', default=0.0))
-            # iteramos sobre VARIANTES, no plantillas
-            variants = self.env['product.product'].search([('product_tmpl_id.sale_type', '=', sale_type)])
+            variants = self.env['product.product'].search([
+                ('product_tmpl_id.sale_type', '=', sale_type)
+            ])
+            _logger.info("🔎 [%s] %d variantes a procesar", sale_type, len(variants))
             for var in variants:
-                cost = var.standard_price or 0.0
+                # fallback: si standard_price > 0 lo usamos, si no, cost_base
+                cost = var.cost_base if var.cost_base and var.cost_base > 0 else (var.standard_price or 0.0)
+                if cost <= 0:
+                    _logger.warning("⚠️ Variante %s (ID %s): no tiene cost válido; se usa 0",
+                                    var.display_name, var.id)
+
                 new_list   = round(cost * (1 + pct_cash   / 100), 0) if cost else 0.0
                 new_credit = round(cost * (1 + pct_credit / 100), 0) if cost else 0.0
-                # escribimos sobre la plantilla asociada
-                var.product_tmpl_id.write({
-                    'list_price':   new_list,
-                    'credit_price': new_credit,
-                    # si necesitas respaldar:
-                    'list_price_backup':   new_list,
-                    'credit_price_backup': new_credit,
-                    'cost_price_backup':   cost,
+
+                # escribimos sobre la plantilla asociada (si tienes cálculos computados, usa sudo y contexto)
+                var.product_tmpl_id.sudo().with_context(bypass_computed_fields=True).write({
+                    'list_price':           new_list,
+                    'credit_price':         new_credit,
+                    'list_price_backup':    new_list,
+                    'credit_price_backup':  new_credit,
+                    'cost_price_backup':    cost,
                 })
-                _logger.info("⚙️ %s.%s: costo=%s → list=%s, cred=%s",
+                _logger.info("⚙️ %s.%s: cost=%s → list=%s, cred=%s",
                              var.product_tmpl_id.name, var.name, cost, new_list, new_credit)
+        _logger.info("=== FIN cron_recompute_product_prices ===")
         return True
 
     @api.depends('credit_price', 'taxes_id')
