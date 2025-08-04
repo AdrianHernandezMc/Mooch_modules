@@ -4,7 +4,7 @@
     'author': ['Baruc Alvarez'],
     'category': 'Inventory',
     'summary': 'Campos traslados para Mooch',
-    'depends': ['stock','hr'],
+    'depends': ['stock','hr','stock_account',],
     'license': 'Other proprietary',
     'data': [
         'views/stock_picking_views.xml',
