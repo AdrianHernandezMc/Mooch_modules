@@ -1,5 +1,3 @@
-# custom_stock_mooch/models/stock_return_picking.py
-# -*- coding: utf-8 -*-
 import logging
 
 from odoo import api, fields, models, _
@@ -60,18 +58,6 @@ class StockReturnPicking(models.TransientModel):
                         'quantity': 0.0,
                         'to_refund': False,
                     }))
-            res['product_return_moves'] = lines
-        return res
-        
-        # 2) Si no vienen líneas del stock.return.picking, inicializamos desde el albarán activo
-        if 'product_return_moves' in fields_list and not res.get('product_return_moves'):
-            picking = self.env['stock.picking'].browse(ctx.get('active_id'))
-            for move in picking.move_ids.filtered(lambda m: m.state!='cancel'):
-                lines.append((0, 0, {
-                    'move_id': move.id,
-                    'quantity': 0.0,
-                    'to_refund': False,
-                }))
             res['product_return_moves'] = lines
         return res
 
