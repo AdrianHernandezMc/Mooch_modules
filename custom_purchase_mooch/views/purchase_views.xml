@@ -57,7 +57,7 @@
           </attribute>
         </xpath>
         <xpath expr="//field[@name='taxes_id']" position="after">
-          <field name="discount_global_value" widget="porcentage" optional="show"/>
+          <field name="discount_global_value" widget="porcentage" readonly="1" optional="show"/>
         </xpath>
       </field>
     </record>
