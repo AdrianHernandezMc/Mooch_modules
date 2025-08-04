@@ -16,7 +16,8 @@
           <field name="discount_global"
                  string="Descuento Global (%)"
                  placeholder="%"
-                 class="ps-3"/>
+                 class="ps-3"
+                 invisible="1"/>
         </xpath>
         <xpath expr="//field[@name='discount']" position="attributes">
           <attribute name="widget"/>
@@ -54,6 +55,9 @@
           <attribute name="options">
             {'product_field': 'product_id', 'business_domain': 'purchase_order', 'amount_field': 'price_subtotal'}
           </attribute>
+        </xpath>
+        <xpath expr="//field[@name='taxes_id']" position="after">
+          <field name="discount_global_value" widget="porcentage" optional="show"/>
         </xpath>
       </field>
     </record>
@@ -116,6 +120,17 @@
         <xpath expr="//field[@name='order_line']//tree//field[@name='product_packaging_id']" position="attributes">
             <attribute name="optional">hide</attribute>
         </xpath>
+        </field>
+    </record>
+    <record id="purchase_order_view_buttons" model="ir.ui.view">
+        <field name="name">purchase.order.view.buttons</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <!-- Agregar botón junto a los existentes -->
+            <xpath expr="//header//button[@name='button_confirm']" position="after">
+                <button name="action_open_discount_wizard" string="Agregar Descuento Global" type="object" class="btn-primary" invisible="not (state == 'draft')"/>
+            </xpath>
         </field>
     </record>
   </data>
