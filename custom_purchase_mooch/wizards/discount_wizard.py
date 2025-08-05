@@ -54,13 +54,13 @@ class PurchaseDiscountWizard(models.TransientModel):
     def action_apply_discount(self):
         self.ensure_one()
         
-        # Validar límite del descuento
+        # Validar límite del descuento (código existente)
         if self.discount_type == 'percentage' and self.discount_value > 100:
             raise UserError("El descuento porcentual no puede ser mayor al 100%")
         elif self.discount_type == 'fixed' and self.discount_value > self.order_id.amount_untaxed:
             raise UserError("El descuento en monto fijo no puede superar el total de la orden")
 
-        # Buscar o crear producto de descuento
+        # Buscar o crear producto de descuento (código existente)
         product = self.env['product.product'].search([('default_code', '=', 'DESC-GLOB')], limit=1)
         if not product:
             product = self.env['product.product'].create({
@@ -71,16 +71,36 @@ class PurchaseDiscountWizard(models.TransientModel):
                 'sale_ok': False,
             })
 
-        # Obtener o crear cuenta analítica
-        analytic_account = self._get_or_create_analytic_account()
+        # ===== CAMBIO PRINCIPAL =====
+        # Obtener cuenta analítica de la primera línea de producto
+        analytic_distribution = {}
+        if self.order_id.order_line:
+            first_product_line = self.order_id.order_line.filtered(
+                lambda l: l.product_id.default_code != 'DESC-GLOB'
+            )[:1]
+            
+            if first_product_line and first_product_line.analytic_distribution:
+                if isinstance(first_product_line.analytic_distribution, str):
+                    try:
+                        analytic_distribution = json.loads(first_product_line.analytic_distribution)
+                    except json.JSONDecodeError:
+                        analytic_distribution = {}
+                elif isinstance(first_product_line.analytic_distribution, dict):
+                    analytic_distribution = first_product_line.analytic_distribution.copy()
+        
+        # Si no encontramos distribución, usamos la cuenta por defecto
+        if not analytic_distribution:
+            analytic_account = self._get_or_create_analytic_account()
+            analytic_distribution = {str(analytic_account.id): 100}
+        # ===== FIN DEL CAMBIO =====
 
-        # Calcular monto del descuento
+        # Calcular monto del descuento (código existente)
         if self.discount_type == 'percentage':
             amount = -(self.order_id.amount_untaxed * self.discount_value / 100)
         else:
             amount = -abs(self.discount_value)
 
-        # Verificar si ya existe un descuento en esta orden
+        # Verificar si ya existe un descuento en esta orden (código existente)
         existing_discount = self.order_id.order_line.filtered(
             lambda l: l.product_id.default_code == 'DESC-GLOB'
         )
@@ -89,7 +109,7 @@ class PurchaseDiscountWizard(models.TransientModel):
             _logger.info(f"Intento de duplicar descuento en orden {self.order_id.name}")
             raise UserError("Ya existe un descuento global en esta orden. Elimínelo primero para aplicar uno nuevo.")
 
-        # Crear línea de descuento con distribución analítica
+        # Crear línea de descuento (solo cambia analytic_distribution)
         self.env['purchase.order.line'].create({
             'order_id': self.order_id.id,
             'product_id': product.id,
@@ -97,9 +117,10 @@ class PurchaseDiscountWizard(models.TransientModel):
             'product_qty': 1,
             'price_unit': amount,
             'discount_global_value': self.discount_value,
-            'analytic_distribution': {str(analytic_account.id): 100},
+            'analytic_distribution': analytic_distribution,  # Usamos la distribución calculada
         })
 
+        # Retorno existente
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
