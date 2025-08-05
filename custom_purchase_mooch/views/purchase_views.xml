@@ -128,7 +128,7 @@
         <field name="inherit_id" ref="purchase.purchase_order_form"/>
         <field name="arch" type="xml">
             <!-- Agregar botón junto a los existentes -->
-            <xpath expr="//header//button[@name='button_confirm']" position="after">
+            <xpath expr="//header//button[@name='action_check_budget']" position="before">
                 <button name="action_open_discount_wizard" string="Agregar Descuento Global" type="object" class="btn-primary" invisible="not (state == 'draft')"/>
             </xpath>
         </field>
