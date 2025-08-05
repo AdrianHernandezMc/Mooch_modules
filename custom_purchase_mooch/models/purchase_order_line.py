@@ -27,6 +27,14 @@ class PurchaseOrderLine(models.Model):
         store=True,
     )
 
+    discount_global_value = fields.Float(
+        string='Valor del Descuento Global (%)',
+        digits=dp.get_precision('Discount'),
+        default=0.0,
+        help="Descuento porcentual a aplicar a esta línea",
+        store=True
+    )
+
     @api.depends('order_id.discount_global')
     def _compute_global_discount(self):
         for line in self:

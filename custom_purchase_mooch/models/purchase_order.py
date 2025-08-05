@@ -309,5 +309,18 @@ class PurchaseOrder(models.Model):
                 'available': available,
                 'percentage': percentage,
             })
-        
+
         return result
+
+    def action_open_discount_wizard(self):
+        self.ensure_one()
+        return {
+            'name': 'Agregar Descuento Global',
+            'type': 'ir.actions.act_window',
+            'res_model': 'purchase.discount.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_order_id': self.id,
+            }
+        }
