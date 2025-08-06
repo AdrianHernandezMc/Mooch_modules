@@ -1,0 +1,7 @@
+<templates id="template">
+ <t t-extend="TicketScreen">
+   <t t-jquery="button.pay-order-button" t-operation="attributes">
+     <attribute name="t-on-click">onClickRefundButton</attribute>
+   </t>
+ </t>
+</templates>
