@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="exchange_buttons_ticket_templates" xml:space="preserve" owl="1">
+  <!-- Heredamos la pantalla de tickets -->
+  <t t-name="exchange_buttons.TicketScreen"
+     t-inherit="point_of_sale.TicketScreen"
+     t-inherit-mode="extension">
+    <!-- Insertamos dentro del div de control-buttons -->
+    <xpath expr="//div[contains(@class,'control-buttons')]" position="inside">
+      <button
+        class="button btn btn-secondary o_ticket_exchange_btn"
+        t-on-click="onClickTicketExchange">
+        <i class="fa fa-exchange me-1"/> Cambiar artículo
+      </button>
+    </xpath>
+  </t>
+</templates>

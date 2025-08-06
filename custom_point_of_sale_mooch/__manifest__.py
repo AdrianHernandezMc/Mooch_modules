@@ -1,0 +1,25 @@
+{
+    'name': "custom_point_of_sale_mooch",
+    'version': '1.0',
+    'category': 'Point of Sale',
+    'summary': 'Reembolsos POS via Loyalty',
+    'depends': ['base','point_of_sale', 'loyalty','pos_loyalty','web'],
+    'data':  [
+        #'views/pos_assets.xml',
+        'security/ir.model.access.csv',
+        'views/changes_menu.xml',
+    ],
+    'assets': {'point_of_sale._assets_pos': [
+        'custom_point_of_sale_mooch/static/src/js/order_selector.js',
+        'custom_point_of_sale_mooch/static/src/js/product_screen_coupon.js',
+        'custom_point_of_sale_mooch/static/src/js/refund_coupon.js',
+        'custom_point_of_sale_mooch/static/src/xml/refund_coupon.xml',
+        'custom_point_of_sale_mooch/static/src/css/refund_coupon.css',
+        'custom_point_of_sale_mooch/static/src/xml/process_exchange.xml',
+        'custom_point_of_sale_mooch/static/src/js/selection_popup.js',
+        'custom_point_of_sale_mooch/static/src/js/alert_invoice.js', 
+    ],
+    },
+    'installable': True,
+    'application': False,
+}

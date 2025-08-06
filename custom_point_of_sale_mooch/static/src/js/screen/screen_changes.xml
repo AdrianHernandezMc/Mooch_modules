@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="exchange.exchanges_template">
+        <div class="vh-100">
+            <h2>Exchange cambios</h2>
+            <div class="d-flex">
+                <div class="changes">
+                    <t t-foreach="state.data_changes" t-as="changes" t-key="changes.id">
+                        <t t-out="changes.id"/>
+                        <t t-out="changes.dest_order_uid"/>
+                    </t>
+                </div>
+             </div>
+        </div>
+    </t>
+</templates>
