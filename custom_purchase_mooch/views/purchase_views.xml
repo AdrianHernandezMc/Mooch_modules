@@ -101,6 +101,9 @@
         <!-- <xpath expr="//button[@name='button_confirm']" position="attributes">
           <attribute name="invisible">1</attribute>
         </xpath> -->
+        <xpath expr="//field[@name='partner_id']" position="attributes">
+            <attribute name="options">{"no_create": true, "no_open": true}</attribute>
+        </xpath>
       </field>
     </record>
     <record id="view_purchase_order_form_hide_description" model="ir.ui.view">
