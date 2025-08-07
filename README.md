@@ -1,129 +1,53 @@
-Mooch Custom Odoo Modules
+# 🐧 Mooch Custom Odoo Modules
 
-Este repositorio agrupa una serie de módulos personalizados desarrollados para Odoo 17/18 bajo la marca Mooch. Cada módulo extiende o mejora funcionalidades estándar de Odoo en áreas de conexión SQL, gestión de crédito, Punto de Venta, compras, reportes, inventario y productos.
+![Odoo](https://img.shields.io/badge/Odoo-17%2F18-7A962B) ![Python](https://img.shields.io/badge/Python-3.10-blue) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
-Tabla de Contenidos
+Este repositorio agrupa una serie de módulos personalizados desarrollados para **Odoo 17/18** bajo la marca **Mooch**. Cada módulo extiende o mejora funcionalidades estándar de Odoo en áreas de conexión SQL, gestión de crédito, Punto de Venta, compras, reportes, inventario y productos.
 
-Requisitos
+---
 
-Instalación
+## 📋 Tabla de Contenidos
 
-Visión General de Módulos
+1. [⚙️ Requisitos](#requisitos)
+2. [🚀 Instalación](#instalación)
+3. [🔍 Visión General de Módulos](#visión-general-de-módulos)
+   - [🗄️ conection_sql_mooch](#conection_sql_mooch)
+   - [💳 custom_credit_mooch](#custom_credit_mooch)
+   - [🛒 custom_point_of_sale_mooch](#custom_point_of_sale_mooch)
+   - [🛍️ custom_purchase_mooch](#custom_purchase_mooch)
+   - [📊 custom_reports_mooch](#custom_reports_mooch)
+   - [📦 custom_stock_mooch](#custom_stock_mooch)
+   - [🔧 product_mooch](#product_mooch)
+4. [📖 Uso Básico](#uso-básico)
+5. [🤝 Contribuciones](#contribuciones)
+6. [📝 Licencia](#licencia)
 
-conection_sql_mooch
+---
 
-custom_credit_mooch
+## ⚙️ Requisitos
 
-custom_point_of_sale_mooch
+- **Odoo** versión 17 o 18
+- **Python** 3.10+
+- Dependencias mínimas (instaladas en tu entorno virtual de Odoo):
+  - `psycopg2`
+  - `reportlab`
+  - `html2canvas`, `jsPDF` (para exportar organigramas)
+  - Otras dependencias propias de Odoo (ver `requirements.txt` de Odoo)
 
-custom_purchase_mooch
+---
 
-custom_reports_mooch
+## 🚀 Instalación
 
-custom_stock_mooch
-
-product_mooch
-
-Uso Básico
-
-Contribuciones
-
-Licencia
-
-Requisitos
-
-Odoo versión 17 o 18
-
-Python 3.10+
-
-Dependencias mínimas (instaladas en tu entorno virtual de Odoo):
-
-psycopg2
-
-reportlab
-
-html2canvas, jsPDF (para exportar organigramas)
-
-Otras dependencias propias de Odoo (ver requirements.txt de Odoo)
-
-Instalación
-
-Clona este repositorio en tu carpeta de módulos de Odoo:
-
+```bash
 cd /ruta/a/tu/odoo/custom_addons
 git clone git@github.com:AdrianHernandezMooch/mooch-custom-addons.git
-
-Asegúrate de que el directorio aparezca en la configuración de Odoo (addons_path).
-
-Mooch Custom Odoo Modules
-
-Este repositorio agrupa una serie de módulos personalizados desarrollados para Odoo 17/18 bajo la marca Mooch. Cada módulo extiende o mejora funcionalidades estándar de Odoo en áreas de conexión SQL, gestión de crédito, Punto de Venta, compras, reportes, inventario y productos.
-
-Tabla de Contenidos
-
-Requisitos
-
-Instalación
-
-Visión General de Módulos
-
-conection_sql_mooch
-
-custom_credit_mooch
-
-custom_point_of_sale_mooch
-
-custom_purchase_mooch
-
-custom_reports_mooch
-
-custom_stock_mooch
-
-product_mooch
-
-Uso Básico
-
-Contribuciones
-
-Licencia
-
-Requisitos
-
-Odoo versión 17 o 18
-
-Python 3.10+
-
-Dependencias mínimas (instaladas en tu entorno virtual de Odoo):
-
-psycopg2
-
-reportlab
-
-html2canvas, jsPDF (para exportar organigramas)
-
-Otras dependencias propias de Odoo (ver requirements.txt de Odoo)
-
-Instalación
-
-Clona este repositorio en tu carpeta de módulos de Odoo:
-
-cd /ruta/a/tu/odoo/custom_addons
-git clone git@github.com:AdrianHernandezMooch/mooch-custom-addons.git
-
-Asegúrate de que el directorio aparezca en la configuración de Odoo (addons_path).
-
-Reinicia el servicio de Odoo:
-
+# Asegúrate de incluir la ruta en addons_path de Odoo
 sudo systemctl restart odoo
 
-Actualiza la lista de Apps en la interfaz de Odoo, activa el modo Desarrollador y busca cada módulo por su nombre técnico.
 
-Instala los módulos en el orden de sus dependencias (si aplica).
 
-Visión General de Módulos
-
-conection_sql_mooch
-
+🔍 Visión General de Módulos
+🗄️ conection_sql_mooch
 Descripción: Facilita conexiones directas a bases de datos externas vía SQL.
 
 Características:
@@ -132,10 +56,9 @@ Configuración de parámetros de conexión (host, port, user, password, dbname).
 
 Métodos para ejecutar consultas y volcar resultados en modelos Odoo.
 
-Dependencias: Ninguna (usa la biblioteca estándar de Python).
+Dependencias: Ninguna.
 
-custom_credit_mooch
-
+💳 custom_credit_mooch
 Descripción: Añade gestión de precio y ventas a crédito.
 
 Características:
@@ -148,23 +71,21 @@ Reportes de cuentas por cobrar.
 
 Dependencias: sale.
 
-custom_point_of_sale_mooch
-
-Descripción: Personalizaciones para el Punto de Venta de Odoo.
+🛒 custom_point_of_sale_mooch
+Descripción: Personalizaciones para el Punto de Venta.
 
 Características:
 
-Funcionalidad de devolución de productos desde el POS.
+Devolución de productos desde el POS.
 
-Alertas cuando el efectivo en caja supera un umbral configurable.
+Alertas de efectivo en caja (umbral configurable).
 
-Botones y popups OWL para gestionar crédito desde el POS.
+Botones y popups OWL para crédito.
 
 Dependencias: point_of_sale, custom_credit_mooch.
 
-custom_purchase_mooch
-
-Descripción: Mejoras al flujo de compras de Odoo.
+🛍️ custom_purchase_mooch
+Descripción: Mejoras al flujo de compras.
 
 Características:
 
@@ -172,68 +93,67 @@ Descuento global en órdenes de compra.
 
 Validación de presupuesto por departamento.
 
-Wizard de selección múltiple de productos para líneas de OC.
+Wizard de selección múltiple de productos.
 
 Dependencias: purchase, account.
 
-custom_reports_mooch
-
+📊 custom_reports_mooch
 Descripción: Reportes personalizados y plantillas QWeb.
 
 Características:
 
-Nuevo reporte de Orden de Compra con campos adicionales.
+Reporte OC con campos adicionales.
 
-Reportes de termopanel con métricas y etiquetas.
+Reportes de termopanel con métricas.
 
 Dependencias: report, purchase.
 
-custom_stock_mooch
-
-Descripción: Extiende la gestión de inventario.
+📦 custom_stock_mooch
+Descripción: Extensión de gestión de inventario.
 
 Características:
 
-Segmentación de pickings por evento/entrada.
+Segmentación de pickings por evento.
 
-Formulario de devolución de stock mejorado con selección de líneas.
+Devoluciones mejoradas con selección de líneas.
 
 Dependencias: stock, custom_purchase_mooch.
 
-product_mooch
-
+🔧 product_mooch
 Descripción: Lógica de negocio para productos.
 
 Características:
 
-Cálculo automático de márgenes y precios de venta.
+Cálculo de márgenes y precios.
 
-Generación automática de códigos internos.
+Generación de códigos internos.
 
 Gestión de atributos (departamento, tipo, color, talla).
 
 Dependencias: product, barcode.
 
-Uso Básico
+📖 Uso Básico
+Configura parámetros en Ajustes → Parámetros.
 
-Tras la instalación, configura los parámetros en Ajustes → Parámetros según el módulo (por ejemplo, umbral de efectivo, porcentajes de descuento, conexiones SQL, etc.).
+Navega a los menús (Ventas, Compras, Inventario, POS, Reportes).
 
-Navega al menú correspondiente (Ventas, Compras, Inventario, POS, Reportes) y prueba las nuevas funcionalidades.
+Prueba las funcionalidades y consulta logs en nivel DEBUG si es necesario.
 
-Para desarrollo y debugging, habilita los logs de nivel INFO/DEBUG en el archivo de configuración de Odoo.
+🤝 Contribuciones
+¡Bienvenidas! Para aportar:
 
-Contribuciones
+bash
+Copiar
+Editar
+git clone git@github.com:AdrianHernandezMooch/mooch-custom-addons.git
+cd mooch-custom-addons
+git checkout -b feature/mi-cambio
+# Realiza cambios, añade tests, documenta
+git push origin feature/mi-cambio
+Luego abre un Pull Request describiendo tu mejora.
 
-¡Las contribuciones son bienvenidas! Para mejoras, bugs o nuevas funcionalidades:
+📝 Licencia
+Distribuido bajo la Licencia MIT. Consulta LICENSE para más detalles.
 
-Haz fork de este repositorio.
-
-Crea una feature branch: git checkout -b feature/mi-nueva-funcionalidad.
-
-Realiza tus cambios, añade tests y documentación.
-
-Envía tu pull request detallando el cambio.
-
-Licencia
-
-Este proyecto se distribuye bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
+Copiar
+Editar
