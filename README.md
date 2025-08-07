@@ -1,34 +1,34 @@
-# ğŸ§ Mooch Custom Odoo Modules
+# ?? Mooch Custom Odoo Modules
 
 ![Odoo](https://img.shields.io/badge/Odoo-17%2F18-7A962B) ![Python](https://img.shields.io/badge/Python-3.10-blue) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
-Este repositorio agrupa una serie de mÃ³dulos personalizados desarrollados para **Odoo 17/18** bajo la marca **Mooch**. Cada mÃ³dulo extiende o mejora funcionalidades estÃ¡ndar de Odoo en Ã¡reas de conexiÃ³n SQL, gestiÃ³n de crÃ©dito, Punto de Venta, compras, reportes, inventario y productos.
+Este repositorio agrupa una serie de m¨®dulos personalizados desarrollados para **Odoo 17/18** bajo la marca **Mooch**. Cada m¨®dulo extiende o mejora funcionalidades est¨¢ndar de Odoo en ¨¢reas de conexi¨®n SQL, gesti¨®n de cr¨¦dito, Punto de Venta, compras, reportes, inventario y productos.
 
 ---
 
-## ğŸ“‹ Tabla de Contenidos
+## ?? Tabla de Contenidos
 
-1. [âš™ï¸ Requisitos](#requisitos)
-2. [ğŸš€ InstalaciÃ³n](#instalaciÃ³n)
-3. [ğŸ” VisiÃ³n General de MÃ³dulos](#visiÃ³n-general-de-mÃ³dulos)
-   - [ğŸ—„ï¸ conection_sql_mooch](#conection_sql_mooch)
-   - [ğŸ’³ custom_credit_mooch](#custom_credit_mooch)
-   - [ğŸ›’ custom_point_of_sale_mooch](#custom_point_of_sale_mooch)
-   - [ğŸ›ï¸ custom_purchase_mooch](#custom_purchase_mooch)
-   - [ğŸ“Š custom_reports_mooch](#custom_reports_mooch)
-   - [ğŸ“¦ custom_stock_mooch](#custom_stock_mooch)
-   - [ğŸ”§ product_mooch](#product_mooch)
-4. [ğŸ“– Uso BÃ¡sico](#uso-bÃ¡sico)
-5. [ğŸ¤ Contribuciones](#contribuciones)
-6. [ğŸ“ Licencia](#licencia)
+1. [?? Requisitos](#requisitos)  
+2. [?? Instalaci¨®n](#instalaci¨®n)  
+3. [?? Visi¨®n General de M¨®dulos](#visi¨®n-general-de-m¨®dulos)  
+   - [??? conection_sql_mooch](#conection_sql_mooch)  
+   - [?? custom_credit_mooch](#custom_credit_mooch)  
+   - [?? custom_point_of_sale_mooch](#custom_point_of_sale_mooch)  
+   - [??? custom_purchase_mooch](#custom_purchase_mooch)  
+   - [?? custom_reports_mooch](#custom_reports_mooch)  
+   - [?? custom_stock_mooch](#custom_stock_mooch)  
+   - [?? product_mooch](#product_mooch)  
+4. [?? Uso B¨¢sico](#uso-b¨¢sico)  
+5. [?? Contribuciones](#contribuciones)  
+6. [?? Licencia](#licencia)  
 
 ---
 
-## âš™ï¸ Requisitos
+## ?? Requisitos
 
-- **Odoo** versiÃ³n 17 o 18
-- **Python** 3.10+
-- Dependencias mÃ­nimas (instaladas en tu entorno virtual de Odoo):
+- **Odoo** versi¨®n 17 o 18  
+- **Python** 3.10+  
+- Dependencias m¨ªnimas (instaladas en tu entorno virtual de Odoo):
   - `psycopg2`
   - `reportlab`
   - `html2canvas`, `jsPDF` (para exportar organigramas)
@@ -36,124 +36,108 @@ Este repositorio agrupa una serie de mÃ³dulos personalizados desarrollados para 
 
 ---
 
-## ğŸš€ InstalaciÃ³n
+## ?? Instalaci¨®n
 
 ```bash
 cd /ruta/a/tu/odoo/custom_addons
 git clone git@github.com:AdrianHernandezMooch/mooch-custom-addons.git
-# AsegÃºrate de incluir la ruta en addons_path de Odoo
+# Aseg¨²rate de incluir la ruta en addons_path de Odoo
 sudo systemctl restart odoo
+```
 
+1. Abre Odoo en modo desarrollador y actualiza la lista de Apps.  
+2. Busca e instala cada m¨®dulo seg¨²n su nombre t¨¦cnico.  
 
+---
 
-ğŸ” VisiÃ³n General de MÃ³dulos
-ğŸ—„ï¸ conection_sql_mooch
-DescripciÃ³n: Facilita conexiones directas a bases de datos externas vÃ­a SQL.
+## ?? Visi¨®n General de M¨®dulos
 
-CaracterÃ­sticas:
+### ??? conection_sql_mooch
 
-ConfiguraciÃ³n de parÃ¡metros de conexiÃ³n (host, port, user, password, dbname).
+- **Descripci¨®n**: Facilita conexiones directas a bases de datos externas v¨ªa SQL.  
+- **Caracter¨ªsticas**:
+  - Configuraci¨®n de par¨¢metros de conexi¨®n (`host`, `port`, `user`, `password`, `dbname`).
+  - M¨¦todos para ejecutar consultas y volcar resultados en modelos Odoo.  
+- **Dependencias**: Ninguna.
 
-MÃ©todos para ejecutar consultas y volcar resultados en modelos Odoo.
+### ?? custom_credit_mooch
 
-Dependencias: Ninguna.
+- **Descripci¨®n**: A?ade gesti¨®n de precio y ventas a cr¨¦dito.  
+- **Caracter¨ªsticas**:
+  - Campo `credit_price` en `product.template`.  
+  - Integraci¨®n en ventas normales y Punto de Venta.  
+  - Reportes de cuentas por cobrar.  
+- **Dependencias**: `sale`.
 
-ğŸ’³ custom_credit_mooch
-DescripciÃ³n: AÃ±ade gestiÃ³n de precio y ventas a crÃ©dito.
+### ?? custom_point_of_sale_mooch
 
-CaracterÃ­sticas:
+- **Descripci¨®n**: Personalizaciones para el Punto de Venta.  
+- **Caracter¨ªsticas**:
+  - Devoluci¨®n de productos desde el POS.  
+  - Alertas de efectivo en caja (umbral configurable).  
+  - Botones y popups OWL para cr¨¦dito.  
+- **Dependencias**: `point_of_sale`, `custom_credit_mooch`.
 
-Campo credit_price en product.template.
+### ??? custom_purchase_mooch
 
-IntegraciÃ³n en ventas normales y Punto de Venta.
+- **Descripci¨®n**: Mejoras al flujo de compras.  
+- **Caracter¨ªsticas**:
+  - Descuento global en ¨®rdenes de compra.  
+  - Validaci¨®n de presupuesto por departamento.  
+  - Wizard de selecci¨®n m¨²ltiple de productos.  
+- **Dependencias**: `purchase`, `account`.
 
-Reportes de cuentas por cobrar.
+### ?? custom_reports_mooch
 
-Dependencias: sale.
+- **Descripci¨®n**: Reportes personalizados y plantillas QWeb.  
+- **Caracter¨ªsticas**:
+  - Reporte de Orden de Compra con campos adicionales.  
+  - Reportes de termopanel con m¨¦tricas.  
+- **Dependencias**: `report`, `purchase`.
 
-ğŸ›’ custom_point_of_sale_mooch
-DescripciÃ³n: Personalizaciones para el Punto de Venta.
+### ?? custom_stock_mooch
 
-CaracterÃ­sticas:
+- **Descripci¨®n**: Extensi¨®n de gesti¨®n de inventario.  
+- **Caracter¨ªsticas**:
+  - Segmentaci¨®n de pickings por evento.  
+  - Devoluciones mejoradas con selecci¨®n de l¨ªneas.  
+- **Dependencias**: `stock`, `custom_purchase_mooch`.
 
-DevoluciÃ³n de productos desde el POS.
+### ?? product_mooch
 
-Alertas de efectivo en caja (umbral configurable).
+- **Descripci¨®n**: L¨®gica de negocio para productos.  
+- **Caracter¨ªsticas**:
+  - C¨¢lculo de m¨¢rgenes y precios.  
+  - Generaci¨®n de c¨®digos internos.  
+  - Gesti¨®n de atributos (departamento, tipo, color, talla).  
+- **Dependencias**: `product`, `barcode`.
 
-Botones y popups OWL para crÃ©dito.
+---
 
-Dependencias: point_of_sale, custom_credit_mooch.
+## ?? Uso B¨¢sico
 
-ğŸ›ï¸ custom_purchase_mooch
-DescripciÃ³n: Mejoras al flujo de compras.
+1. Configura par¨¢metros en **Ajustes ¡ú Par¨¢metros**.  
+2. Navega a los men¨²s (Ventas, Compras, Inventario, POS, Reportes).  
+3. Prueba las funcionalidades y consulta logs en nivel DEBUG si es necesario.  
 
-CaracterÃ­sticas:
+---
 
-Descuento global en Ã³rdenes de compra.
+## ?? Contribuciones
 
-ValidaciÃ³n de presupuesto por departamento.
+?Bienvenides! Para aportar:
 
-Wizard de selecciÃ³n mÃºltiple de productos.
-
-Dependencias: purchase, account.
-
-ğŸ“Š custom_reports_mooch
-DescripciÃ³n: Reportes personalizados y plantillas QWeb.
-
-CaracterÃ­sticas:
-
-Reporte OC con campos adicionales.
-
-Reportes de termopanel con mÃ©tricas.
-
-Dependencias: report, purchase.
-
-ğŸ“¦ custom_stock_mooch
-DescripciÃ³n: ExtensiÃ³n de gestiÃ³n de inventario.
-
-CaracterÃ­sticas:
-
-SegmentaciÃ³n de pickings por evento.
-
-Devoluciones mejoradas con selecciÃ³n de lÃ­neas.
-
-Dependencias: stock, custom_purchase_mooch.
-
-ğŸ”§ product_mooch
-DescripciÃ³n: LÃ³gica de negocio para productos.
-
-CaracterÃ­sticas:
-
-CÃ¡lculo de mÃ¡rgenes y precios.
-
-GeneraciÃ³n de cÃ³digos internos.
-
-GestiÃ³n de atributos (departamento, tipo, color, talla).
-
-Dependencias: product, barcode.
-
-ğŸ“– Uso BÃ¡sico
-Configura parÃ¡metros en Ajustes â†’ ParÃ¡metros.
-
-Navega a los menÃºs (Ventas, Compras, Inventario, POS, Reportes).
-
-Prueba las funcionalidades y consulta logs en nivel DEBUG si es necesario.
-
-ğŸ¤ Contribuciones
-Â¡Bienvenidas! Para aportar:
-
-bash
-Copiar
-Editar
+```bash
 git clone git@github.com:AdrianHernandezMooch/mooch-custom-addons.git
 cd mooch-custom-addons
 git checkout -b feature/mi-cambio
-# Realiza cambios, aÃ±ade tests, documenta
+# Realiza cambios, a?ade tests, documenta
 git push origin feature/mi-cambio
+```
+
 Luego abre un Pull Request describiendo tu mejora.
 
-ğŸ“ Licencia
-Distribuido bajo la Licencia MIT. Consulta LICENSE para mÃ¡s detalles.
+---
 
-Copiar
-Editar
+## ?? Licencia
+
+Distribuido bajo la **Licencia MIT**. Consulta `LICENSE` para m¨¢s detalles.
