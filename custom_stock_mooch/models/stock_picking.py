@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -37,6 +37,13 @@ class StockPicking(models.Model):
         help="Fecha en que el otro picking (origen o destino) fue validado."
     )
 
+    department = fields.Char(
+        string='Departamento',
+        compute='_compute_department',
+        store=True,      # <- si prefieres no almacenarlo, pon False; pero para búsqueda y group_by rinde mejor True
+        index=True,
+    )
+
     @api.depends('state', 'origin', 'name')
     def _compute_date_destination_done(self):
         for picking in self:
@@ -63,3 +70,19 @@ class StockPicking(models.Model):
                     _logger.info(f"[DESTINO] {picking.name} => origen: {origen.name}, fecha: {origen.date_done}")
 
             picking.date_destination_done = date_done_result
+
+    @api.depends('move_ids.product_id.default_code')
+    def _compute_department(self):
+        PARAM = self.env['barcode.parameter.line']
+        PREFIX_LEN = 2
+        for pick in self:
+            if not pick.move_ids:
+                pick.department = _('Sin departamento')
+                continue
+            code = pick.move_ids[0].product_id.default_code or ''
+            prefix = code[:PREFIX_LEN]
+            dept = PARAM.search([
+                ('parameter_id.name', '=', 'Departamento'),
+                ('codigo', '=', prefix),
+            ], limit=1)
+            pick.department = dept.nombre if dept else _('Sin departamento')

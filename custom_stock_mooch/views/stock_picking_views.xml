@@ -32,6 +32,32 @@
             <xpath expr="//button[@data-hotkey='k' and @type='action']" position="attributes">
                 <attribute name="groups">base.group_erp_manager</attribute>
             </xpath>
+            <xpath expr="//sheet//field[@name='location_dest_id']" position="after">
+                <field name="department" string="Departamento" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+    <record id="custom_stock_picking_tree_department" model="ir.ui.view">
+        <field name="name">stock.picking.tree.department</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="priority" eval="17"/>
+        <field name="arch" type="xml">
+        <xpath expr="//field[@name='partner_id']" position="after">
+            <field name="department" string="Departamento"/>
+        </xpath>
+        </field>
+    </record>
+    <record id="view_picking_search_inherit_department" model="ir.ui.view">
+        <field name="name">stock.picking.search.department</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_internal_search"/>
+        <field name="arch" type="xml">
+        <xpath expr="//search" position="inside">
+            <field name="department" string="Departamento"/>
+            <filter name="group_by_department" string="Agrupar por Departamento"
+                    context="{'group_by':'department'}"/>
+        </xpath>
         </field>
     </record>
 </odoo>
