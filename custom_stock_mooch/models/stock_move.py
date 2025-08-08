@@ -1,9 +1,15 @@
-from odoo import models, api, _ 
+from odoo import models, api, _ , fields
 from odoo.tools import float_compare
 
 class StockMove(models.Model):
     _inherit = 'stock.move'
-    
+
+    department_name = fields.Char(
+        string='Departamento',
+        store=True,
+        compute='_compute_department_name',
+    )
+
     def _assign_picking(self):
         """Override to avoid grouping: each stock.move -> its own picking."""
         StockPicking = self.env['stock.picking']
@@ -20,3 +26,8 @@ class StockMove(models.Model):
             # Llamar a la post-procesamiento estándar (reservas, backorders, etc.)
             move._assign_picking_post_process(new=True)
         return True
+
+    @api.depends('product_id.product_tmpl_id.department_id.name')
+    def _compute_department_name(self):
+        for move in self:
+            move.department_name = move.product_id.product_tmpl_id.department_id.name or ''
