@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <record id="view_stock_picking_purchase_totals_inherit" model="ir.ui.view">
+    <field name="name">stock.picking.purchase.totals.inherit.custom_stock_mooch</field>
+    <field name="model">stock.picking</field>
+    <field name="inherit_id" ref="stock.view_picking_form"/>
+    <field name="arch" type="xml">
+
+      <!-- 1) Inyectamos purchase_id oculto para que el motor pueda usarlo en modifiers -->
+      <xpath expr="//form/sheet" position="inside">
+        <field name="purchase_id" invisible="1"/>
+      </xpath>
+
+      <!-- 2) Nuestro bloque debajo de Envios, con el modifier correcto -->
+      <!-- <xpath expr="//page[@name='extra']//group[@name='send_information']" position="after"> -->
+      <xpath expr="//page[@name='operations']" position="inside">
+        <group string="Orden de compra" name="po_totals" invisible="not purchase_id">
+          <field name="purchase_id" readonly="1"/>
+          <group>
+            <field name="po_amount_untaxed" readonly="1"/>
+            <field name="po_amount_tax" readonly="1"/>
+            <field name="po_amount_total" readonly="1"/>
+          </group>
+          <separator string="Este traslado (valuado con OC)"/>
+          <group>
+            <field name="po_picking_amount_untaxed" readonly="1"/>
+            <field name="po_picking_amount_total" readonly="1"/>
+          </group>
+        </group>
+      </xpath>
+    </field>
+  </record>
+</odoo>
