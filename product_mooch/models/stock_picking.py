@@ -26,17 +26,20 @@ class StockPicking(models.Model):
         return self.env.ref('product_mooch.action_report_product_labels_from_picking').report_action(product_templates)
 
     @api.depends(
-        'move_ids_without_package.product_uom_qty',
-        'move_ids_without_package.move_line_ids.qty_done'
+        'move_ids',                     # altas/bajas de líneas (OC)
+        'move_ids.product_uom_qty',     # demanda
+        'move_ids.product_uom',         # conversión
+        'move_ids.state',
+        'state',
     )
     def _compute_total_pieces(self):
-        for pick in self:
+        uom_unit = self.env.ref('uom.product_uom_unit', raise_if_not_found=False)
+        for picking in self:
             total = 0.0
-            for move in pick.move_ids_without_package:
-                if move.move_line_ids:
-                    # si ya generó líneas de operación, sumamos lo ejecutado
-                    total += sum(line.qty_done for line in move.move_line_ids)
-                else:
-                    # si todavía está en borrador, sumamos la demanda prevista
-                    total += move.product_uom_qty
-            pick.total_pieces = total
+            for mv in picking.move_ids.filtered(lambda m: m.state != 'cancel'):
+                # solo contamos si la UoM está en la categoría Unit(s)
+                uom = mv.product_uom
+                if uom_unit and uom and uom.category_id == uom_unit.category_id:
+                    qty = uom._compute_quantity(mv.product_uom_qty or 0.0, uom_unit)
+                    total += qty
+            picking.total_pieces = int(round(total))
