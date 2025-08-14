@@ -17,13 +17,14 @@
         <group string="Orden de compra" name="po_totals" invisible="not purchase_id">
           <field name="purchase_id" readonly="1"/>
           <group>
-            <field name="po_amount_untaxed" readonly="1"/>
+            <!-- <field name="po_amount_untaxed" readonly="1"/>
             <field name="po_amount_tax" readonly="1"/>
-            <field name="po_amount_total" readonly="1"/>
+            <field name="po_amount_total" readonly="1"/> -->
           </group>
           <separator string="Este traslado (valuado con OC)"/>
           <group>
             <field name="po_picking_amount_untaxed" readonly="1"/>
+            <field name="po_picking_amount_tax" readonly="1"/>
             <field name="po_picking_amount_total" readonly="1"/>
           </group>
         </group>

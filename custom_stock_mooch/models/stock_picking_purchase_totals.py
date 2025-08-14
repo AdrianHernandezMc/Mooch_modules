@@ -43,6 +43,13 @@ class StockPickingPurchaseTotals(models.Model):
         store=False,
         readonly=True,
     )
+    po_picking_amount_tax = fields.Monetary(
+        string='Costo de este traslado (Impuesto)',
+        currency_field='po_currency_id',
+        compute='_compute_po_picking_amounts',
+        store=False,
+        readonly=True,
+    )
     po_picking_amount_total = fields.Monetary(
         string='Costo de este traslado (c/imp)',
         currency_field='po_currency_id',
@@ -68,6 +75,7 @@ class StockPickingPurchaseTotals(models.Model):
             po = picking.purchase_id
             if not po:
                 picking.po_picking_amount_untaxed = 0.0
+                picking.po_picking_amount_tax = 0.0
                 picking.po_picking_amount_total = 0.0
                 continue
 
@@ -111,5 +119,8 @@ class StockPickingPurchaseTotals(models.Model):
                     untaxed += line_total
                     total   += line_total
 
+            tax = total - untaxed
+
             picking.po_picking_amount_untaxed = currency.round(untaxed) if currency else untaxed
+            picking.po_picking_amount_tax = currency.round(tax) if currency else tax
             picking.po_picking_amount_total   = currency.round(total)   if currency else total
