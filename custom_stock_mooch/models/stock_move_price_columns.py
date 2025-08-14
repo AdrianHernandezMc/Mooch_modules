@@ -27,7 +27,7 @@ class StockMove(models.Model):
     @api.depends(
         'purchase_line_id.price_unit', 'purchase_line_id.discount',
         'purchase_line_id.currency_id', 'purchase_line_id.product_uom',
-        'product_uom_qty', 'product_uom', 'state', 'company_id.currency_id'
+        'quantity', 'product_uom', 'state', 'company_id.currency_id'
     )
     def _compute_po_price_vals(self):
         for mv in self:
@@ -40,7 +40,7 @@ class StockMove(models.Model):
                     unit_price = unit_price * (1.0 - (pol.discount or 0.0) / 100.0)
 
                 # cantidad de Demanda convertida a la UdM de la OC
-                qty = mv.product_uom_qty or 0.0
+                qty = mv.quantity or 0.0
                 if mv.product_uom and pol.product_uom and mv.product_uom != pol.product_uom:
                     qty = mv.product_uom._compute_quantity(qty, pol.product_uom, rounding_method='HALF-UP')
 
