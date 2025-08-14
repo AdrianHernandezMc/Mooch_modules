@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_stock_transfer_product_selector_user,stock.transfer.product.selector user,model_stock_transfer_product_selector,stock.group_stock_user,1,1,1,1
+access_stock_transfer_product_selector_mgr,stock.transfer.product.selector manager,model_stock_transfer_product_selector,stock.group_stock_manager,1,1,1,1
+access_stock_transfer_product_selector_line_user,stock.transfer.product.selector.line user,model_stock_transfer_product_selector_line,stock.group_stock_user,1,1,1,1
+access_stock_transfer_product_selector_line_mgr,stock.transfer.product.selector.line manager,model_stock_transfer_product_selector_line,stock.group_stock_manager,1,1,1,1
