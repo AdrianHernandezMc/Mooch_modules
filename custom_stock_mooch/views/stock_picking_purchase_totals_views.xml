@@ -24,6 +24,7 @@
           <separator string="Este traslado (valuado con OC)"/>
           <group>
             <field name="po_picking_amount_untaxed" readonly="1"/>
+            <field name="po_picking_amount_tax" readonly="1"/>
             <field name="po_picking_amount_total" readonly="1"/>
           </group>
         </group>
