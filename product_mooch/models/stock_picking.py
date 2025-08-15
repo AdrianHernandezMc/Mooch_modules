@@ -1,6 +1,12 @@
 from odoo import models, api, fields
 from odoo.exceptions import UserError
+class StockMove(models.Model):
+    _inherit = 'stock.move'
 
+    label_selected = fields.Boolean(
+        string="Sel. etiqueta",
+        help="Marca esta línea para imprimir etiqueta."
+    )
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
@@ -12,17 +18,23 @@ class StockPicking(models.Model):
     )
 
     def action_print_labels(self):
+        """
+        En picking:
+        - Si hay líneas con 'label_selected' → imprime solo esas.
+        - Si no hay ninguna marcada → imprime todas las líneas del picking.
+        No toca el formato ni el template del reporte.
+        """
         self.ensure_one()
-        product_templates = []
-        for line in self.move_line_ids:
-            product = line.product_id.product_tmpl_id
-            qty = int(line.qty_done or 0)
-            if product.active and qty > 0:
-                product_templates += [product.id] * qty
+        moves = self.move_ids_without_package or self.move_ids
+        to_print_moves = moves.filtered('label_selected') or moves
+
+        # Plantillas de producto a imprimir
+        product_templates = to_print_moves.mapped('product_id.product_tmpl_id').ids
 
         if not product_templates:
-            raise UserError("No hay productos activos con cantidad válida en las líneas del traslado.")
+            raise UserError("No hay productos para imprimir en este picking.")
 
+        # Mantengo tu acción de reporte tal cual la usas actualmente
         return self.env.ref('product_mooch.action_report_product_labels_from_picking').report_action(product_templates)
 
     @api.depends(
