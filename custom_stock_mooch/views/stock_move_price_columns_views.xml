@@ -5,14 +5,35 @@
     <field name="model">stock.picking</field>
     <field name="inherit_id" ref="stock.view_picking_form"/>
     <field name="arch" type="xml">
-      <xpath expr="//field[@name='move_ids_without_package']/tree" position="inside">
+      <xpath expr="//field[@name='move_ids_without_package']/tree/field[@name='product_uom']" position="after">
         <!-- campo usado por el modifier: DEBE estar en el tree -->
-        <field name="purchase_line_id" invisible="1"/>
+        <field name="purchase_line_id" invisible="1" optional="hide"/>
         <!-- columnas -->
         <field name="po_unit_cost"  invisible="not purchase_line_id" optional="show"/>
         <!-- agrega ‘sum’ para ver el total al pie del grid -->
         <field name="po_line_total" invisible="not purchase_line_id" optional="show" sum="Total (OC)"/>
       </xpath>
+    </field>
+  </record>
+  <record id="view_move_qty_labels_in_picking" model="ir.ui.view">
+    <field name="name">stock.picking.move.qty.labels.inherit.custom_stock_mooch</field>
+    <field name="model">stock.picking</field>
+    <field name="inherit_id" ref="stock.view_picking_form"/>
+    <field name="arch" type="xml">
+
+      <!-- Cambiar "Demanda" (product_uom_qty) a "Solicitada" -->
+      <xpath expr="//field[@name='move_ids_without_package']/tree/field[@name='product_uom_qty']"
+             position="attributes">
+        <attribute name="string">Solicitada</attribute>
+      </xpath>
+
+      <!-- Cambiar "Cantidad" a "Recibida"
+           (en v17 el campo es 'quantity'; en bases viejas era 'quantity_done') -->
+      <xpath expr="//field[@name='move_ids_without_package']/tree/field[@name='quantity' or @name='quantity_done']"
+             position="attributes">
+        <attribute name="string">Recibida</attribute>
+      </xpath>
+
     </field>
   </record>
 </odoo>

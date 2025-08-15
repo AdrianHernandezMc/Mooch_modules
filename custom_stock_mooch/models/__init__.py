@@ -4,3 +4,4 @@ from . import stock_move
 from . import stock_picking_purchase_totals
 from . import stock_move_price_columns
 from . import stock_transfer_product_selector_wizard
+from . import stock_move_force_zero
