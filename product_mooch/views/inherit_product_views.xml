@@ -67,7 +67,11 @@
                 <field name="sale_type"/>
             </xpath>
             <xpath expr="//field[@name='categ_id']" position="before">
-                <field name="cost_base" string="Costo Base"/>
+                <field name="enable_cost_base" string="Habilitar costo base"/>
+                <field name="cost_base"
+                       string="Costo Base"
+                       invisible="not enable_cost_base"
+                       required="enable_cost_base"/>
             </xpath>
             <xpath expr="//page[@name='general_information']" position="after">
                 <page name="product_codes"
@@ -129,5 +133,28 @@
                 <field name="label_selected" string="Sel." widget="boolean_toggle" optional="show"/>
             </xpath>
         </field>
+    </record>
+    <record id="product_template_search_extend_custom" model="ir.ui.view">
+    <field name="name">product.template.search.extend.custom</field>
+    <field name="model">product.template</field>
+    <!-- Odoo 17 -->
+    <field name="inherit_id" ref="product.product_template_search_view"/>
+    <field name="priority">99</field>
+    <field name="arch" type="xml">
+        <xpath expr="//search" position="inside">
+        <separator string="Filtros adicionales"/>
+        <field name="department_id" string="Departamento"/>
+        <field name="sub_department_id" string="Subdepartamento"/>
+        <field name="color_id" string="Color"/>
+        <field name="type_id" string="Tipo de producto"/>
+        <field name="size_id" string="Talla"/>
+        <field name="unspsc_code_id" string="Categoría SAT"/>
+        <field name="partner_name" string="Nombre proveedor"/>
+        <field name="partner_code" string="Modelo proveedor"/>
+
+        <filter name="no_unspsc" string="Sin SAT" domain="[('unspsc_code_id','=',False)]"/>
+        <filter name="with_supplier_name" string="Con Nombre proveedor" domain="[('partner_name','!=',False)]"/>
+        </xpath>
+    </field>
     </record>
 </odoo>

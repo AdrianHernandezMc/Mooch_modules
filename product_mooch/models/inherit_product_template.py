@@ -156,7 +156,16 @@ class ProductMooch(models.Model):
         store=False,
         readonly=True,
     )
-    cost_base = fields.Float(string="Costo Base", store="True")
+
+    enable_cost_base = fields.Boolean(
+        string="Habilitar costo base",
+        default=False,
+        help="Si está activo, el Precio de Contado/Crédito se calculará con base en 'Costo Base'."
+    )
+
+    cost_base = fields.Float(string="Costo Base",
+                             store="True",
+                             help="El Precio de Contado/Crédito se calculará con base en 'Costo Base'.")
 
     _sql_constraints = [
         ('unique_product_name', 'UNIQUE(name)',
@@ -339,31 +348,32 @@ class ProductMooch(models.Model):
             product.profit_margin_list = margin_list
             product.profit_margin_cred = margin_cred
 
-    @api.depends('standard_price', 'profit_margin_list', 'sale_type', 'cost_base')
+    @api.depends('standard_price', 'profit_margin_list', 'sale_type', 'cost_base', 'enable_cost_base')
     def _compute_prices_list(self):
-        """Precio de contado = (costo base, si lo tiene, o costo real) * (1 + porcentaje_contado)"""
+        """Precio de contado = (costo elegido) * (1 + porcentaje_contado)"""
         params = self.env['ir.config_parameter'].sudo()
         for product in self:
-            base_cost = product.cost_base if product.cost_base and product.cost_base > 0 else product.standard_price
+            # usar cost_base SOLO si el check está activo y tiene valor > 0
+            base_cost = product.standard_price
+            if product.enable_cost_base and product.cost_base and product.cost_base > 0:
+                base_cost = product.cost_base
+
             key = f'product_mooch.{product.sale_type}_cash'
             pct = float(params.get_param(key, default=0.0))
-            if base_cost:
-                product.list_price = round(base_cost * (1 + pct / 100), 0)
-            else:
-                product.list_price = 0.0
+            product.list_price = round(base_cost * (1 + pct / 100), 0) if base_cost else 0.0
 
-    @api.depends('standard_price', 'profit_margin_cred', 'sale_type', 'cost_base')
+    @api.depends('standard_price', 'profit_margin_cred', 'sale_type', 'cost_base', 'enable_cost_base')
     def _compute_prices_cred(self):
-        """Precio de crédito = (costo base, si lo tiene, o costo real) * (1 + porcentaje_credito)"""
+        """Precio de crédito = (costo elegido) * (1 + porcentaje_credito)"""
         params = self.env['ir.config_parameter'].sudo()
         for product in self:
-            base_cost = product.cost_base if product.cost_base and product.cost_base > 0 else product.standard_price
+            base_cost = product.standard_price
+            if product.enable_cost_base and product.cost_base and product.cost_base > 0:
+                base_cost = product.cost_base
+
             key = f'product_mooch.{product.sale_type}_credit'
             pct = float(params.get_param(key, default=0.0))
-            if base_cost:
-                product.credit_price = round(base_cost * (1 + pct / 100), 0)
-            else:
-                product.credit_price = 0.0
+            product.credit_price = round(base_cost * (1 + pct / 100), 0) if base_cost else 0.0
 
     @api.onchange('type_id')
     def _onchange_type_id_set_unspsc(self):
@@ -464,6 +474,13 @@ class ProductMooch(models.Model):
     def action_print_labels(self):
         return self.env.ref('product_mooch.action_report_product_labels').report_action(self)
 
+    def _selected_cost_for_variant(self, variant):
+        """Helper para cron: elige costo según check."""
+        # variant es product.product; los campos heredados del template están disponibles.
+        if getattr(variant, 'enable_cost_base', False) and variant.cost_base and variant.cost_base > 0:
+            return variant.cost_base
+        return variant.standard_price or 0.0
+
     @api.model
     def cron_recompute_product_prices(self):
         """Recalcula precios tomando el costo real de cada variante."""
@@ -478,7 +495,7 @@ class ProductMooch(models.Model):
             _logger.info("🔎 [%s] %d variantes a procesar", sale_type, len(variants))
             for var in variants:
                 # fallback: si standard_price > 0 lo usamos, si no, cost_base
-                cost = var.cost_base if var.cost_base and var.cost_base > 0 else (var.standard_price or 0.0)
+                cost = self._selected_cost_for_variant(var)
                 if cost <= 0:
                     _logger.warning("⚠️ Variante %s (ID %s): no tiene cost válido; se usa 0",
                                     var.display_name, var.id)
