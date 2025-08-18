@@ -22,15 +22,17 @@
         <xpath expr="//field[@name='discount']" position="attributes">
           <attribute name="widget"/>
         </xpath>
-        <!-- 3) Total Descuento antes de la sección de impuestos en Products -->
-        <xpath expr="//page[@name='products']//group[@class='oe_subtotal_footer']" position="before">
-          <group class="oe_subtotal_footer">
-            <field name="total_discount"
+        <xpath expr="//field[@name='notes']" position="before">
+          <separator string="Resumen de cantidades"/>
+          <field name="qty_total_order" readonly="1"/>
+        </xpath>
+        <xpath expr="//field[@name='notes']" position="before">
+          <separator string="Resumen de Descuento"/>
+          <field name="total_discount"
                    string="Total Descuento"
                    readonly="1"
                    widget="monetary"
                    options="{'currency_field':'currency_id'}"/>
-          </group>
         </xpath>
       </field>
     </record>
