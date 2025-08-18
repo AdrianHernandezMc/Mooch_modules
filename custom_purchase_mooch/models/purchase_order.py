@@ -50,6 +50,14 @@ class PurchaseOrder(models.Model):
     )
     show_confirm_button = fields.Boolean(string="Mostrar Confirmar", compute='_compute_show_confirm_button', store=False)
 
+    qty_total_order = fields.Float(
+        string='Conteo total de cantidades',
+        compute='_compute_qty_total_order',
+        digits='Product Unit of Measure',
+        help='Suma de las cantidades de las líneas de la orden, excluyendo secciones y notas.',
+        store=True,
+    )
+
     @api.depends('order_line.price_unit', 'order_line.product_qty', 'order_line.discount')
     def _compute_total_discount(self):
         for order in self:
@@ -368,3 +376,19 @@ class PurchaseOrder(models.Model):
                 'default_order_id': self.id,
             }
         }
+        
+
+    @api.depends('order_line.product_qty', 'order_line.display_type')
+    def _compute_qty_total_order(self):
+        for order in self:
+            order.qty_total_order = sum(
+                l.product_qty for l in order.order_line if not l.display_type
+            )
+
+    # Para que se actualice visualmente mientras editas, sin esperar a guardar
+    @api.onchange('order_line', 'order_line.product_qty', 'order_line.display_type')
+    def _onchange_qty_total_order(self):
+        for order in self:
+            order.qty_total_order = sum(
+                l.product_qty for l in order.order_line if not l.display_type
+            )
