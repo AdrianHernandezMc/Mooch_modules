@@ -31,9 +31,6 @@ class StockPicking(models.Model):
         # Plantillas de producto a imprimir
         product_templates = to_print_moves.mapped('product_id.product_tmpl_id').ids
 
-        if not product_templates:
-            raise UserError("No hay productos para imprimir en este picking.")
-
         # Mantengo tu acción de reporte tal cual la usas actualmente
         return self.env.ref('product_mooch.action_report_product_labels_from_picking').report_action(product_templates)
 
