@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="paperformat_attendance_landscape" model="report.paperformat">
+    <field name="name">Attendance A4 Landscape</field>
+    <field name="format">A4</field>
+    <field name="orientation">Landscape</field>
+    <field name="margin_top">35</field>
+    <field name="margin_bottom">10</field>
+    <field name="margin_left">15</field>
+    <field name="margin_right">15</field>
+    <field name="header_line" eval="False"/>
+    <field name="dpi">96</field>
+  </record>
+
+  <record id="action_attendance_pdf" model="ir.actions.report">
+    <field name="name">Asistencias PDF</field>
+    <field name="model">attendance.report.wizard</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">custom_reports_mooch.attendance_pdf</field>
+    <field name="paperformat_id" ref="paperformat_attendance_landscape"/>
+    <field name="print_report_name">
+      'Asistencias_%s_%s' % ((object.date_from or ''), (object.date_to or ''))
+    </field>
+  </record>
+</odoo>
