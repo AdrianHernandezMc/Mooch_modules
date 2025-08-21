@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from collections import defaultdict
 
 # ======= Constantes de formato =======
@@ -25,6 +25,17 @@ def _to_naive(dt):
         return dt.replace(tzinfo=None) if getattr(dt, "tzinfo", None) else dt
     except Exception:
         return dt
+
+def _as_date(v):
+    if isinstance(v, datetime):
+        return v.date()
+    return v
+
+def _iter_days(dfrom, dto):
+    d = dfrom
+    while d <= dto:
+        yield d
+        d += timedelta(days=1)
 
 class ReportAttendancePDF(models.AbstractModel):
     _name = 'report.custom_reports_mooch.attendance_pdf'
@@ -51,7 +62,7 @@ class ReportAttendancePDF(models.AbstractModel):
         if is_rest_day:
             return None
         cal = (
-            emp.work_calendar_id               # tu campo editable
+            getattr(emp, 'work_calendar_id', False)
             or emp.resource_calendar_id
             or emp.company_id.resource_calendar_id
             or self.env.company.resource_calendar_id
@@ -85,7 +96,6 @@ class ReportAttendancePDF(models.AbstractModel):
         in_strs  = {'in', 'check in', 'check_in', 'overtime in', 'overtime_in'}
         out_strs = {'out', 'check out', 'check_out', 'overtime out', 'overtime_out'}
 
-        # Normaliza (dt, tipo) y ordena
         norm = []
         for e in events:
             if isinstance(e, (list, tuple)):
@@ -107,13 +117,16 @@ class ReportAttendancePDF(models.AbstractModel):
 
             norm.append((_to_naive(dt), tnorm))
 
+        # Orden cronológico
         norm.sort(key=lambda x: x[0])
 
-        # 1) Si no hay tipos, alterna in/out
-        if all(t is None for _, t in norm):
+        # Si los tipos vienen "cojos" (todos iguales o todos None), alternar por orden
+        has_in = any(t == 'in' for _, t in norm)
+        has_out = any(t == 'out' for _, t in norm)
+        if not (has_in and has_out):
             return [(dt, 'in' if i % 2 == 0 else 'out') for i, (dt, _) in enumerate(norm)]
 
-        # 2) Completa tipos faltantes alternando desde el último conocido
+        # Caso mixto: rellenar missing alternando desde el último conocido
         filled, current = [], 'in'
         for dt, t in norm:
             if t in ('in', 'out'):
@@ -122,17 +135,6 @@ class ReportAttendancePDF(models.AbstractModel):
                 t = current
             filled.append((dt, t))
             current = 'out' if t == 'in' else 'in'
-
-        # 3) Si tras completar aún tenemos solo un tipo (p.ej. todo 'in'),
-        #    forzamos alternancia por tiempo para posibilitar el cálculo.
-        has_in  = any(t == 'in'  for _, t in filled)
-        has_out = any(t == 'out' for _, t in filled)
-        if not (has_in and has_out):
-            alts = []
-            for i, (dt, _) in enumerate(filled):
-                alts.append((dt, 'in' if i % 2 == 0 else 'out'))
-            return alts
-
         return filled
 
     # ---------- Cálculo por día ----------
@@ -178,17 +180,20 @@ class ReportAttendancePDF(models.AbstractModel):
                 work_sec += int((dt - pin).total_seconds())
                 pin = None
 
-        # Fallback: si no se armó ningún tramo (p.ej. todo "in"),
-        # usa salida - entrada como jornada bruta.
+        # Fallback si no se logró emparejar nada pero hay al menos 2 marcas:
         if work_sec == 0 and entrada_dt and salida_dt and salida_dt > entrada_dt:
             work_sec = int((salida_dt - entrada_dt).total_seconds())
+            # Heurística de comida: usar 2ª y 3ª marcas si existen
+            if len(ev) >= 3:
+                comida_ini = ev[1][0]
+                comida_fin = ev[2][0] if len(ev) >= 3 else None
 
         # Comida válida 30–120 min
         lunch_sec = 0
         if comida_ini and comida_fin:
-            lunch_sec = max(0, int((comida_fin - comida_ini).total_seconds()))
-            if not (1800 <= lunch_sec <= 7200):
-                lunch_sec = 0
+            lunch_time = int((comida_fin - comida_ini).total_seconds())
+            if 1800 <= lunch_time <= 7200:
+                lunch_sec = lunch_time
 
         neto_sec = max(0, work_sec - lunch_sec)
         ot_sec = max(0, neto_sec - 8 * 3600)
@@ -211,6 +216,33 @@ class ReportAttendancePDF(models.AbstractModel):
         })
         return vals
 
+    # ---------- Índice de ausencias (hr.leave) por día ----------
+    def _build_leave_index(self, emp, dfrom, dto):
+        dfrom_d = _as_date(dfrom)
+        dto_d = _as_date(dto)
+
+        Leave = self.env['hr.leave']
+        leaves = Leave.search([
+            ('employee_id', '=', emp.id),
+            ('state', 'not in', ['cancel', 'refuse']),
+            ('request_date_from', '<=', dto_d),
+            ('request_date_to', '>=', dfrom_d),
+        ])
+
+        idx = {}
+        for lv in leaves:
+            start = lv.request_date_from or _as_date(lv.date_from)
+            end = lv.request_date_to or _as_date(lv.date_to)
+            start = _as_date(start)
+            end = _as_date(end)
+            if not start or not end:
+                continue
+            start = max(start, dfrom_d)
+            end = min(end, dto_d)
+            for dd in _iter_days(start, end):
+                idx[dd] = lv
+        return idx
+
     # ---------- Armado del reporte ----------
     def _get_report_values(self, docids, data=None):
         wiz = self.env['attendance.report.wizard'].browse(docids)[:1]
@@ -222,6 +254,8 @@ class ReportAttendancePDF(models.AbstractModel):
         for emp in ds.get('employees', []):
             filas_tmp = []
             emp_days = ds.get('per_emp_day', {}).get(emp.id, {})
+
+            leave_idx = self._build_leave_index(emp, ds['dfrom'], ds['dto'])
 
             for d in ds.get('day_list', []):
                 is_rest = self._is_rest_day(emp, d)
@@ -238,6 +272,22 @@ class ReportAttendancePDF(models.AbstractModel):
                     row['retardo_sec'] = 0
                 else:
                     status = 'Falta' if not has_attendance else 'Asistencia'
+
+                # time off del día
+                leave = leave_idx.get(_as_date(d))
+                if leave:
+                    status = leave.holiday_status_id.name or 'Tiempo libre'
+                    row.update({
+                        'entrada': '',
+                        'comida_ini': '',
+                        'comida_fin': '',
+                        'salida': '',
+                        'h_trab': '00:00',
+                        'h_comida': '00:00',
+                        'h_extra': '00:00',
+                        'retardo': '00:00',
+                        'retardo_sec': 0,
+                    })
 
                 filas_tmp.append({
                     'd': d,
@@ -268,7 +318,7 @@ class ReportAttendancePDF(models.AbstractModel):
                 'emp': emp,
                 'dept': emp.department_id.name or '',
                 'ref': emp.barcode or emp.identification_id or 'no asignado',
-                'suc': emp.work_location_id.name or 'no asignada',
+                'suc': getattr(emp, 'work_location_id', False) and emp.work_location_id.name or 'no asignada',
                 'rows': filas,
             })
 

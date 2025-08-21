@@ -44,6 +44,10 @@
         .att-kv small{
             color: #555;
         }
+        .att-tr small{
+            color: #555;
+            font-size: 8px;
+        }
         .tbl{
             width: 100%;
             border-collapse: collapse;
@@ -69,11 +73,20 @@
         .clearfix {
             clear: both;
         }
+        /* === NUEVO: control de anchos y ajuste del Status === */
+        .tbl { table-layout: fixed; }  /* respeta anchos del */
+        .tbl col.w-date   { width: 14%; }
+        .tbl col.w-time   { width: 16%; }   /* Entrada / Comida ini / fin / Salida */
+        .tbl col.w-work   { width: 16%; }   /* H. trabajadas / H. comida / Retardo */
+        .tbl col.w-status { width: 29%; }  /* más espacio para Status */
+
+        .nowrap      { white-space: nowrap; }              /* HH:MM en una línea */
+        .status-cell { white-space: normal; word-break: break-word; } /* Status completo */
 
         /* ====== AÑADIDO: estilos de status ====== */
         .status-pill {
             padding: 2px 6px;
-            border-radius: 10px;
+            border-radius: 8px;
             color: #fff;
             font-weight: 700;
             font-size: 10px;
@@ -83,6 +96,9 @@
         .st-orange { background: #ef6c00; }  /* Retardo */
         .st-red    { background: #c62828; }  /* Falta */
         .st-blue   { background: #1565c0; }  /* Descanso */
+        .st-purple { background: #6a1b9a; }  /* Vacaciones */
+        .st-teal   { background: #00695c; }  /* Permiso c/goce */
+        .st-gray   { background: #455a64; }  /* Permiso s/goce */
       </style>
 
       <div class="page">
@@ -97,21 +113,26 @@
                 <div><small>No.Empleado:</small> <t t-esc="c['emp'].barcode or 'no asignado'"/></div>
                 <div><t t-esc="c['emp'].name"/></div>
                 <div><small>Departamento:</small> <t t-esc="c['dept']"/></div>
-              </div>
-              <div class="att-kv" style="text-align:right;">
                 <div><small>Sucursal:</small> <t t-esc="c['suc'] or '—'"/></div>
               </div>
             </div>
 
             <table class="tbl">
+              <!-- NUEVO: distribución de anchos por columna -->
+              <colgroup>
+                <col class="w-date"/>
+                <col class="w-time"/><col class="w-time"/><col class="w-time"/><col class="w-time"/>
+                <col class="w-work"/><col class="w-work"/><col class="w-work"/>
+                <col class="w-status"/>
+              </colgroup>
+
               <thead>
                 <tr>
                   <th rowspan="2">Fecha</th>
                   <th colspan="4">Checadas</th>
                   <th rowspan="2">Horas trabajadas</th>
                   <th rowspan="2">Horas de comida</th>
-                  <th rowspan="2">Retardo</th>  <!-- NUEVO -->
-                  <!-- <th rowspan="2">Horas extra</th> -->
+                  <th rowspan="2">Retardo</th>
                   <th rowspan="2">Status</th>
                 </tr>
                 <tr>
@@ -121,25 +142,32 @@
                   <th>Salida</th>
                 </tr>
               </thead>
+
               <tbody>
                 <t t-foreach="c['rows']" t-as="r">
                   <tr>
                     <td><t t-esc="r['fecha_lbl']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['entrada']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['comida_ini']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['comida_fin']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['salida']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['h_trab']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['h_comida']"/></td>
-                    <td style="text-align:center;"><t t-esc="r['retardo']"/></td> <!-- NUEVO -->
-                    <!-- <td style="text-align:center;"><t t-esc="r['h_extra']"/></td> -->
-                    <!-- ====== AÑADIDO: pill de color para el status ====== -->
-                    <td style="text-align:center;">
+
+                    <!-- HH:MM en una sola línea y centrado -->
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['entrada']"/></td>
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['comida_ini']"/></td>
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['comida_fin']"/></td>
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['salida']"/></td>
+
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['h_trab']"/></td>
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['h_comida']"/></td>
+                    <td class="nowrap" style="text-align:center;"><t t-esc="r['retardo']"/></td>
+
+                    <!-- Deja que el Status tenga más ancho y se parta si es largo -->
+                    <td class="status-cell" style="text-align:center;">
                       <span t-att-class="'status-pill ' + (
-                            'st-green'  if r['status']=='Asistencia' else
-                            ('st-orange' if r['status']=='Retardo'   else
-                             ('st-red'    if r['status']=='Falta'     else 'st-blue'))
-                          )">
+                          'st-green'  if r['status']=='Asistencia'      else
+                          ('st-orange' if r['status']=='Retardo'        else
+                          ('st-red'    if r['status']=='Falta'          else
+                          ('st-blue'   if r['status']=='Descanso'       else
+                          ('st-purple' if r['status']=='Vacaciones'     else
+                          ('st-teal'   if r['status']=='Permiso c/goce' else
+                          'st-gray'))))) )">
                         <t t-esc="r['status']"/>
                       </span>
                     </td>
@@ -147,7 +175,9 @@
                 </t>
               </tbody>
             </table>
-
+            <!-- <div class="att-tr" style="text-align:right;">
+              <div><small>Tiempo Total Retardo:</small> <t t-esc="c['suc'] or '—'"/></div>
+            </div> -->
             <t t-if="include_signature">
               <div style="margin-top:12px;">
                 <div class="sign"></div>
