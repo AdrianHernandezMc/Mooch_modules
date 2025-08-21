@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- wrapper requerido -->
+  <template id="attendance_pdf">
+    <t t-call="web.html_container">
+      <t t-call="custom_reports_mooch.attendance_pdf_document"/>
+    </t>
+  </template>
+
+  <template id="attendance_pdf_document">
+    <t t-call="web.external_layout">
+      <!-- tarjetas por hoja (default 4) -->
+      <t t-set="cpp" t-value="4"/>
+      <style>
+        .att-card{
+            display: inline-block;
+            vertical-align: top;
+            border: 1px solid #333;
+            padding: 8px;
+            margin: 6px 6px 0px 0;
+            page-break-inside: avoid;
+            width: 48%;
+            box-sizing: border-box;
+        }
+        .att-head{
+            display: grid;
+            grid-template-columns: 80px 1fr 1fr;
+            grid-gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .att-head .pic{
+            width: 80px;
+            height: 80px;
+            border: 1px solid #bbb;
+            object-fit: cover;
+        }
+        .att-title{
+            font-weight: 700;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 0px;
+        }
+        .att-kv small{
+            color: #555;
+        }
+        .tbl{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+        }
+        .tbl th, .tbl td{
+            border: 1px solid #333;
+            padding: 3px;
+        }
+        .tbl thead th{
+            text-align: center;
+        }
+        .sign{
+            border: 1px solid #333;
+            height: 24px;
+        }
+        /* Contenedor para organizar 2 tarjetas por fila */
+        .card-row {
+            width: 100%;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .clearfix {
+            clear: both;
+        }
+      </style>
+
+      <div class="page">
+        <div class="att-title"><t t-esc="title"/></div>
+
+        <!-- CORRECCIÓN: Cambiar idx por c_index -->
+        <t t-foreach="cards" t-as="c" t-foreach-index="c_index">
+          <div class="att-card" t-att-style="'width:%s;' % card_width">
+            <div class="att-head">
+              <!-- <img class="pic" t-att-src="'/web/image/hr.employee/%s/image_128' % c['emp'].id"/> -->
+              <div class="att-kv">
+                <div><small>Empleado:</small> <t t-esc="c['emp'].id"/></div>
+                <div><t t-esc="c['emp'].name"/></div>
+                <div><small>Departamento:</small> <t t-esc="c['dept']"/></div>
+              </div>
+              <div class="att-kv" style="text-align:right;">
+                <div><small>Referencia:</small> <t t-esc="c['ref'] or '—'"/></div>
+              </div>
+            </div>
+
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th rowspan="2">Fecha</th>
+                  <th colspan="4">Checadas</th>
+                  <th rowspan="2">Horas trabajadas</th>
+                  <th rowspan="2">Horas de comida</th>
+                  <!-- <th rowspan="2">Horas extra</th> -->
+                  <th rowspan="2">Status</th>
+                </tr>
+                <tr>
+                  <th>Entrada</th>
+                  <th>Inicia Comida</th>
+                  <th>Termina Comida</th>
+                  <th>Salida</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-foreach="c['rows']" t-as="r">
+                  <tr>
+                    <td><t t-esc="r['fecha_lbl']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['entrada']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['comida_ini']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['comida_fin']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['salida']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['h_trab']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['h_comida']"/></td>
+                    <!-- <td style="text-align:center;"><t t-esc="r['h_extra']"/></td> -->
+                    <td style="text-align:center;"><t t-esc="r['status']"/></td>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+
+            <t t-if="include_signature">
+              <div style="margin-top:12px;">
+                <div class="sign"></div>
+                <div style="text-align:center; font-weight:1000; margin-top:4px;">Nombre y Firma del empleado</div>
+              </div>
+            </t>
+          </div>
+
+          <!-- CORRECCIÓN: Cambiar idx por c_index -->
+          <t t-if="cpp and (((c_index + 1) % cpp) == 0)">
+            <div style="page-break-after:always;"></div>
+          </t>
+        </t>
+      </div>
+    </t>
+  </template>
+</odoo>

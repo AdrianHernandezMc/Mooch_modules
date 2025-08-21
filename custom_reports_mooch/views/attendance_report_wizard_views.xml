@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- Wizard -->
+  <record id="view_attendance_report_wizard_form" model="ir.ui.view">
+    <field name="name">attendance.report.wizard.form</field>
+    <field name="model">attendance.report.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Reporte de asistencias">
+        <group>
+          <group>
+            <field name="date_from"/>
+            <field name="date_to"/>
+            <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"/>
+            <field name="include_signature"/>
+            <field name="cards_per_page" readonly="1"/>
+          </group>
+        </group>
+        <footer>
+          <button string="Imprimir PDF" type="action" name="%(action_attendance_pdf)d" class="btn-primary"/>
+          <button string="Cancelar" special="cancel" class="btn-secondary"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <!-- Acción “normal” para abrir el wizard (si quieres desde menú) -->
+  <record id="action_attendance_report_wizard" model="ir.actions.act_window">
+    <field name="name">Asistencias PDF</field>
+    <field name="res_model">attendance.report.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+  </record>
+
+  <!-- Menú opcional (puedes dejarlo o no) -->
+  <menuitem id="menu_attendance_report_root"
+            name="Reporte Asistencias"
+            parent="hr_attendance.menu_hr_attendance_root"
+            sequence="99"
+            groups="base.group_user"/>
+  <menuitem id="menu_attendance_report_open"
+            name="Imprimir PDF"
+            parent="menu_attendance_report_root"
+            action="action_attendance_report_wizard"
+            sequence="1"
+            groups="base.group_user"/>
+
+  <!-- Acción contextual en la lista Daily Attendance -->
+  <record id="daily_attendance_tree_inherit_print_button" model="ir.ui.view">
+    <field name="name">daily.attendance.tree.inherit.print.button</field>
+    <field name="model">daily.attendance</field>
+    <field name="inherit_id" ref="hr_biometric_attendance.daily_attendance_view_tree"/>
+    <field name="arch" type="xml">
+      <xpath expr="//tree" position="inside">
+        <!-- abre el wizard usando la acción normal -->
+        <button type="action"
+                name="%(action_attendance_report_wizard)d"
+                string="PDF"
+                icon="fa-print"
+                context="{'active_model':'daily.attendance','active_ids':[active_id]}"/>
+      </xpath>
+    </field>
+  </record>
+</odoo>
