@@ -69,6 +69,20 @@
         .clearfix {
             clear: both;
         }
+
+        /* ====== AÑADIDO: estilos de status ====== */
+        .status-pill {
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: 700;
+            font-size: 10px;
+            display: inline-block;
+        }
+        .st-green  { background: #2e7d32; }  /* Asistencia */
+        .st-orange { background: #ef6c00; }  /* Retardo */
+        .st-red    { background: #c62828; }  /* Falta */
+        .st-blue   { background: #1565c0; }  /* Descanso */
       </style>
 
       <div class="page">
@@ -80,12 +94,12 @@
             <div class="att-head">
               <!-- <img class="pic" t-att-src="'/web/image/hr.employee/%s/image_128' % c['emp'].id"/> -->
               <div class="att-kv">
-                <div><small>Empleado:</small> <t t-esc="c['emp'].id"/></div>
+                <div><small>No.Empleado:</small> <t t-esc="c['emp'].barcode or 'no asignado'"/></div>
                 <div><t t-esc="c['emp'].name"/></div>
                 <div><small>Departamento:</small> <t t-esc="c['dept']"/></div>
               </div>
               <div class="att-kv" style="text-align:right;">
-                <div><small>Referencia:</small> <t t-esc="c['ref'] or '—'"/></div>
+                <div><small>Sucursal:</small> <t t-esc="c['suc'] or '—'"/></div>
               </div>
             </div>
 
@@ -96,6 +110,7 @@
                   <th colspan="4">Checadas</th>
                   <th rowspan="2">Horas trabajadas</th>
                   <th rowspan="2">Horas de comida</th>
+                  <th rowspan="2">Retardo</th>  <!-- NUEVO -->
                   <!-- <th rowspan="2">Horas extra</th> -->
                   <th rowspan="2">Status</th>
                 </tr>
@@ -116,8 +131,18 @@
                     <td style="text-align:center;"><t t-esc="r['salida']"/></td>
                     <td style="text-align:center;"><t t-esc="r['h_trab']"/></td>
                     <td style="text-align:center;"><t t-esc="r['h_comida']"/></td>
+                    <td style="text-align:center;"><t t-esc="r['retardo']"/></td> <!-- NUEVO -->
                     <!-- <td style="text-align:center;"><t t-esc="r['h_extra']"/></td> -->
-                    <td style="text-align:center;"><t t-esc="r['status']"/></td>
+                    <!-- ====== AÑADIDO: pill de color para el status ====== -->
+                    <td style="text-align:center;">
+                      <span t-att-class="'status-pill ' + (
+                            'st-green'  if r['status']=='Asistencia' else
+                            ('st-orange' if r['status']=='Retardo'   else
+                             ('st-red'    if r['status']=='Falta'     else 'st-blue'))
+                          )">
+                        <t t-esc="r['status']"/>
+                      </span>
+                    </td>
                   </tr>
                 </t>
               </tbody>
