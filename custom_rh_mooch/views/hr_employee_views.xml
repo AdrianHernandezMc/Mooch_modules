@@ -1,0 +1,38 @@
+<!-- custom_rh_mooch/views/hr_employee_views.xml -->
+<odoo>
+  <record id="view_employee_form_schedule_tab" model="ir.ui.view">
+    <field name="name">hr.employee.form.schedule.tab.mooch</field>
+    <field name="model">hr.employee</field>
+    <field name="inherit_id" ref="hr.view_employee_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//notebook" position="inside">
+        <page string="Horarios" name="mooch_schedule_tab">
+          <group>
+            <separator string="Calendario de trabajo"/>
+            <group>
+              <field name="work_calendar_id"
+                     domain="[('company_id','in',[False, company_id])]"
+                     options="{'no_open': False}"
+                     context="{'default_company_id': company_id}"/>
+            </group>
+
+            <separator string="Días de descanso (semanal)"/>
+            <group>
+              <field name="rest_monday"/>
+              <field name="rest_tuesday"/>
+              <field name="rest_wednesday"/>
+              <field name="rest_thursday"/>
+              <field name="rest_friday"/>
+              <field name="rest_saturday"/>
+              <field name="rest_sunday"/>
+            </group>
+
+            <group>
+              <field name="rest_notes" placeholder="Notas u observaciones..." />
+            </group>
+          </group>
+        </page>
+      </xpath>
+    </field>
+  </record>
+</odoo>
