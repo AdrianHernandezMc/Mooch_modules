@@ -54,7 +54,7 @@
         }
         .tbl th, .tbl td{
             border: 1px solid #333;
-            padding: 3px;
+            padding: 1px;
         }
         .tbl thead th{
             text-align: center;
@@ -67,7 +67,7 @@
         .card-row {
             width: 100%;
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 1px;
         }
         .clearfix {
             clear: both;
@@ -84,8 +84,8 @@
 
         /* ====== AÑADIDO: estilos de status ====== */
         .status-pill {
-            padding: 2px 6px;
-            border-radius: 8px;
+            padding: 2px 2px;
+            border-radius: 6px;
             color: #fff;
             font-weight: 700;
             font-size: 10px;
@@ -181,9 +181,9 @@
               </div>
             </div>
             <t t-if="include_signature">
-              <div style="margin-top:12px;">
+              <div style="margin-top:1px;">
                 <div class="sign"></div>
-                <div style="text-align:center; font-weight:1000; margin-top:4px;">Nombre y Firma del empleado</div>
+                <div style="text-align:center; font-weight:1000; margin-top:1px;">Nombre y Firma del empleado</div>
               </div>
             </t>
           </div>
