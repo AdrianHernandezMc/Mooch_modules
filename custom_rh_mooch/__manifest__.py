@@ -5,7 +5,7 @@
     'category': 'RH',
     "summary": "Cambios, campos y actualizaciones personalizadas para el modulo de recursos humanos.",
     'author': 'Adrian Hernandez',
-    "depends": ["hr","custom_reports_mooch"],
+    "depends": ["hr"],
     "data": [
         "views/hr_employee_views.xml",
     ],
