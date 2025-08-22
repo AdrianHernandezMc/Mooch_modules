@@ -243,22 +243,75 @@ class ReportAttendancePDF(models.AbstractModel):
                 idx[dd] = lv
         return idx
 
+    # Dentro de class ReportAttendancePDF(models.AbstractModel):
+
+    def _build_events_index_from_attendance(self, emp, dfrom, dto):
+        """
+        Construye un índice por día con checadas a partir de hr.attendance
+        cuando el dataset no trae per_emp_day.
+        Devuelve: { date: [(datetime, 'in'|'out'), ...] }
+        """
+        Att = self.env['hr.attendance']
+
+        dfrom_d = _as_date(dfrom)
+        dto_d   = _as_date(dto)
+
+        # Rango completo del periodo en datetime
+        dt_start = datetime.combine(dfrom_d, datetime.min.time())
+        dt_end   = datetime.combine(dto_d,   datetime.max.time())
+
+        # Trae cualquier asistencia que toque el rango:
+        # check_in <= fin Y (check_out es nulo O check_out >= inicio)
+        domain = [
+            ('employee_id', '=', emp.id),
+            ('check_in', '<=', dt_end),
+            '|', ('check_out', '=', False), ('check_out', '>=', dt_start),
+        ]
+        recs = Att.search(domain, order='check_in asc')
+
+        from collections import defaultdict
+        events_by_day = defaultdict(list)
+
+        for att in recs:
+            if att.check_in:
+                events_by_day[att.check_in.date()].append((att.check_in, 'in'))
+            if att.check_out:
+                events_by_day[att.check_out.date()].append((att.check_out, 'out'))
+
+        return events_by_day
+
+
     # ---------- Armado del reporte ----------
     def _get_report_values(self, docids, data=None):
         wiz = self.env['attendance.report.wizard'].browse(docids)[:1]
         ds = wiz._fetch_dataset()  # { employees, day_list, per_emp_day, dfrom, dto, ... }
 
+        # === NUEVO: empleados por defecto si el wizard no trae ===
+        employees = list(ds.get('employees') or self.env['hr.employee'].search([('active', '=', True)]))
+
+        # === NUEVO: day_list por defecto si el dataset no trae ===
+        dfrom_d = _as_date(ds['dfrom'])
+        dto_d   = _as_date(ds['dto'])
+        day_list = list(ds.get('day_list') or _iter_days(dfrom_d, dto_d))
+
         cards = []
         THRESH_WEEK_SEC = 10 * 60  # 10 minutos acumulables/semana
 
-        for emp in ds.get('employees', []):
+        for emp in employees:
             filas_tmp = []
-            emp_days = ds.get('per_emp_day', {}).get(emp.id, {})
+
+            # per_emp_day del dataset (si existe)
+            per_emp_day_all = ds.get('per_emp_day', {}) or {}
+            emp_days = per_emp_day_all.get(emp.id)
+
+            # === NUEVO: si no hay datos en el dataset, consulta hr.attendance ===
+            if not emp_days:
+                emp_days = self._build_events_index_from_attendance(emp, ds['dfrom'], ds['dto'])
 
             # índice de ausencias (vacaciones, permisos, etc.)
             leave_idx = self._build_leave_index(emp, ds['dfrom'], ds['dto'])
 
-            for d in ds.get('day_list', []):
+            for d in day_list:
                 is_rest = self._is_rest_day(emp, d)
                 expected_start = self._expected_start_local(emp, d, is_rest)
 
@@ -274,7 +327,7 @@ class ReportAttendancePDF(models.AbstractModel):
                 else:
                     status = 'Falta' if not has_attendance else 'Asistencia'
 
-                # si hay leave ese día, pisa status y zerea tiempos
+                # leave del día
                 leave = leave_idx.get(_as_date(d))
                 if leave:
                     status = leave.holiday_status_id.name or 'Tiempo libre'
@@ -294,26 +347,26 @@ class ReportAttendancePDF(models.AbstractModel):
                     'status': status,
                 })
 
-            # === NUEVO: total de retardo del periodo (solo días laborables con asistencia) ===
-            retardo_total_sec = sum(
-                r.get('retardo_sec', 0)
-                for r in filas_tmp
-                if not r['is_rest'] and r['has_attendance']
-            )
-
-            # acumulado semanal de retardos para pintar "Retardo" si pasa de 10 min/semana
+            # acumulado semanal de retardos
             from collections import defaultdict
             sum_week = defaultdict(int)
             for r in filas_tmp:
                 if not r['is_rest'] and r['has_attendance']:
                     sum_week[r['week_key']] += r.get('retardo_sec', 0)
 
+            # total de retardo del periodo (solo días laborables con asistencia)
+            retardo_total_sec = sum(
+                r.get('retardo_sec', 0)
+                for r in filas_tmp
+                if not r['is_rest'] and r['has_attendance']
+            )
+
             filas = []
             for r in filas_tmp:
                 if r['status'] == 'Asistencia' and r.get('retardo_sec', 0) > 0:
                     if sum_week[r['week_key']] > THRESH_WEEK_SEC:
                         r['status'] = 'Retardo'
-                # limpiar claves internas
+                # limpiar llaves internas
                 for k in ('retardo_sec', 'd', 'week_key', 'is_rest', 'has_attendance'):
                     r.pop(k, None)
                 filas.append(r)
@@ -323,12 +376,12 @@ class ReportAttendancePDF(models.AbstractModel):
                 'dept': emp.department_id.name or '',
                 'ref': emp.barcode or emp.identification_id or 'no asignado',
                 'suc': getattr(emp, 'work_location_id', False) and emp.work_location_id.name or 'no asignada',
-                'retardo_total': _fmt_hhmm_from_seconds(retardo_total_sec),  # === NUEVO ===
+                'retardo_total': _fmt_hhmm_from_seconds(retardo_total_sec),
                 'rows': filas,
             })
 
         title = f"Registro de asistencia del {_title_spanish(ds['dfrom'])} al {_title_spanish(ds['dto'])}."
-        cpp = 4  # 4 tarjetas por hoja
+        cpp = 4
 
         return {
             'doc_ids': docids,

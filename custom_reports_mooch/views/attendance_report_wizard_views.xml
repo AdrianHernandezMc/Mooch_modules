@@ -11,6 +11,7 @@
           <group>
             <field name="date_from"/>
             <field name="date_to"/>
+            <field name="work_location_id" options="{'no_open': False, 'no_create': True}"/>
             <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"/>
             <field name="include_signature"/>
             <field name="cards_per_page" readonly="1"/>
@@ -36,7 +37,7 @@
   <menuitem id="menu_attendance_report_root"
             name="Reporte Asistencias"
             parent="hr_attendance.menu_hr_attendance_root"
-            sequence="99"
+            sequence="61"
             groups="base.group_user"/>
   <menuitem id="menu_attendance_report_open"
             name="Imprimir PDF"
