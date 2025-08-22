@@ -44,10 +44,9 @@
         .att-kv small{
             color: #555;
         }
-        .att-tr small{
-            color: #555;
-            font-size: 8px;
-        }
+        .att-tr .val {
+          font-size: 10px;
+          font-weight:700; }  /* número pequeño y legible */
         .tbl{
             width: 100%;
             border-collapse: collapse;
@@ -75,9 +74,9 @@
         }
         /* === NUEVO: control de anchos y ajuste del Status === */
         .tbl { table-layout: fixed; }  /* respeta anchos del */
-        .tbl col.w-date   { width: 14%; }
+        .tbl col.w-date   { width: 16%; }
         .tbl col.w-time   { width: 16%; }   /* Entrada / Comida ini / fin / Salida */
-        .tbl col.w-work   { width: 16%; }   /* H. trabajadas / H. comida / Retardo */
+        .tbl col.w-work   { width: 14%; }   /* H. trabajadas / H. comida / Retardo */
         .tbl col.w-status { width: 29%; }  /* más espacio para Status */
 
         .nowrap      { white-space: nowrap; }              /* HH:MM en una línea */
@@ -175,9 +174,12 @@
                 </t>
               </tbody>
             </table>
-            <!-- <div class="att-tr" style="text-align:right;">
-              <div><small>Tiempo Total Retardo:</small> <t t-esc="c['suc'] or '—'"/></div>
-            </div> -->
+            <div class="att-tr" style="text-align:right;">
+              <div>
+                <small>Tiempo Total Retardo:</small>
+                <span class="val"><t t-esc="c['retardo_total']"/></span>
+              </div>
+            </div>
             <t t-if="include_signature">
               <div style="margin-top:12px;">
                 <div class="sign"></div>

@@ -255,6 +255,7 @@ class ReportAttendancePDF(models.AbstractModel):
             filas_tmp = []
             emp_days = ds.get('per_emp_day', {}).get(emp.id, {})
 
+            # índice de ausencias (vacaciones, permisos, etc.)
             leave_idx = self._build_leave_index(emp, ds['dfrom'], ds['dto'])
 
             for d in ds.get('day_list', []):
@@ -273,20 +274,14 @@ class ReportAttendancePDF(models.AbstractModel):
                 else:
                     status = 'Falta' if not has_attendance else 'Asistencia'
 
-                # time off del día
+                # si hay leave ese día, pisa status y zerea tiempos
                 leave = leave_idx.get(_as_date(d))
                 if leave:
                     status = leave.holiday_status_id.name or 'Tiempo libre'
                     row.update({
-                        'entrada': '',
-                        'comida_ini': '',
-                        'comida_fin': '',
-                        'salida': '',
-                        'h_trab': '00:00',
-                        'h_comida': '00:00',
-                        'h_extra': '00:00',
-                        'retardo': '00:00',
-                        'retardo_sec': 0,
+                        'entrada': '', 'comida_ini': '', 'comida_fin': '', 'salida': '',
+                        'h_trab': '00:00', 'h_comida': '00:00', 'h_extra': '00:00',
+                        'retardo': '00:00', 'retardo_sec': 0,
                     })
 
                 filas_tmp.append({
@@ -299,7 +294,15 @@ class ReportAttendancePDF(models.AbstractModel):
                     'status': status,
                 })
 
-            # Acumulado semanal de retardos
+            # === NUEVO: total de retardo del periodo (solo días laborables con asistencia) ===
+            retardo_total_sec = sum(
+                r.get('retardo_sec', 0)
+                for r in filas_tmp
+                if not r['is_rest'] and r['has_attendance']
+            )
+
+            # acumulado semanal de retardos para pintar "Retardo" si pasa de 10 min/semana
+            from collections import defaultdict
             sum_week = defaultdict(int)
             for r in filas_tmp:
                 if not r['is_rest'] and r['has_attendance']:
@@ -310,6 +313,7 @@ class ReportAttendancePDF(models.AbstractModel):
                 if r['status'] == 'Asistencia' and r.get('retardo_sec', 0) > 0:
                     if sum_week[r['week_key']] > THRESH_WEEK_SEC:
                         r['status'] = 'Retardo'
+                # limpiar claves internas
                 for k in ('retardo_sec', 'd', 'week_key', 'is_rest', 'has_attendance'):
                     r.pop(k, None)
                 filas.append(r)
@@ -319,6 +323,7 @@ class ReportAttendancePDF(models.AbstractModel):
                 'dept': emp.department_id.name or '',
                 'ref': emp.barcode or emp.identification_id or 'no asignado',
                 'suc': getattr(emp, 'work_location_id', False) and emp.work_location_id.name or 'no asignada',
+                'retardo_total': _fmt_hhmm_from_seconds(retardo_total_sec),  # === NUEVO ===
                 'rows': filas,
             })
 
