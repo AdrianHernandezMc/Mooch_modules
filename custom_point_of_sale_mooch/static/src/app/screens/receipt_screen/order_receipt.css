@@ -1,0 +1,57 @@
+/* tu_modulo/static/src/scss/receipt_times.scss */
+
+.pos-receipt {
+  /* Times New Roman con fallbacks clásicos */
+  /* font-family: "Times New Roman", Times, serif; */
+  font-size: 12pt;        /* ajusta 10–12pt según tu impresora */
+  line-height: 1.25;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+
+  /* Tips para térmica 80mm */
+  width: 90mm;               /* área útil en rollo 80mm */
+  margin: 0 auto;
+}
+
+/* Encabezados ligeramente más marcados */
+.pos-receipt h1, .pos-receipt h2, .pos-receipt h3 {
+  font-weight: 700;
+  letter-spacing: 0.1px;
+}
+
+/* Totales y cambio con mayor presencia */
+.pos-receipt .pos-receipt-amount,
+.pos-receipt .receipt-change {
+  font-weight: 700;       /* negrita para legibilidad en térmica */
+  font-size: 11pt;
+}
+
+/* Alineados a la derecha (importes) */
+.pos-receipt .pos-receipt-right-align {
+  text-align: right;
+}
+
+
+
+/* Solo al imprimir (si usas PDF/navegador) */
+@media print { 
+  @page { size: 150mm auto; margin: 0;}  /* algunos navegadores lo respetan */
+
+/* .pos-receipt, .pos-receipt * {
+    font-family:
+      "Hiragino Kaku Gothic ProN",
+      "Hiragino Kaku Gothic Pro",
+      "Hiragino Sans",
+      "Yu Gothic",
+      "Meiryo",
+      "Noto Sans JP",
+      Arial, sans-serif !important;
+    color: #000 !important; 
+    font-weight: 800 !important;*/     /* negrita fuerte */
+    /* -webkit-print-color-adjust: exact;
+    print-color-adjust: exact; */
+/* } */
+}
+
+
+

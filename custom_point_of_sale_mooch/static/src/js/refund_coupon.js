@@ -9,23 +9,21 @@ const _superSetup = TicketScreen.prototype.setup;
 patch(TicketScreen.prototype, {
     setup() {
 
-        this.popup = useService('popup');
+        //this.popup = useService('popup');
         this.pos = useService("pos");
         this.rpc = useService("rpc");
         this.orm = useService("orm")
-        this.currentOrder = this.pos.get_order();
-        this.poss = usePos();
-
+        //this.currentOrder = this.pos.get_order();
+        //this.poss = usePos();
         _superSetup.apply(this, arguments);
     },
 
     async onClickTicketExchange() {
         const destinationOrder = this.pos.get_order();
         if (destinationOrder) {
-
             try {
                 const ondoInventory =  await this.move_to_inventory();
-                console.log(ondoInventory);
+
                 if (!ondoInventory){
                     this.pos.toRefundLines = {}
                     return;
@@ -62,19 +60,15 @@ patch(TicketScreen.prototype, {
 
                 totalRefund = Math.round(totalRefund);
                 totalRefund =  totalRefund.toFixed(2)
-                //alert(totalRefund);
 
                 if (totalRefund <= 0) {
                   alert("selecciona un arcitulo")
                   return
                 }
 
+                 //crea una lines de cambio en la tabla de cambios.
                 const origin_id = refundDetails.map(d => d.orderline.orderBackendId);
                 const productId_origin =  refundDetails.map(d => d.orderline.productId);
-
-                console.log("origin_id",origin_id)
-                console.log("productId_origin",productId_origin)
-
                 await this.orm.call(
                 'pos.changes',
                 'poschanges_links_pre',
@@ -84,48 +78,22 @@ patch(TicketScreen.prototype, {
                   productId_origin
                 ]
                 );
-                              
-                const couponId = await this.createCoupon(destinationOrder,totalRefund);
+                
+                await ProductScreen.prototype._applyCoupon.call(this, totalRefund);
+                this.pos.showScreen("ProductScreen");
+                this.pos.toRefundLines = {};            
+               
+                //const couponId = await this.createCoupon(destinationOrder,totalRefund);
         } catch (error) {
             this.pos.toRefundLines = {};
             alert("Error al guardar reembolso: " + (error.message || "Hubo un error al guardar la orden de reembolso."));
         }
       }
     },
-    async createCoupon(order, totalRefund) {
-        const expirationDate  = new Date();
-        expirationDate .setDate(expirationDate .getDate() + 7);
-        const partner = order.get_partner();
-        const partnerId = partner ? partner.id : false;
-        // 3) Obtener código por defecto
-        const defaults = await this.orm.call("loyalty.card", "default_get", [["code"]]);
-        //alert("aplicando cuponxxxx");
-
-        const couponData = {
-            program_id: 4, // Ajusta según tu setup
-            company_id: this.pos.company.id,
-            partner_id: partnerId,
-            code: defaults.code,
-            expiration_date: expirationDate, // o calcula con Date()
-            points: totalRefund, // o el totalRefund si lo tienes
-            source_pos_order_id: order.backendId || false,
-        };
-
-        //const [couponId] = await this.orm.create("loyalty.card", [couponData]);
-        //this.couponCode = defaults.code;
-
-        //const code = '0447-7e98-46a3'
-
-        await ProductScreen.prototype._applyCoupon.call(this,defaults.code, totalRefund);
-
-        this.pos.showScreen("ProductScreen");
-        this.pos.toRefundLines = {};
-        //this.render();
-    },
-
+   
 
     async move_to_inventory(order, totalRefund) {
-      const partner = this.getSelectedPartner();
+      //const partner = this.getSelectedPartner();
       const details = Object.values(this.pos.toRefundLines);
       const refundDetails =  details.filter(d => d.qty > 0).map(d => d.orderline);
       const detallesArray = Object.values(refundDetails);
@@ -142,23 +110,31 @@ patch(TicketScreen.prototype, {
 
       const refundIds = selectRefundProductId.map(o => o.productId);
       const res = await this.orm.call(
-      "pos.order",
-      "get_order_locations",
-      [[backendId]]
+          "pos.order",
+          "get_order_locations",
+          [[backendId]]
       );
+
+
       const locations = res[backendId] || [];
       const filteredLocations = locations.filter(loc =>
         refundIds.includes(loc.product_id)
       );
-      //console.log("filteredLocations",filteredLocations)
+      console.log("refundIds",refundIds)
+      
       const firstLoc = locations[0];
+
       console.log("firstLoc",firstLoc);
+      if (!firstLoc) {
+          alert("No hay movimiento de salida en este articulo, ")
+          return false
+      }
+
       // 5) Por cada línea, creo el picking de entrada
       for (const detail of detallesArray) {
           const productId = detail.productId;
           const qty = detail.qty;
           const newQty = qty; //*-1;
-
 
           // //5.0 Actualizo cada orderline en negativo
           const lineIds = await this.orm.call(
@@ -200,7 +176,8 @@ patch(TicketScreen.prototype, {
             { fields: ["id"] }                       // kwargs
           );
           if (!pt) {
-              alert("No existe un tipo de operación de entrada configurado.");
+            console.log("pt",pt)
+              alert("No existe un tipo de operación de entrada configurado.......");
               return false
           }
 
@@ -234,9 +211,8 @@ patch(TicketScreen.prototype, {
           await this.orm.call("stock.picking", "action_assign",     [[pickingId]]);
           await this.orm.call("stock.picking", "button_validate",   [[pickingId]]);
 
-          //this.pos.toRefundLines = {};
-          //this.render();
           return true
       }
     },
 });
+

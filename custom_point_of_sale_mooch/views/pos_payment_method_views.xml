@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+    <!-- Insertar el checkbox en el formulario de métodos de pago del POS -->
+        <record id="view_pos_payment_method_txid_inherit" model="ir.ui.view">
+            <field name="name">pos.payment.method.txid.inherit</field>
+            <field name="model">pos.payment.method</field>
+            <field name="inherit_id" ref="point_of_sale.pos_payment_method_view_form"/>
+            <field name="arch" type="xml">
+            <xpath expr="//form//field[@name='l10n_mx_edi_payment_method_id']" position="after">
+            <field name="require_transaction_id"/>
+            </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
