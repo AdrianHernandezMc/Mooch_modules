@@ -215,33 +215,4 @@ patch(TicketScreen.prototype, {
       }
     },
 });
- // async createCoupon(order, totalRefund) {
-    //     const expirationDate  = new Date();
-    //     expirationDate .setDate(expirationDate .getDate() + 7);
-    //     const partner = order.get_partner();
-    //     const partnerId = partner ? partner.id : false;
-    //     // 3) Obtener código por defecto
-    //     const defaults = await this.orm.call("loyalty.card", "default_get", [["code"]]);
-    //     alert("aplicando cuponxxxx");
 
-    //     const couponData = {
-    //         program_id: 4, // Ajusta según tu setup
-    //         company_id: this.pos.company.id,
-    //         partner_id: partnerId,
-    //         code: defaults.code,
-    //         expiration_date: expirationDate, // o calcula con Date()
-    //         points: totalRefund, // o el totalRefund si lo tienes
-    //         source_pos_order_id: order.backendId || false,
-    //     };
-
-    //     //const [couponId] = await this.orm.create("loyalty.card", [couponData]);
-    //     //this.couponCode = defaults.code;
-
-    //     //const code = '0447-7e98-46a3'
-
-    //     await ProductScreen.prototype._applyCoupon.call(this,defaults.code, totalRefund);
-
-    //     this.pos.showScreen("ProductScreen");
-    //     this.pos.toRefundLines = {};
-    //     //this.render();
-    // },

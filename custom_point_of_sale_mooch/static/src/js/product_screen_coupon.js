@@ -16,7 +16,7 @@ patch(ProductScreen.prototype, {
   async _applyCoupon(totalRefund) {
     const order = this.pos.get_order();
 
-    alert("Agrega producto a product_screen")
+    //alert("Agrega producto a product_screen")
     const cfgId = this.pos.config.id;
     const pid = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
     console.log("🟢 changes_product_id (RPC) =", pid);
