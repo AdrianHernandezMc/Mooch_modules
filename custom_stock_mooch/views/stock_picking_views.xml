@@ -29,6 +29,13 @@
                            ]
                        }"/>
             </xpath>
+            <xpath expr="//sheet//field[@name='location_dest_id']" position="after">
+                <field name="invoice_order_ids"
+                    widget="many2many_tags"
+                    options="{'no_create': False}"
+                    placeholder="Añadir número de factura…"
+                    modifiers="{'invisible': [('purchase_id','=',False)]}"/>
+            </xpath>
 
             <!-- Mostrar botón Revertir trasl. solo a Administrador de Inventario -->
             <xpath expr="//button[@data-hotkey='k' and @type='action']" position="attributes">

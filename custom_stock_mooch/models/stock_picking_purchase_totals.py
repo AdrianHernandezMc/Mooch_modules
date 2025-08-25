@@ -58,7 +58,7 @@ class StockPickingPurchaseTotals(models.Model):
         readonly=True,
     )
 
-    @api.onchange(
+    @api.depends(
         'purchase_id', 'purchase_id.currency_id', 'purchase_id.partner_id',
         'move_ids.state', 'move_ids.quantity', 'move_ids.product_uom',
         'move_ids.purchase_line_id.price_unit', 'move_ids.purchase_line_id.taxes_id',
