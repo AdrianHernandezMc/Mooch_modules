@@ -37,6 +37,13 @@ class StockPicking(models.Model):
         help="Fecha en que el otro picking (origen o destino) fue validado."
     )
 
+    invoice_order_ids = fields.Many2many(
+        'purchase.invoice.tag',  # Mismo modelo que usa la orden de compra
+        string="Facturas Proveedor traslados",
+        help="Añade aquí tantas referencias de factura como necesites",
+    )
+
+
     department = fields.Char(
         string='Departamento',
         compute='_compute_department',
@@ -86,3 +93,40 @@ class StockPicking(models.Model):
                 ('codigo', '=', prefix),
             ], limit=1)
             pick.department = dept.nombre if dept else _('Sin departamento')
+
+    def write(self, vals):
+        # Ejecutar primero el write normal
+        result = super(StockPicking, self).write(vals)
+
+        # Si se modificó el campo de facturas, sincronizar con la orden de compra
+        if 'invoice_order_ids' in vals:
+            self._sync_invoice_tags_to_purchase()
+
+        return result
+
+    @api.model
+    def create(self, vals):
+        # Crear el picking primero
+        picking = super(StockPicking, self).create(vals)
+
+        # Si hay facturas en los valores, sincronizar
+        if 'invoice_order_ids' in vals:
+            picking._sync_invoice_tags_to_purchase()
+
+        return picking
+
+    def _sync_invoice_tags_to_purchase(self):
+        """Sincroniza las facturas del traslado a la orden de compra"""
+        for picking in self:
+            if picking.purchase_id and picking.invoice_order_ids:
+                # Actualizar la orden de compra con las facturas del traslado
+                picking.purchase_id.sudo().write({
+                    'invoice_tag_ids': [(6, 0, picking.invoice_order_ids.ids)]
+                })
+
+    @api.onchange('invoice_order_ids')
+    def _onchange_invoice_order_ids(self):
+        """Sincroniza inmediatamente cuando se modifican las facturas en la vista"""
+        if self.purchase_id and self.invoice_order_ids:
+            # Actualizar la orden de compra
+            self.purchase_id.invoice_tag_ids = [(6, 0, self.invoice_order_ids.ids)]
