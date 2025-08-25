@@ -1,4 +1,4 @@
-from odoo import models, api, fields
+from odoo import models, api, fields, _
 from odoo.exceptions import UserError
 class StockMove(models.Model):
     _inherit = 'stock.move'
@@ -74,7 +74,7 @@ class StockPicking(models.Model):
 
     @api.depends(
         'move_ids',                     # altas/bajas de líneas (OC)
-        'move_ids.product_uom_qty',     # demanda
+        'move_ids.quantity',     # cantidad
         'move_ids.product_uom',         # conversión
         'move_ids.state',
         'state',
@@ -87,6 +87,6 @@ class StockPicking(models.Model):
                 # solo contamos si la UoM está en la categoría Unit(s)
                 uom = mv.product_uom
                 if uom_unit and uom and uom.category_id == uom_unit.category_id:
-                    qty = uom._compute_quantity(mv.product_uom_qty or 0.0, uom_unit)
+                    qty = uom._compute_quantity(mv.quantity or 0.0, uom_unit)
                     total += qty
             picking.total_pieces = int(round(total))

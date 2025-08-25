@@ -58,9 +58,9 @@ class StockPickingPurchaseTotals(models.Model):
         readonly=True,
     )
 
-    @api.depends(
+    @api.onchange(
         'purchase_id', 'purchase_id.currency_id', 'purchase_id.partner_id',
-        'move_ids.state', 'move_ids.product_uom_qty', 'move_ids.product_uom',
+        'move_ids.state', 'move_ids.quantity', 'move_ids.product_uom',
         'move_ids.purchase_line_id.price_unit', 'move_ids.purchase_line_id.taxes_id',
         'move_line_ids.qty_done', 'move_line_ids.product_uom_id',
         'state'
@@ -90,7 +90,7 @@ class StockPickingPurchaseTotals(models.Model):
 
                 # Cantidad real movida; si no hay done todavía, tomamos la esperada del move
                 qty_done = sum(mv.move_line_ids.filtered(lambda l: l.state != 'cancel').mapped('qty_done')) or 0.0
-                qty = qty_done if qty_done > 0.0 else (mv.product_uom_qty or 0.0)
+                qty = qty_done if qty_done > 0.0 else (mv.quantity or 0.0)
 
                 if qty <= 0.0:
                     continue
