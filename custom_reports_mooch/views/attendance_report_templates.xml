@@ -147,17 +147,17 @@
                   <tr>
                     <td><t t-esc="r['fecha_lbl']"/></td>
 
-                    <!-- HH:MM en una sola línea y centrado -->
+                    <!-- Checadas -->
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['entrada']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['comida_ini']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['comida_fin']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['salida']"/></td>
 
+                    <!-- Totales -->
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['h_trab']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['h_comida']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['retardo']"/></td>
 
-                    <!-- Deja que el Status tenga más ancho y se parta si es largo -->
                     <td class="status-cell" style="text-align:center;">
                       <span t-att-class="'status-pill ' + (
                           'st-green'  if r['status']=='Asistencia'      else
