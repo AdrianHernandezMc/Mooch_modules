@@ -139,6 +139,7 @@ class ReportAttendancePDF(models.AbstractModel):
         return filled
 
     # ---------- Cálculo por día ----------
+    # === Parámetros ajustables ===
     def _process_attendance_data(self, events_raw, expected_start, is_rest):
         """
         events_raw: lista [(dt_naive, punch)] con punch en {'in','out'} (y si existiera 'lunch_in','lunch_out')
@@ -203,7 +204,7 @@ class ReportAttendancePDF(models.AbstractModel):
             if s and e and LUNCH_MIN <= max_gap <= LUNCH_MAX:
                 lunch_out, lunch_in = s, e
                 lunch_secs = int((e - s).total_seconds())
-                # Ese hueco ya estaba incluido como trabajo; descuéntalo
+                # Ese hueco ya estaba incluido como trabajo; descuéntalo del NETO interno
                 work_secs = max(0, work_secs - lunch_secs)
 
         # 2) Si no hubo hueco válido, aplicar comida por defecto centrada en el turno
@@ -213,11 +214,11 @@ class ReportAttendancePDF(models.AbstractModel):
                 mid = first_in + shift / 2
                 lo  = mid - DEFAULT_LUNCH / 2
                 li  = mid + DEFAULT_LUNCH / 2
-                # Asegura que no salga del turno
                 if lo < first_in: lo = first_in
                 if li > last_out: li = last_out
                 lunch_out, lunch_in = lo, li
                 lunch_secs = int((li - lo).total_seconds())
+                # También descuéntala del NETO interno
                 work_secs = max(0, work_secs - lunch_secs)
 
         # Retardo vs hora esperada
@@ -225,18 +226,20 @@ class ReportAttendancePDF(models.AbstractModel):
         if not is_rest and first_in and expected_start and first_in > expected_start:
             retardo_sec = int((first_in - expected_start).total_seconds())
 
+        h_trab_secs = work_secs + lunch_secs
         fmt = lambda dt: dt and dt.strftime('%H:%M') or '00:00'
         return {
             'entrada': fmt(first_in),
             'comida_ini': fmt(lunch_out),
             'comida_fin': fmt(lunch_in),
             'salida': fmt(last_out),
-            'h_trab': hhmm(work_secs),
+
+            'h_trab': hhmm(h_trab_secs),
             'h_comida': hhmm(lunch_secs),
             'h_extra': '00:00',
+
             'retardo': hhmm(retardo_sec),
             'retardo_sec': retardo_sec,
-            # Flag robusto para decidir Asistencia/Falta
             'has_attendance': bool(first_in or last_out),
         }
 
