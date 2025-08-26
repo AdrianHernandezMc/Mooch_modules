@@ -57,6 +57,13 @@ class PurchaseOrder(models.Model):
         help='Suma de las cantidades de las líneas de la orden, excluyendo secciones y notas.',
         store=True,
     )
+    employee_id = fields.Many2one(
+        'hr.employee',
+        string='Solicitante',
+        help='persona solicitante y responsable de este pedido',
+        store=True,
+        required=True
+    )
 
     @api.depends('order_line.price_unit', 'order_line.product_qty', 'order_line.discount')
     def _compute_total_discount(self):

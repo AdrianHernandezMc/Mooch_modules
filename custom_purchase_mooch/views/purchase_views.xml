@@ -13,6 +13,9 @@
                  widget="many2many_tags"
                  options="{'no_create': False}"
                  placeholder="Añadir número de factura…"/>
+          <field name="employee_id"
+                 options="{'no_create': False}"
+                 placeholder="Añadir persona solicitante…"/>
           <field name="discount_global"
                  string="Descuento Global (%)"
                  placeholder="%"
