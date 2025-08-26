@@ -30,13 +30,13 @@
                 <setting id="sale_type_shoe_credit_setting" string="Porcentaje crédito para productos de calzado (Crédito %)">
                     <field name="sale_type_shoe_credit" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <!-- Temporada -->
-                <!-- <setting id="sale_type_season_cash_setting" string="Porcentaje contado para productos de temporada (Contado %)">
+                <!-- Temporada Navideña -->
+                <setting id="sale_type_season_cash_setting" string="Porcentaje contado para productos de Ropa de Invierno (Contado %)">
                     <field name="sale_type_season_cash" widget="float" options="{'suffix': ' %'}"/>
                 </setting>
-                <setting id="sale_type_season_credit_setting" string="Porcentaje crédito para productos de temporada (Crédito %)">
+                <setting id="sale_type_season_credit_setting" string="Porcentaje crédito para productos de Ropa de Invierno (Crédito %)">
                     <field name="sale_type_season_credit" widget="float" options="{'suffix': ' %'}"/>
-                </setting> -->
+                </setting>
             </xpath>
         </field>
     </record>
