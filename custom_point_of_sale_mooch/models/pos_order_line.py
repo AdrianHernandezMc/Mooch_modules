@@ -11,7 +11,7 @@ class PosSession(models.Model):
     def _loader_params_pos_order_line(self):
         params = super()._loader_params_pos_order_line()
         params["search_params"]["fields"].extend(["changes"])
-        _logger.info(f"Result Python: {params}")
+        # _logger.info(f"Result Python: {params}")
         return params
 
 
@@ -29,7 +29,7 @@ class PosOrderLine(models.Model):
     def _export_for_ui(self, line):
         res = super()._export_for_ui(line)
         res["changes"] = line.changes
-        _logger.info(f"Result Python: {res}")
+        # _logger.info(f"Result Python: {res}")
         return res
 
 
@@ -55,11 +55,7 @@ class PosOrderLine(models.Model):
 
             # 2) Actualiza refunded_qty
             line.refunded_qty += qty
-            #_logger.info("Linea %s ➜ refunded_qty += %s", line.id, qty)
 
-            # 3) (Opcional) genera un picking de entrada
-            # Aquí pondrías tu lógica de stock si la necesitas
-            # self._generate_simple_return_picking(line, qty)
         return True
 
 
@@ -119,8 +115,8 @@ class PosChanges(models.Model):
 
     @api.model
     def poschanges_links_pre(self, origin_id, dest_order_uid, product_ids):
-        _logger.info("▶▶ poschanges_links_pre called with origin=%s dest_uid=%s products=%s",
-                     origin_id, dest_order_uid, product_ids)
+        # _logger.info("▶▶ poschanges_links_pre called with origin=%s dest_uid=%s products=%s",
+        #              origin_id, dest_order_uid, product_ids)
         """
         Crea registros en pos.changes antes de validar la venta,
         guardando el UID temporal y el producto por línea.
@@ -140,7 +136,7 @@ class PosChanges(models.Model):
                 'product_id':    pid,
             })
             created.append(rec.id)
-            _logger.info("◀◀ poschanges_links_pre created IDs %s", created)
+            # _logger.info("◀◀ poschanges_links_pre created IDs %s", created)
         return created
 
 # ------------------------------------------------------------------
@@ -163,34 +159,7 @@ class PosOrder(models.Model):
                 })
         return order_id
 
-    # @api.model_create_multi
-    # def create(self, vals_list):
-    #     orders = super().create(vals_list)
-    #     for order in orders:
-    #         # Busca todos los PosChanges hechos con el UID de este pedido
-    #         changes = self.env['pos.changes'].search([
-    #             ('dest_order_uid', '=', order.pos_reference)
-    #         ])
 
-    #         if changes:
-    #             # Escribe el dest_id real y limpia el UID temporal
-    #             changes.write({
-    #                 'dest_id': order.id,
-    #                 'dest_order_uid': False,
-    #             })
-    #     return orders
-
-
-
-    # @api.model
-    # def _export_for_ui(self):
-    #     original = super(PosOrderLine, self).export_for_ui()
-    #     results = []
-    #     for data, line in zip(original, self):
-    #         data['changes'] = line.changes
-    #         results.append(data)
-    #         _logger.info(f"Result Python: {results}")
-    #     return results
 
 
 

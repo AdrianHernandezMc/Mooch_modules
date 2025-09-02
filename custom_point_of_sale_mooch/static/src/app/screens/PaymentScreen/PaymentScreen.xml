@@ -3,8 +3,8 @@
     <t t-inherit="point_of_sale.PaymentScreenMethods" t-inherit-mode="extension" owl="1">
     <!-- Inserta el input antes del componente de líneas de pago -->
     <xpath expr="//PaymentScreenPaymentLines" position="before">
-       <t t-if="requiresTxId">
-        <div class="o_pos_txid_box d-flex align-items-center gap-2 my-2">
+        <t t-if="requiresTxId">
+        <div class="o_pos_txid_box d-flex ">
           <label class="small text-muted">Transaction ID</label>
           <input type="text"
                  class="form-control form-control-sm"

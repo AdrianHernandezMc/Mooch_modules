@@ -23,7 +23,7 @@
         <span t-esc="props.formatCurrency(props.data.change)" class="pos-receipt-right-align"/>
     </div>
     </xpath>
-
+ 
     <!-- quita la palabra con la tecnologia de Odoo -->
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')]/p[1]" position="replace">
     <t/>

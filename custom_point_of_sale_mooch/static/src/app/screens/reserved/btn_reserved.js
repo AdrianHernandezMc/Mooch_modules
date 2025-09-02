@@ -18,12 +18,12 @@ export class Reserved extends Component {
 
     click() {
 
-        const cfgId = this.pos.config.id;
-        const pid =  this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
-        console.log("🟢 changes_product_id (RPC) =", pid);
+        //const cfgId = this.pos.config.id;
+        //const pid =  this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
+        //console.log("🟢 changes_product_id (RPC) =", pid);
 
-             //window.open('/web#action=custom_point_of_sale_mooch.exchange_change_action', '_blank');
-            // this.showScreen("custom_point_of_sale_mooch.exchange_change_action", { recordId: null });
+        //window.open('/web#action=custom_point_of_sale_mooch.exchange_change_action', '_blank');
+        this.showScreen("custom_point_of_sale_mooch.exchange_change_action", { recordId: null });
     }
 }
 
