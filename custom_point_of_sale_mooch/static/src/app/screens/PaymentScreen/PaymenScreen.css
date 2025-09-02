@@ -1,8 +1,0 @@
-label.small.text-muted {
-    font-size: 14px;       /* tamaño de letra */
-    font-weight: bold;     /* negrita */
-    color: #1a1a1a;        /* texto más oscuro */
-    font-family: "Times New Roman", serif;  /* fuente personalizada */
-    letter-spacing: 1px;   /* espacio entre letras */
-    text-transform: uppercase; /* todo en mayúsculas */
-}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="product_screen_qty_sumline" xml:space="preserve">
+    <t t-inherit="point_of_sale.ProductScreen" t-inherit-mode="extension" owl="1">
+    <xpath expr="//OrderWidget" position="after">
+        <div class="pos-total-items d-flex justify-content-between p-2">
+            <span>Cantidad de artículos:</span>
+            <span t-esc="getTotalItems()"/>
+        </div>
+    </xpath>
+    </t>
+</templates>

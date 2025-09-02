@@ -1,0 +1,9 @@
+.pos-total-items {
+    background-color: #a0baf0;   /* 🟢 Azul muy claro */
+    color: #000;                 /* 🟡 Texto negro */
+    font-weight: bold;           /* 🔵 Negritas */
+    border-top: 1px solid #ccc;  /* 🔴 Línea separadora */
+    border-bottom: 1px solid #ccc;
+    padding: 8px;
+    border-radius: 4px;
+}

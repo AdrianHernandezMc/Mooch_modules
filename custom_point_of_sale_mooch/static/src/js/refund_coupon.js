@@ -187,7 +187,7 @@ patch(TicketScreen.prototype, {
               picking_type_id: pt.id,
               location_id: firstLoc.origin_id,
               location_dest_id: firstLoc.location_id,
-          move_ids_without_package: [
+              move_ids_without_package: [
           [0, 0, {
               product_id: productId,
               product_uom_qty: qty,
