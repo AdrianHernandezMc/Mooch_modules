@@ -3,6 +3,8 @@ from odoo import models
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 import pytz
+import logging
+_logger = logging.getLogger(__name__)
 
 # ======= Constantes de formato =======
 SPANISH_WEEKDAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
@@ -83,6 +85,113 @@ class ReportAttendancePDF(models.AbstractModel):
         mm = int(round((hour - hh) * 60))
         return datetime(d.year, d.month, d.day, hh, mm)
 
+    def _planned_lunch_window(self, emp, d):
+        """
+        Devuelve (lunch_start_dt, lunch_end_dt) en hora local NAIVE, si el
+        calendario del empleado tiene un tramo marcado como Descanso/Comida.
+        """
+        cal = (
+            getattr(emp, 'work_calendar_id', False)
+            or emp.resource_calendar_id
+            or emp.company_id.resource_calendar_id
+            or self.env.company.resource_calendar_id
+        )
+        if not cal:
+            return (None, None)
+
+        dow = str(d.weekday())
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
+        )
+        if not lines:
+            return (None, None)
+
+        def _is_break(l):
+            name = (l.name or '').lower()
+            wet  = getattr(l, 'work_entry_type_id', False)
+            wetn = (wet and wet.name or '').lower()
+            return (
+                'descanso' in name or 'comida' in name or 'almuerzo' in name or
+                'lunch' in name   or 'break' in name or
+                'descanso' in wetn or 'comida' in wetn or 'almuerzo' in wetn or
+                'lunch' in wetn or 'break' in wetn or
+                bool(getattr(l, 'is_break', False))
+            )
+
+        breaks = [l for l in lines if _is_break(l)]
+        if not breaks:
+            return (None, None)
+
+        start = min(b.hour_from for b in breaks)
+        end   = max(b.hour_to   for b in breaks)
+
+        def _to_dt(hfloat):
+            hh = int(hfloat)
+            mm = int(round((hfloat - hh) * 60))
+            return datetime(d.year, d.month, d.day, hh, mm)
+
+        return (_to_dt(start), _to_dt(end))
+
+    def _planned_segments(self, emp, d):
+        """
+        Devuelve lista de segmentos planeados para el día con mejor logging
+        """
+        cal = (
+            getattr(emp, 'work_calendar_id', False)
+            or emp.resource_calendar_id
+            or emp.company_id.resource_calendar_id
+            or self.env.company.resource_calendar_id
+        )
+        
+        import logging
+        _logger = logging.getLogger(__name__)
+        
+        if not cal:
+            _logger.debug("Empleado %s no tiene calendario asignado", emp.name)
+            return []
+
+        dow = str(d.weekday())
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
+        ).sorted(key=lambda l: l.hour_from)
+
+        _logger.debug("Calendario para %s - Día %s: %s líneas", emp.name, d, len(lines))
+
+        def _is_break(l):
+            name = (l.name or '').lower()
+            wet  = getattr(l, 'work_entry_type_id', False)
+            wetn = (wet and wet.name or '').lower()
+            is_break = (
+                'descanso' in name or 'comida' in name or 'almuerzo' in name or
+                'lunch' in name or 'break' in name or
+                'descanso' in wetn or 'comida' in wetn or 'almuerzo' in wetn or
+                'lunch' in wetn or 'break' in wetn or
+                bool(getattr(l, 'is_break', False))
+            )
+            _logger.debug("Línea %s-%s: %s (break=%s)", l.hour_from, l.hour_to, l.name, is_break)
+            return is_break
+
+        def _to_dt(hfloat):
+            hh = int(hfloat)
+            mm = int(round((hfloat - hh) * 60))
+            return datetime(d.year, d.month, d.day, hh, mm)
+
+        segs = []
+        for l in lines:
+            seg_kind = 'break' if _is_break(l) else 'work'
+            segs.append({
+                'kind': seg_kind,
+                'start': _to_dt(l.hour_from),
+                'end':   _to_dt(l.hour_to),
+                'name':  l.name or '',
+            })
+            _logger.debug("Segmento: %s %s-%s (%s)", seg_kind, 
+                        _to_dt(l.hour_from).strftime('%H:%M'), 
+                        _to_dt(l.hour_to).strftime('%H:%M'), 
+                        l.name or 'sin nombre')
+
+        return segs
+
     # ---------- Normalización de eventos ----------
     def _normalize_events(self, events):
         """
@@ -137,22 +246,59 @@ class ReportAttendancePDF(models.AbstractModel):
             filled.append((dt, t))
             current = 'out' if t == 'in' else 'in'
         return filled
+    # ---------- Ventanas (intervalos) programadas según el calendario ----------
+    def _get_day_windows(self, emp, d):
+        """
+        Devuelve una lista de intervalos [(start_dt, end_dt), ...] en hora local (naive)
+        a partir del calendario del empleado para el día d.
+        Si el calendario tiene 2+ intervalos, el hueco mayor suele ser la comida.
+        """
+        cal = (
+            getattr(emp, 'work_calendar_id', False)
+            or emp.resource_calendar_id
+            or emp.company_id.resource_calendar_id
+            or self.env.company.resource_calendar_id
+        )
+        if not cal:
+            return []
+
+        dow = str(d.weekday())  # '0'..'6'
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
+        )
+        if not lines:
+            return []
+
+        intervals = []
+        for l in sorted(lines, key=lambda x: x.hour_from):
+            hf = float(l.hour_from or 0.0)
+            ht = float(l.hour_to or 0.0)
+            fh, fm = int(hf), int(round((hf - int(hf)) * 60))
+            th, tm = int(ht), int(round((ht - int(ht)) * 60))
+            start = datetime(d.year, d.month, d.day, fh, fm)
+            end   = datetime(d.year, d.month, d.day, th, tm)
+            if end > start:
+                intervals.append((start, end))
+        return intervals
 
     # ---------- Cálculo por día ----------
-    # === Parámetros ajustables ===
-    def _process_attendance_data(self, events_raw, expected_start, is_rest):
+    def _process_attendance_data(self, events_raw, expected_start, is_rest, planned_lunch=None, planned_segments=None):
         """
-        events_raw: lista [(dt_naive, punch)] con punch en {'in','out'} (y si existiera 'lunch_in','lunch_out')
-        expected_start: datetime local (naive) con la hora esperada de entrada
-        is_rest: bool, si el día es descanso
+        Maneja múltiples checadas y prioriza checadas reales.
+        FIX: si no hay 'in', ya NO usar la primera marca como entrada;
+            primero intentaremos completar desde hr.attendance (ver paso 2 abajo).
         """
         from datetime import timedelta
+        import logging
 
-        # === Parámetros ajustables ===
-        LUNCH_MIN = timedelta(minutes=30)               # mínimo para considerar un hueco como comida
-        LUNCH_MAX = timedelta(hours=3)                  # máximo razonable para una comida
-        DEFAULT_LUNCH = timedelta(minutes=60)           # comida por defecto si no hay hueco
-        DEFAULT_LUNCH_MIN_SHIFT = timedelta(hours=6)    # turno mínimo para aplicar comida por defecto
+        logger = logging.getLogger('attendance_debug')
+        logger.setLevel(logging.DEBUG)
+        if not logger.handlers:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
 
         def hhmm(total_secs):
             total_secs = max(0, int(total_secs or 0))
@@ -160,90 +306,150 @@ class ReportAttendancePDF(models.AbstractModel):
             m = (total_secs % 3600) // 60
             return f"{h:02d}:{m:02d}"
 
-        # Normaliza y ordena (si no trae punch, toma 'in' por defecto)
-        logs = [(dt, (p or 'in')) for (dt, p) in events_raw if dt]
-        logs.sort(key=lambda x: x[0])
+        fmt = lambda dt: dt.strftime('%H:%M') if dt else '00:00'
 
-        first_in = next((dt for dt, p in logs if p in ('in', 'lunch_in')), None)
-        last_out = next((dt for dt, p in reversed(logs) if p in ('out', 'lunch_out')), None)
+        logger.debug("=== INICIANDO PROCESAMIENTO DE ASISTENCIA ===")
+        logger.debug("Eventos crudos recibidos: %s", events_raw)
 
-        # Comida explícita (por si alguna vez llega como lunch_out/lunch_in)
-        lunch_out = next((dt for dt, p in logs if p == 'lunch_out'), None)
-        lunch_in  = next((dt for dt, p in logs if p == 'lunch_in' and (not lunch_out or dt >= lunch_out)), None)
-        lunch_explicit = bool(lunch_out and lunch_in and lunch_in > lunch_out)
+        # --- PASO 1: Separar checadas por tipo ---
+        all_events = []
+        lunch_out_events = []
+        lunch_in_events = []
+        in_events = []
+        out_events = []
 
-        # Trabajo por tramos (corta en out o lunch_out; reabre en in o lunch_in)
+        for dt, p in events_raw:
+            if dt:
+                all_events.append((dt, p))
+                if p == 'lunch_out':
+                    lunch_out_events.append(dt)
+                elif p == 'lunch_in':
+                    lunch_in_events.append(dt)
+                elif p == 'in':
+                    in_events.append(dt)
+                elif p == 'out':
+                    out_events.append(dt)
+
+        all_events.sort(key=lambda x: x[0])
+        all_times = [dt for dt, p in all_events]
+
+        logger.debug("Todos los eventos: %s", [(dt.strftime('%H:%M'), p) for dt, p in all_events])
+        logger.debug("Eventos lunch_out: %s", [dt.strftime('%H:%M') for dt in lunch_out_events])
+        logger.debug("Eventos lunch_in: %s", [dt.strftime('%H:%M') for dt in lunch_in_events])
+        logger.debug("Eventos in: %s", [dt.strftime('%H:%M') for dt in in_events])
+        logger.debug("Eventos out: %s", [dt.strftime('%H:%M') for dt in out_events])
+
+        # --- PASO 2: Entrada y salida principal (FIX) ---
+        # Antes: si no había 'in', usábamos la primera marca -> eso entrega 20:02 como entrada.
+        # Ahora: si no hay 'in', se queda en None (se completará en el caller con hr.attendance).
+        first_in = in_events[0] if in_events else None
+        last_out = out_events[-1] if out_events else None
+
+        logger.debug("Entrada detectada: %s", fmt(first_in))
+        logger.debug("Salida detectada: %s", fmt(last_out))
+
+        # --- PASO 3: Detección de comida (igual que antes, prioriza checadas reales) ---
+        lunch_out = lunch_in = None
+        ls_plan, le_plan = (planned_lunch or (None, None))
+        logger.debug("Comida planificada: %s a %s", fmt(ls_plan) if ls_plan else "None", fmt(le_plan) if le_plan else "None")
+
+        if lunch_out_events or lunch_in_events:
+            logger.debug("Checadas explícitas de comida detectadas")
+            if lunch_out_events and lunch_in_events:
+                lo = min(lunch_out_events)
+                li = max(lunch_in_events)
+                if li > lo:
+                    lunch_out, lunch_in = lo, li
+                    logger.debug("Ambos tipos válidos: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
+                else:
+                    valid_pairs = []
+                    for _lo in lunch_out_events:
+                        for _li in lunch_in_events:
+                            if _li > _lo:
+                                valid_pairs.append((_lo, _li, (_li - _lo).total_seconds()))
+                    if valid_pairs:
+                        valid_pairs.sort(key=lambda x: abs(x[2] - 3600))
+                        lunch_out, lunch_in, _ = valid_pairs[0]
+                        logger.debug("Par válido encontrado: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
+            if lunch_out_events and not lunch_out:
+                if ls_plan:
+                    lunch_out = min(lunch_out_events, key=lambda dt: abs(dt - ls_plan))
+                else:
+                    lunch_out = min(lunch_out_events)
+                logger.debug("Múltiples/único lunch_out -> elegido: %s", fmt(lunch_out))
+            if lunch_in_events and not lunch_in:
+                if le_plan:
+                    lunch_in = min(lunch_in_events, key=lambda dt: abs(dt - le_plan))
+                else:
+                    lunch_in = max(lunch_in_events)
+                logger.debug("Múltiples/único lunch_in -> elegido: %s", fmt(lunch_in))
+
+        if (lunch_out is None or lunch_in is None) and ls_plan and le_plan:
+            logger.debug("No hay checadas explícitas, usando calendario (ventana ampliada)")
+            from datetime import timedelta
+            TOL = timedelta(minutes=90)
+            window_start = ls_plan - TOL
+            window_end = le_plan + TOL
+            checadas_en_comida = [dt for dt in all_times if window_start <= dt <= window_end]
+            if checadas_en_comida:
+                lunch_out = min(checadas_en_comida)
+                lunch_in = max(checadas_en_comida)
+                logger.debug("Comida inferida por checadas en ventana: %s a %s", fmt(lunch_out), fmt(lunch_in))
+            else:
+                lunch_out, lunch_in = ls_plan, le_plan
+                logger.debug("Comida por calendario: %s a %s", fmt(lunch_out), fmt(lunch_in))
+
+        if lunch_out and lunch_in:
+            if lunch_in <= lunch_out:
+                lunch_in = lunch_out + timedelta(hours=1)
+            lunch_duration = lunch_in - lunch_out
+            if not (timedelta(minutes=20) <= lunch_duration <= timedelta(hours=3)):
+                logger.debug("Duración de comida no válida (%s), descartando/completando por plan)", lunch_duration)
+                if ls_plan and le_plan:
+                    lunch_out, lunch_in = ls_plan, le_plan
+                else:
+                    lunch_out = lunch_in = None
+            else:
+                logger.debug("Duración de comida válida: %s", lunch_duration)
+
+        # --- PASO 4: Horas trabajadas ---
         work_secs = 0
-        open_in = None
-        for dt, p in logs:
-            if p in ('in', 'lunch_in') and open_in is None:
-                open_in = dt
-            elif p in ('out', 'lunch_out') and open_in:
-                work_secs += int((dt - open_in).total_seconds())
-                open_in = None
-        if open_in and last_out and last_out > open_in:
-            work_secs += int((last_out - open_in).total_seconds())
-
-        # === Determinar comida: explícita → inferida por hueco → por defecto centrada en el turno ===
         lunch_secs = 0
+        if first_in and last_out and last_out > first_in:
+            total_secs = int((last_out - first_in).total_seconds())
+            if lunch_out and lunch_in and lunch_in > lunch_out:
+                lunch_secs = int((lunch_in - lunch_out).total_seconds())
+                work_secs = max(0, total_secs - lunch_secs)
+            else:
+                work_secs = total_secs
 
-        # 1) Hueco real entre first_in y last_out
-        if not lunch_explicit and first_in and last_out and last_out > first_in:
-            times = [dt for dt, _ in logs if first_in <= dt <= last_out]
-            if first_in not in times:
-                times.insert(0, first_in)
-            if last_out not in times:
-                times.append(last_out)
-
-            max_gap = timedelta(0); s = e = None
-            for a, b in zip(times, times[1:]):
-                gap = b - a
-                if gap > max_gap:
-                    max_gap = gap; s = a; e = b
-
-            if s and e and LUNCH_MIN <= max_gap <= LUNCH_MAX:
-                lunch_out, lunch_in = s, e
-                lunch_secs = int((e - s).total_seconds())
-                # Ese hueco ya estaba incluido como trabajo; descuéntalo del NETO interno
-                work_secs = max(0, work_secs - lunch_secs)
-
-        # 2) Si no hubo hueco válido, aplicar comida por defecto centrada en el turno
-        if lunch_secs == 0 and first_in and last_out and last_out > first_in:
-            shift = last_out - first_in
-            if shift >= DEFAULT_LUNCH_MIN_SHIFT:
-                mid = first_in + shift / 2
-                lo  = mid - DEFAULT_LUNCH / 2
-                li  = mid + DEFAULT_LUNCH / 2
-                if lo < first_in: lo = first_in
-                if li > last_out: li = last_out
-                lunch_out, lunch_in = lo, li
-                lunch_secs = int((li - lo).total_seconds())
-                # También descuéntala del NETO interno
-                work_secs = max(0, work_secs - lunch_secs)
-
-        # Retardo vs hora esperada
+        # --- PASO 5: Retardo ---
         retardo_sec = 0
         if not is_rest and first_in and expected_start and first_in > expected_start:
             retardo_sec = int((first_in - expected_start).total_seconds())
 
-        h_trab_secs = work_secs + lunch_secs
-        fmt = lambda dt: dt and dt.strftime('%H:%M') or '00:00'
+        logger.debug("=== RESULTADO FINAL ===")
+        logger.debug("Entrada: %s", fmt(first_in))
+        logger.debug("Comida inicio: %s", fmt(lunch_out))
+        logger.debug("Comida fin: %s", fmt(lunch_in))
+        logger.debug("Salida: %s", fmt(last_out))
+        logger.debug("Horas trabajo: %s", hhmm(work_secs))
+        logger.debug("Horas comida: %s", hhmm(lunch_secs))
+        logger.debug("Retardo: %s", hhmm(retardo_sec))
+        logger.debug("========================\n")
+
         return {
-            'entrada': fmt(first_in),
+            'entrada':    fmt(first_in),
             'comida_ini': fmt(lunch_out),
             'comida_fin': fmt(lunch_in),
-            'salida': fmt(last_out),
-
-            'h_trab': hhmm(h_trab_secs),
-            'h_comida': hhmm(lunch_secs),
-            'h_extra': '00:00',
-
-            'retardo': hhmm(retardo_sec),
+            'salida':     fmt(last_out),
+            'h_trab':     hhmm(work_secs),
+            'h_comida':   hhmm(lunch_secs),
+            'h_extra':    '00:00',
+            'retardo':    hhmm(retardo_sec),
             'retardo_sec': retardo_sec,
             'has_attendance': bool(first_in or last_out),
         }
-
-
     # ---------- Índice de ausencias (hr.leave) por día ----------
     def _build_leave_index(self, emp, dfrom, dto):
         dfrom_d = _as_date(dfrom)
@@ -362,7 +568,31 @@ class ReportAttendancePDF(models.AbstractModel):
 
             for d in day_list:
                 is_rest = self._is_rest_day(emp, d)
-                expected_start = self._expected_start_local(emp, d, is_rest)
+                
+                # Obtener segmentos del calendario
+                segs = self._planned_segments(emp, d)
+                
+                # ENCONTRAR EL SEGMENTO DE COMIDA (break)
+                lunch_seg = None
+                for s in segs:
+                    if s['kind'] == 'break':
+                        lunch_seg = (s['start'], s['end'])
+                        break
+                
+                # Si no hay segmento de break, buscar cualquier intervalo largo (>1h) entre trabajo
+                if not lunch_seg and len(segs) >= 2:
+                    # Buscar el hueco más grande entre segmentos de trabajo
+                    max_gap = timedelta(0)
+                    for i in range(len(segs) - 1):
+                        if segs[i]['kind'] == 'work' and segs[i + 1]['kind'] == 'work':
+                            gap = segs[i + 1]['start'] - segs[i]['end']
+                            if gap > max_gap and gap >= timedelta(minutes=30):
+                                max_gap = gap
+                                lunch_seg = (segs[i]['end'], segs[i + 1]['start'])
+                
+                # Entrada esperada (primer segmento de trabajo)
+                work_segs = [s for s in segs if s['kind'] == 'work']
+                expected_start = work_segs[0]['start'] if work_segs else self._expected_start_local(emp, d, is_rest)
 
                 # Construir eventos crudos del día (naive local)
                 events_raw = []
@@ -378,7 +608,8 @@ class ReportAttendancePDF(models.AbstractModel):
                         events_raw.append((event_time, event_type))
 
                 # Procesa IN/OUT + Comida (explícita, inferida o por defecto)
-                row = self._process_attendance_data(events_raw, expected_start, is_rest)
+                row = self._process_attendance_data(events_raw, expected_start, is_rest,
+                                    planned_lunch=lunch_seg, planned_segments=segs)
 
                 # Asistencia robusta (no usar strings "00:00" como truthy)
                 has_attendance = row.pop('has_attendance', None)

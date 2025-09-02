@@ -76,24 +76,59 @@ class AttendanceReportWizard(models.TransientModel):
                 lambda e: e.work_location_id == self.work_location_id
             ).ids)]
 
+    def adjust_crossed_dates(self, events, tz):
+        """
+        Ajusta eventos que cruzan medianoche y empareja entradas con salidas correctamente.
+        """
+        adjusted_events = []
+        
+        for event_time, event_type, hour, minute in events:
+            # Si el evento es entre medianoche y 6 AM, asignar al día anterior
+            if 0 <= hour < 6:
+                adjusted_date = event_time.date() - timedelta(days=1)
+                adjusted_time = datetime.combine(adjusted_date, event_time.time())
+                adjusted_events.append((adjusted_time, event_type, hour, minute))
+            else:
+                adjusted_events.append((event_time, event_type, hour, minute))
+        
+        return adjusted_events
 
+    def group_events_by_workday(self, events_by_day):
+        """
+        Reagrupa eventos por día de trabajo, considerando turnos que cruzan medianoche.
+        """
+        from collections import defaultdict
+        
+        workday_events = defaultdict(list)
+        
+        for date_key, events in events_by_day.items():
+            for event_time, event_type, hour, minute in events:
+                # Para eventos de salida después de medianoche, usar fecha del día anterior
+                if event_type == 'out' and 0 <= hour < 6:
+                    workday_date = event_time.date() - timedelta(days=1)
+                else:
+                    workday_date = event_time.date()
+                
+                workday_events[workday_date].append((event_time, event_type, hour, minute))
+        
+        return workday_events
     # ----------------- DATASET SOLO DESDE daily.attendance -----------------
     def _fetch_dataset(self):
-        """Obtiene dataset de asistencias, normalizado a la TZ del usuario (robusto a IDs cruzados)."""
+        """Obtiene dataset de asistencias, normalizado a la TZ del usuario."""
         self.ensure_one()
         tz = pytz.timezone(self.env.user.tz or 'UTC')
 
-        # --- Rango
+        # Rango
         dfrom = fields.Datetime.from_string(self.date_from)
         dto   = fields.Datetime.from_string(self.date_to)
         if dfrom > dto:
             dfrom, dto = dto, dfrom
 
-        # Límites a UTC naive
+        # Convertir límites a UTC "naive" para SQL (timestamp without tz en UTC)
         dfrom_utc = dfrom.astimezone(pytz.UTC).replace(tzinfo=None) if dfrom.tzinfo else dfrom
         dto_utc   = dto.astimezone(pytz.UTC).replace(tzinfo=None)   if dto.tzinfo   else dto
 
-        # --- Empleados base (tu dominio original)
+        # Empleados
         emp_domain = [('active', '=', True)]
         if self.work_location_id:
             emp_domain.append(('work_location_id', '=', self.work_location_id.id))
@@ -101,58 +136,80 @@ class AttendanceReportWizard(models.TransientModel):
         employees = self.employee_ids or self.env['hr.employee'].search(
             emp_domain, order='work_location_id,name'
         )
-        emp_ids = set(employees.ids)
+        emp_ids = list(set(employees.ids)) or [-1]
 
-        # Mapas para remapear marcas a tus empleados
-        def _norm_name(s):
-            return ' '.join((s or '').strip().lower().split())
-
-        name_to_id = {_norm_name(e.name): e.id for e in employees}
-        barcode_to_id = { (e.barcode or '').strip(): e.id for e in employees if e.barcode }
-
-        # --- Traer logs crudos del período (SIN filtrar por empleado)
-        # Hacemos join para tener nombre/barcode del empleado que grabó la marca.
+        # Traer logs crudos
         query = """
             SELECT 
-                da.id,
-                da.employee_id,
-                he.name      AS emp_name,
-                he.barcode   AS emp_barcode,
-                da.punching_day,
-                da.address_id,
-                da.attendance_type,
-                da.punching_time,
-                da.punch_type
-            FROM daily_attendance da
-            LEFT JOIN hr_employee he ON he.id = da.employee_id
-            WHERE da.punching_time >= %s
-            AND da.punching_time <  %s
-            ORDER BY da.employee_id, da.punching_time
+                id,
+                employee_id,
+                punching_day,
+                address_id,
+                attendance_type,
+                punching_time,
+                punch_type
+            FROM daily_attendance
+            WHERE punching_time BETWEEN %s AND %s
+            AND employee_id = ANY(%s)
+            ORDER BY employee_id, punching_time
         """
-        self.env.cr.execute(query, (dfrom_utc, dto_utc))
+        self.env.cr.execute(query, (dfrom_utc, dto_utc, emp_ids))
         recs = self.env.cr.dictfetchall()
 
-        # --- Normalizador de tipo de marca (igual al tuyo)
-        IN_CODES        = {'0', '5', 0, 5}
-        OUT_CODES       = {'1', '4', 1, 4}
-        BREAK_HINTS_OUT = {'break out', 'lunch out', 'break start', 'meal out'}
-        BREAK_HINTS_IN  = {'break in',  'lunch in',  'break end',   'meal in'}
-
+        print("=== DATOS CRUDOS DE LA BASE DE DATOS ===")
+        for r in recs:
+            print(f"EMP: {r['employee_id']}, TIME: {r['punching_time']}, ATT_TYPE: {r['attendance_type']}, PUNCH_TYPE: {r['punch_type']}")
+        print("========================================")
+        # --- Normalizador de tipo de marca --------------------------------------
         def _classify(v_att, v_punch):
+            """
+            Devuelve: 'in' | 'out' | 'lunch_out' | 'lunch_in'
+            - Basado en códigos numéricos del sistema
+            """
+            # Priorizar punch_type sobre attendance_type
             val = v_punch if v_punch not in (None, '') else v_att
             if val is None:
                 return 'in'
-            s  = str(val).strip()
+
+            # Convertir a string y limpiar
+            s = str(val).strip()
             sl = s.lower()
-            if any(h in sl for h in BREAK_HINTS_OUT): return 'lunch_out'
-            if any(h in sl for h in BREAK_HINTS_IN):  return 'lunch_in'
-            if s in IN_CODES:  return 'in'
-            if s in OUT_CODES: return 'out'
-            if 'check in'   in sl or 'overtime in' in sl or 'duty on'  in sl or sl == 'in':  return 'in'
-            if 'check out'  in sl or 'overtime out'in sl or 'duty off' in sl or sl == 'out': return 'out'
+
+            print(f"DEBUG _classify: v_att='{v_att}', v_punch='{v_punch}', s='{s}'")
+
+            # Mapeo CORREGIDO de códigos numéricos específicos del reloj
+            # Basado en los datos que vimos: 
+            # 0 = Entrada (in)
+            # 1 = Salida (out) 
+            # 4 = Inicio comida (lunch_out) - Overtime In
+            # 5 = Fin comida (lunch_in) - Overtime Out
+            if s == '0':
+                print("DEBUG: Código 0 detectado como entrada")
+                return 'in'
+            elif s == '1':
+                print("DEBUG: Código 1 detectado como salida")
+                return 'out'
+            elif s == '4':
+                print("DEBUG: Código 4 detectado como lunch_out (Inicio comida)")
+                return 'lunch_out'
+            elif s == '5':
+                print("DEBUG: Código 5 detectado como lunch_in (Fin comida)")
+                return 'lunch_in'
+
+            # Textos como fallback
+            if any(keyword in sl for keyword in ['in', 'check in', 'checkin', 'entrada', 'on', 'duty on']):
+                print("DEBUG: Entrada detectada por texto")
+                return 'in'
+            if any(keyword in sl for keyword in ['out', 'check out', 'checkout', 'salida', 'off', 'duty off']):
+                print("DEBUG: Salida detectada por texto")
+                return 'out'
+
+            print("DEBUG: Por defecto, asumiendo entrada")
             return 'in'
 
-        # --- Día-list en TZ del usuario (INCLUSIVO)
+        # ------------------------------------------------------------------------
+
+        # Día-list en TZ del usuario (INCLUSIVO)
         start_local = (pytz.utc.localize(dfrom) if dfrom.tzinfo is None else dfrom.astimezone(pytz.UTC)).astimezone(tz)
         end_local   = (pytz.utc.localize(dto)   if dto.tzinfo   is None else dto.astimezone(pytz.UTC)).astimezone(tz)
 
@@ -163,50 +220,46 @@ class AttendanceReportWizard(models.TransientModel):
             day_list.append(day)
             day += timedelta(days=1)
 
-        # --- Agrupar por empleado/día con TZ del usuario
+        # Agrupar por empleado/día con tiempos ya en TZ del usuario
         from collections import defaultdict as dd
         per_emp_day = dd(lambda: dd(list))
-        seen_emp_ids_from_logs = set()
 
+        # En la sección donde se procesan los eventos, agregar:
         for r in recs:
-            # Filtro suave por sucursal (si el evento trae address y no coincide, omitir)
-            if self.work_location_id and r.get('address_id') and r['address_id'] != self.work_location_id.id:
-                continue
-
             when = r.get('punching_time')
-            if not when:
-                continue
-
-            # Remapear employee_id de la marca al empleado de tus tarjetas
-            emp_id_log = r.get('employee_id')
-            if emp_id_log not in emp_ids:
-                # 1) por barcode
-                bc = (r.get('emp_barcode') or '').strip()
-                mapped = barcode_to_id.get(bc) if bc else None
-                # 2) por nombre (si no hubo barcode o no coincidió)
-                if not mapped:
-                    mapped = name_to_id.get(_norm_name(r.get('emp_name')))
-                if not mapped:
-                    # no corresponde a los empleados que estás reportando
-                    continue
-                emp_id_log = mapped
-
-            # UTC -> TZ usuario
-            localized_time = pytz.utc.localize(when).astimezone(tz) if when.tzinfo is None else when.astimezone(tz)
+            print(f"UTC: {when} - ATT_TYPE: {r['attendance_type']} - PUNCH_TYPE: {r['punch_type']}")
+            
+            # UTC -> TZ del usuario
+            if when.tzinfo is None:
+                localized_time = pytz.utc.localize(when).astimezone(tz)
+            else:
+                localized_time = when.astimezone(tz)
+            
+            print(f"LOCAL: {localized_time}")
+            
             punch = _classify(r.get('attendance_type'), r.get('punch_type'))
 
-            per_emp_day[emp_id_log][localized_time.date()].append(
+            per_emp_day[r['employee_id']][localized_time.date()].append(
                 (localized_time, punch, localized_time.hour, localized_time.minute)
             )
-            seen_emp_ids_from_logs.add(emp_id_log)
 
-        # --- (Pequeño ajuste) si hay empleados con marcas que no estaban en "employees", súmalos
-        missing = seen_emp_ids_from_logs - emp_ids
-        if missing:
-            extra = self.env['hr.employee'].browse(list(missing))
-            if extra:
-                employees = (employees | extra).sorted(key=lambda e: (e.work_location_id.name or '', e.name))
-                emp_ids |= set(extra.ids)
+        # ===== NUEVO: AJUSTAR FECHAS CRUZADAS =====
+        for emp_id, days in per_emp_day.items():
+            # Primero ajustar fechas cruzadas
+            adjusted_days = {}
+            for day_date, events in days.items():
+                adjusted_events = self.adjust_crossed_dates(events, tz)
+                for event_time, event_type, hour, minute in adjusted_events:
+                    adjusted_date = event_time.date()
+                    if adjusted_date not in adjusted_days:
+                        adjusted_days[adjusted_date] = []
+                    adjusted_days[adjusted_date].append((event_time, event_type, hour, minute))
+            
+            # Luego reagrupar por día de trabajo
+            workday_events = self.group_events_by_workday(adjusted_days)
+            
+            # Reemplazar los días originales con los días de trabajo
+            per_emp_day[emp_id] = workday_events
 
         # Ordenar marcas por hora
         for emp_id, days in per_emp_day.items():
@@ -214,8 +267,8 @@ class AttendanceReportWizard(models.TransientModel):
                 days[d].sort(key=lambda tup: tup[0])
 
         # ------------------ RESUMEN POR DÍA (incluye COMIDA) --------------------
-        LUNCH_MIN = timedelta(minutes=30)
-        LUNCH_MAX = timedelta(hours=3)
+        LUNCH_MIN = timedelta(minutes=30)   # mínimo para inferir comida
+        LUNCH_MAX = timedelta(hours=3)      # máximo razonable para comida
 
         def _hhmm(total_secs):
             total_secs = max(0, int(total_secs))
@@ -224,6 +277,10 @@ class AttendanceReportWizard(models.TransientModel):
             return f"{h:02d}:{m:02d}"
 
         def _summarize_day(sorted_logs):
+            """
+            Recibe lista ordenada: [(dt, 'in'|'out'|'lunch_out'|'lunch_in', h, m), ...]
+            Devuelve dict con: first_in, lunch_out, lunch_in, last_out, work_str, lunch_str
+            """
             if not sorted_logs:
                 return {
                     'first_in': None, 'last_out': None, 'lunch_out': None, 'lunch_in': None,
@@ -233,12 +290,15 @@ class AttendanceReportWizard(models.TransientModel):
                     'work_str': '00:00', 'lunch_str': '00:00',
                 }
 
+            # primeras/últimas marcas
             first_in = next((dt for dt, p, *_ in sorted_logs if p == 'in'), None)
             last_out = next((dt for dt, p, *_ in reversed(sorted_logs) if p == 'out'), None)
 
+            # comida explícita (primera pareja)
             lunch_out = next((dt for dt, p, *_ in sorted_logs if p == 'lunch_out'), None)
             lunch_in  = next((dt for dt, p, *_ in sorted_logs if p == 'lunch_in' and (not lunch_out or dt >= lunch_out)), None)
 
+            # si no hay explícita, inferir con el mayor hueco entre first_in y last_out
             if (not lunch_out or not lunch_in) and first_in and last_out and last_out > first_in:
                 times = [dt for (dt, _, *_ ) in sorted_logs if first_in <= dt <= last_out]
                 max_gap = timedelta(0); s=None; e=None
@@ -249,6 +309,7 @@ class AttendanceReportWizard(models.TransientModel):
                 if s and e and LUNCH_MIN <= max_gap <= LUNCH_MAX:
                     lunch_out, lunch_in = s, e
 
+            # sumar horas por tramos (cerrando en lunch y reabriendo después)
             work_secs = 0
             open_in = None
             for dt, p, *_ in sorted_logs:
@@ -292,7 +353,7 @@ class AttendanceReportWizard(models.TransientModel):
                 per_emp_day_summary[emp.id][d] = _summarize_day(emp_days.get(d, []))
         # ------------------------------------------------------------------------
 
-        # (Opcional) Log de diagnóstico
+        # (Opcional) Log de diagnóstico: cuántas marcas por empleado
         _logger = logging.getLogger(__name__)
         for emp in employees:
             total_marks = sum(len(per_emp_day.get(emp.id, {}).get(d, [])) for d in day_list)
@@ -301,8 +362,8 @@ class AttendanceReportWizard(models.TransientModel):
         return {
             'employees': employees,
             'day_list': day_list,
-            'per_emp_day': per_emp_day,
-            'per_emp_day_summary': per_emp_day_summary,
+            'per_emp_day': per_emp_day,                     # conserva marcas detalladas
+            'per_emp_day_summary': per_emp_day_summary,     # NUEVO: resumen para pintar comida
             'dfrom': dfrom,
             'dto': dto,
             'tz': self.env.user.tz or 'UTC',
