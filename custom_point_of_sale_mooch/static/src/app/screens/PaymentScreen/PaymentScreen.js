@@ -32,6 +32,7 @@ patch(PaymentScreen.prototype, {
         });
         }
         this.pos.TicketScreen_onDoRefund= false;
+        
     },
 
     async autoValidate() {
