@@ -2,6 +2,9 @@
 from odoo import models
 from datetime import datetime, date, timedelta
 from collections import defaultdict
+import pytz
+import logging
+_logger = logging.getLogger(__name__)
 
 # ======= Constantes de formato =======
 SPANISH_WEEKDAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
@@ -82,6 +85,113 @@ class ReportAttendancePDF(models.AbstractModel):
         mm = int(round((hour - hh) * 60))
         return datetime(d.year, d.month, d.day, hh, mm)
 
+    def _planned_lunch_window(self, emp, d):
+        """
+        Devuelve (lunch_start_dt, lunch_end_dt) en hora local NAIVE, si el
+        calendario del empleado tiene un tramo marcado como Descanso/Comida.
+        """
+        cal = (
+            getattr(emp, 'work_calendar_id', False)
+            or emp.resource_calendar_id
+            or emp.company_id.resource_calendar_id
+            or self.env.company.resource_calendar_id
+        )
+        if not cal:
+            return (None, None)
+
+        dow = str(d.weekday())
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
+        )
+        if not lines:
+            return (None, None)
+
+        def _is_break(l):
+            name = (l.name or '').lower()
+            wet  = getattr(l, 'work_entry_type_id', False)
+            wetn = (wet and wet.name or '').lower()
+            return (
+                'descanso' in name or 'comida' in name or 'almuerzo' in name or
+                'lunch' in name   or 'break' in name or
+                'descanso' in wetn or 'comida' in wetn or 'almuerzo' in wetn or
+                'lunch' in wetn or 'break' in wetn or
+                bool(getattr(l, 'is_break', False))
+            )
+
+        breaks = [l for l in lines if _is_break(l)]
+        if not breaks:
+            return (None, None)
+
+        start = min(b.hour_from for b in breaks)
+        end   = max(b.hour_to   for b in breaks)
+
+        def _to_dt(hfloat):
+            hh = int(hfloat)
+            mm = int(round((hfloat - hh) * 60))
+            return datetime(d.year, d.month, d.day, hh, mm)
+
+        return (_to_dt(start), _to_dt(end))
+
+    def _planned_segments(self, emp, d):
+        """
+        Devuelve lista de segmentos planeados para el día con mejor logging
+        """
+        cal = (
+            getattr(emp, 'work_calendar_id', False)
+            or emp.resource_calendar_id
+            or emp.company_id.resource_calendar_id
+            or self.env.company.resource_calendar_id
+        )
+        
+        import logging
+        _logger = logging.getLogger(__name__)
+        
+        if not cal:
+            _logger.debug("Empleado %s no tiene calendario asignado", emp.name)
+            return []
+
+        dow = str(d.weekday())
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
+        ).sorted(key=lambda l: l.hour_from)
+
+        _logger.debug("Calendario para %s - Día %s: %s líneas", emp.name, d, len(lines))
+
+        def _is_break(l):
+            name = (l.name or '').lower()
+            wet  = getattr(l, 'work_entry_type_id', False)
+            wetn = (wet and wet.name or '').lower()
+            is_break = (
+                'descanso' in name or 'comida' in name or 'almuerzo' in name or
+                'lunch' in name or 'break' in name or
+                'descanso' in wetn or 'comida' in wetn or 'almuerzo' in wetn or
+                'lunch' in wetn or 'break' in wetn or
+                bool(getattr(l, 'is_break', False))
+            )
+            _logger.debug("Línea %s-%s: %s (break=%s)", l.hour_from, l.hour_to, l.name, is_break)
+            return is_break
+
+        def _to_dt(hfloat):
+            hh = int(hfloat)
+            mm = int(round((hfloat - hh) * 60))
+            return datetime(d.year, d.month, d.day, hh, mm)
+
+        segs = []
+        for l in lines:
+            seg_kind = 'break' if _is_break(l) else 'work'
+            segs.append({
+                'kind': seg_kind,
+                'start': _to_dt(l.hour_from),
+                'end':   _to_dt(l.hour_to),
+                'name':  l.name or '',
+            })
+            _logger.debug("Segmento: %s %s-%s (%s)", seg_kind, 
+                        _to_dt(l.hour_from).strftime('%H:%M'), 
+                        _to_dt(l.hour_to).strftime('%H:%M'), 
+                        l.name or 'sin nombre')
+
+        return segs
+
     # ---------- Normalización de eventos ----------
     def _normalize_events(self, events):
         """
@@ -136,86 +246,210 @@ class ReportAttendancePDF(models.AbstractModel):
             filled.append((dt, t))
             current = 'out' if t == 'in' else 'in'
         return filled
+    # ---------- Ventanas (intervalos) programadas según el calendario ----------
+    def _get_day_windows(self, emp, d):
+        """
+        Devuelve una lista de intervalos [(start_dt, end_dt), ...] en hora local (naive)
+        a partir del calendario del empleado para el día d.
+        Si el calendario tiene 2+ intervalos, el hueco mayor suele ser la comida.
+        """
+        cal = (
+            getattr(emp, 'work_calendar_id', False)
+            or emp.resource_calendar_id
+            or emp.company_id.resource_calendar_id
+            or self.env.company.resource_calendar_id
+        )
+        if not cal:
+            return []
+
+        dow = str(d.weekday())  # '0'..'6'
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
+        )
+        if not lines:
+            return []
+
+        intervals = []
+        for l in sorted(lines, key=lambda x: x.hour_from):
+            hf = float(l.hour_from or 0.0)
+            ht = float(l.hour_to or 0.0)
+            fh, fm = int(hf), int(round((hf - int(hf)) * 60))
+            th, tm = int(ht), int(round((ht - int(ht)) * 60))
+            start = datetime(d.year, d.month, d.day, fh, fm)
+            end   = datetime(d.year, d.month, d.day, th, tm)
+            if end > start:
+                intervals.append((start, end))
+        return intervals
 
     # ---------- Cálculo por día ----------
-    def _process_attendance_data(self, events, expected_start):
-        vals = {
-            'entrada': '',
-            'comida_ini': '',
-            'comida_fin': '',
-            'salida': '',
-            'h_trab': '00:00',
-            'h_comida': '00:00',
-            'h_extra': '00:00',
-            'retardo': '00:00',
-            'retardo_sec': 0,
+    def _process_attendance_data(self, events_raw, expected_start, is_rest, planned_lunch=None, planned_segments=None):
+        """
+        Maneja múltiples checadas y prioriza checadas reales.
+        FIX: si no hay 'in', ya NO usar la primera marca como entrada;
+            primero intentaremos completar desde hr.attendance (ver paso 2 abajo).
+        """
+        from datetime import timedelta
+        import logging
+
+        logger = logging.getLogger('attendance_debug')
+        logger.setLevel(logging.DEBUG)
+        if not logger.handlers:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+
+        def hhmm(total_secs):
+            total_secs = max(0, int(total_secs or 0))
+            h = total_secs // 3600
+            m = (total_secs % 3600) // 60
+            return f"{h:02d}:{m:02d}"
+
+        fmt = lambda dt: dt.strftime('%H:%M') if dt else '00:00'
+
+        logger.debug("=== INICIANDO PROCESAMIENTO DE ASISTENCIA ===")
+        logger.debug("Eventos crudos recibidos: %s", events_raw)
+
+        # --- PASO 1: Separar checadas por tipo ---
+        all_events = []
+        lunch_out_events = []
+        lunch_in_events = []
+        in_events = []
+        out_events = []
+
+        for dt, p in events_raw:
+            if dt:
+                all_events.append((dt, p))
+                if p == 'lunch_out':
+                    lunch_out_events.append(dt)
+                elif p == 'lunch_in':
+                    lunch_in_events.append(dt)
+                elif p == 'in':
+                    in_events.append(dt)
+                elif p == 'out':
+                    out_events.append(dt)
+
+        all_events.sort(key=lambda x: x[0])
+        all_times = [dt for dt, p in all_events]
+
+        logger.debug("Todos los eventos: %s", [(dt.strftime('%H:%M'), p) for dt, p in all_events])
+        logger.debug("Eventos lunch_out: %s", [dt.strftime('%H:%M') for dt in lunch_out_events])
+        logger.debug("Eventos lunch_in: %s", [dt.strftime('%H:%M') for dt in lunch_in_events])
+        logger.debug("Eventos in: %s", [dt.strftime('%H:%M') for dt in in_events])
+        logger.debug("Eventos out: %s", [dt.strftime('%H:%M') for dt in out_events])
+
+        # --- PASO 2: Entrada y salida principal (FIX) ---
+        # Antes: si no había 'in', usábamos la primera marca -> eso entrega 20:02 como entrada.
+        # Ahora: si no hay 'in', se queda en None (se completará en el caller con hr.attendance).
+        first_in = in_events[0] if in_events else None
+        last_out = out_events[-1] if out_events else None
+
+        logger.debug("Entrada detectada: %s", fmt(first_in))
+        logger.debug("Salida detectada: %s", fmt(last_out))
+
+        # --- PASO 3: Detección de comida (igual que antes, prioriza checadas reales) ---
+        lunch_out = lunch_in = None
+        ls_plan, le_plan = (planned_lunch or (None, None))
+        logger.debug("Comida planificada: %s a %s", fmt(ls_plan) if ls_plan else "None", fmt(le_plan) if le_plan else "None")
+
+        if lunch_out_events or lunch_in_events:
+            logger.debug("Checadas explícitas de comida detectadas")
+            if lunch_out_events and lunch_in_events:
+                lo = min(lunch_out_events)
+                li = max(lunch_in_events)
+                if li > lo:
+                    lunch_out, lunch_in = lo, li
+                    logger.debug("Ambos tipos válidos: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
+                else:
+                    valid_pairs = []
+                    for _lo in lunch_out_events:
+                        for _li in lunch_in_events:
+                            if _li > _lo:
+                                valid_pairs.append((_lo, _li, (_li - _lo).total_seconds()))
+                    if valid_pairs:
+                        valid_pairs.sort(key=lambda x: abs(x[2] - 3600))
+                        lunch_out, lunch_in, _ = valid_pairs[0]
+                        logger.debug("Par válido encontrado: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
+            if lunch_out_events and not lunch_out:
+                if ls_plan:
+                    lunch_out = min(lunch_out_events, key=lambda dt: abs(dt - ls_plan))
+                else:
+                    lunch_out = min(lunch_out_events)
+                logger.debug("Múltiples/único lunch_out -> elegido: %s", fmt(lunch_out))
+            if lunch_in_events and not lunch_in:
+                if le_plan:
+                    lunch_in = min(lunch_in_events, key=lambda dt: abs(dt - le_plan))
+                else:
+                    lunch_in = max(lunch_in_events)
+                logger.debug("Múltiples/único lunch_in -> elegido: %s", fmt(lunch_in))
+
+        if (lunch_out is None or lunch_in is None) and ls_plan and le_plan:
+            logger.debug("No hay checadas explícitas, usando calendario (ventana ampliada)")
+            from datetime import timedelta
+            TOL = timedelta(minutes=90)
+            window_start = ls_plan - TOL
+            window_end = le_plan + TOL
+            checadas_en_comida = [dt for dt in all_times if window_start <= dt <= window_end]
+            if checadas_en_comida:
+                lunch_out = min(checadas_en_comida)
+                lunch_in = max(checadas_en_comida)
+                logger.debug("Comida inferida por checadas en ventana: %s a %s", fmt(lunch_out), fmt(lunch_in))
+            else:
+                lunch_out, lunch_in = ls_plan, le_plan
+                logger.debug("Comida por calendario: %s a %s", fmt(lunch_out), fmt(lunch_in))
+
+        if lunch_out and lunch_in:
+            if lunch_in <= lunch_out:
+                lunch_in = lunch_out + timedelta(hours=1)
+            lunch_duration = lunch_in - lunch_out
+            if not (timedelta(minutes=20) <= lunch_duration <= timedelta(hours=3)):
+                logger.debug("Duración de comida no válida (%s), descartando/completando por plan)", lunch_duration)
+                if ls_plan and le_plan:
+                    lunch_out, lunch_in = ls_plan, le_plan
+                else:
+                    lunch_out = lunch_in = None
+            else:
+                logger.debug("Duración de comida válida: %s", lunch_duration)
+
+        # --- PASO 4: Horas trabajadas ---
+        work_secs = 0
+        lunch_secs = 0
+        if first_in and last_out and last_out > first_in:
+            total_secs = int((last_out - first_in).total_seconds())
+            if lunch_out and lunch_in and lunch_in > lunch_out:
+                lunch_secs = int((lunch_in - lunch_out).total_seconds())
+                work_secs = max(0, total_secs - lunch_secs)
+            else:
+                work_secs = total_secs
+
+        # --- PASO 5: Retardo ---
+        retardo_sec = 0
+        if not is_rest and first_in and expected_start and first_in > expected_start:
+            retardo_sec = int((first_in - expected_start).total_seconds())
+
+        logger.debug("=== RESULTADO FINAL ===")
+        logger.debug("Entrada: %s", fmt(first_in))
+        logger.debug("Comida inicio: %s", fmt(lunch_out))
+        logger.debug("Comida fin: %s", fmt(lunch_in))
+        logger.debug("Salida: %s", fmt(last_out))
+        logger.debug("Horas trabajo: %s", hhmm(work_secs))
+        logger.debug("Horas comida: %s", hhmm(lunch_secs))
+        logger.debug("Retardo: %s", hhmm(retardo_sec))
+        logger.debug("========================\n")
+
+        return {
+            'entrada':    fmt(first_in),
+            'comida_ini': fmt(lunch_out),
+            'comida_fin': fmt(lunch_in),
+            'salida':     fmt(last_out),
+            'h_trab':     hhmm(work_secs),
+            'h_comida':   hhmm(lunch_secs),
+            'h_extra':    '00:00',
+            'retardo':    hhmm(retardo_sec),
+            'retardo_sec': retardo_sec,
+            'has_attendance': bool(first_in or last_out),
         }
-        if not events:
-            return vals
-
-        ev = self._normalize_events(events)
-
-        # Entrada = primer IN ; Salida = último OUT (con fallback)
-        entrada_dt = next((dt for dt, t in ev if t == 'in'), ev[0][0])
-        salida_dt  = next((dt for dt, t in reversed(ev) if t == 'out'), ev[-1][0])
-
-        # Comida = primer OUT + siguiente IN
-        comida_ini = None
-        comida_fin = None
-        for i, (dt, t) in enumerate(ev):
-            if t == 'out':
-                comida_ini = dt
-                for j in range(i + 1, len(ev)):
-                    if ev[j][1] == 'in':
-                        comida_fin = ev[j][0]
-                        break
-                break
-
-        # Horas trabajadas sumando tramos in→out
-        work_sec, pin = 0, None
-        for dt, t in ev:
-            if t == 'in' and pin is None:
-                pin = dt
-            elif t == 'out' and pin is not None:
-                work_sec += int((dt - pin).total_seconds())
-                pin = None
-
-        # Fallback si no se logró emparejar nada pero hay al menos 2 marcas:
-        if work_sec == 0 and entrada_dt and salida_dt and salida_dt > entrada_dt:
-            work_sec = int((salida_dt - entrada_dt).total_seconds())
-            # Heurística de comida: usar 2ª y 3ª marcas si existen
-            if len(ev) >= 3:
-                comida_ini = ev[1][0]
-                comida_fin = ev[2][0] if len(ev) >= 3 else None
-
-        # Comida válida 30–120 min
-        lunch_sec = 0
-        if comida_ini and comida_fin:
-            lunch_time = int((comida_fin - comida_ini).total_seconds())
-            if 1800 <= lunch_time <= 7200:
-                lunch_sec = lunch_time
-
-        neto_sec = max(0, work_sec - lunch_sec)
-        ot_sec = max(0, neto_sec - 8 * 3600)
-
-        # Retardo contra hora esperada
-        delay_sec = 0
-        if expected_start and entrada_dt:
-            delay_sec = max(0, int((entrada_dt - expected_start).total_seconds()))
-
-        vals.update({
-            'entrada': entrada_dt.strftime('%H:%M') if entrada_dt else '',
-            'comida_ini': comida_ini.strftime('%H:%M') if comida_ini else '',
-            'comida_fin': comida_fin.strftime('%H:%M') if comida_fin else '',
-            'salida': salida_dt.strftime('%H:%M') if salida_dt else '',
-            'h_trab': _fmt_hhmm_from_seconds(neto_sec),
-            'h_comida': _fmt_hhmm_from_seconds(lunch_sec),
-            'h_extra': _fmt_hhmm_from_seconds(ot_sec),
-            'retardo': _fmt_hhmm_from_seconds(delay_sec),
-            'retardo_sec': delay_sec,
-        })
-        return vals
-
     # ---------- Índice de ausencias (hr.leave) por día ----------
     def _build_leave_index(self, emp, dfrom, dto):
         dfrom_d = _as_date(dfrom)
@@ -272,24 +506,45 @@ class ReportAttendancePDF(models.AbstractModel):
         from collections import defaultdict
         events_by_day = defaultdict(list)
 
+        tz = pytz.timezone(self.env.user.tz or 'UTC')
+
+        def _loc(dt):
+            if not dt:
+                return None
+            if dt.tzinfo is None:
+                dt = pytz.utc.localize(dt)
+            return dt.astimezone(tz)
+
         for att in recs:
             if att.check_in:
-                events_by_day[att.check_in.date()].append((att.check_in, 'in'))
+                ci = _loc(att.check_in)
+                events_by_day[ci.date()].append((ci, 'in'))
             if att.check_out:
-                events_by_day[att.check_out.date()].append((att.check_out, 'out'))
+                co = _loc(att.check_out)
+                events_by_day[co.date()].append((co, 'out'))
 
         return events_by_day
 
 
     # ---------- Armado del reporte ----------
     def _get_report_values(self, docids, data=None):
+        # Wizard y dataset
         wiz = self.env['attendance.report.wizard'].browse(docids)[:1]
-        ds = wiz._fetch_dataset()  # { employees, day_list, per_emp_day, dfrom, dto, ... }
+        ds = wiz._fetch_dataset()  # { employees, day_list, per_emp_day, dfrom, dto, tz, include_signature, ... }
 
-        # === NUEVO: empleados por defecto si el wizard no trae ===
+        # Empleados del dataset o fallback
         employees = list(ds.get('employees') or self.env['hr.employee'].search([('active', '=', True)]))
 
-        # === NUEVO: day_list por defecto si el dataset no trae ===
+        # Lista de días (date) del dataset o fallback
+        def _as_date(dt):
+            return dt.date() if hasattr(dt, 'date') else dt
+        def _iter_days(d1, d2):
+            from datetime import timedelta
+            cur = d1
+            while cur <= d2:
+                yield cur
+                cur += timedelta(days=1)
+
         dfrom_d = _as_date(ds['dfrom'])
         dto_d   = _as_date(ds['dto'])
         day_list = list(ds.get('day_list') or _iter_days(dfrom_d, dto_d))
@@ -300,34 +555,78 @@ class ReportAttendancePDF(models.AbstractModel):
         for emp in employees:
             filas_tmp = []
 
-            # per_emp_day del dataset (si existe)
+            # Índice por día del dataset (si existe)
             per_emp_day_all = ds.get('per_emp_day', {}) or {}
             emp_days = per_emp_day_all.get(emp.id)
 
-            # === NUEVO: si no hay datos en el dataset, consulta hr.attendance ===
+            # Fallback: si no hay datos del checador para el empleado, arma desde hr.attendance
             if not emp_days:
                 emp_days = self._build_events_index_from_attendance(emp, ds['dfrom'], ds['dto'])
 
-            # índice de ausencias (vacaciones, permisos, etc.)
+            # Índice de ausencias (vacaciones, permisos, etc.)
             leave_idx = self._build_leave_index(emp, ds['dfrom'], ds['dto'])
 
             for d in day_list:
                 is_rest = self._is_rest_day(emp, d)
-                expected_start = self._expected_start_local(emp, d, is_rest)
+                
+                # Obtener segmentos del calendario
+                segs = self._planned_segments(emp, d)
+                
+                # ENCONTRAR EL SEGMENTO DE COMIDA (break)
+                lunch_seg = None
+                for s in segs:
+                    if s['kind'] == 'break':
+                        lunch_seg = (s['start'], s['end'])
+                        break
+                
+                # Si no hay segmento de break, buscar cualquier intervalo largo (>1h) entre trabajo
+                if not lunch_seg and len(segs) >= 2:
+                    # Buscar el hueco más grande entre segmentos de trabajo
+                    max_gap = timedelta(0)
+                    for i in range(len(segs) - 1):
+                        if segs[i]['kind'] == 'work' and segs[i + 1]['kind'] == 'work':
+                            gap = segs[i + 1]['start'] - segs[i]['end']
+                            if gap > max_gap and gap >= timedelta(minutes=30):
+                                max_gap = gap
+                                lunch_seg = (segs[i]['end'], segs[i + 1]['start'])
+                
+                # Entrada esperada (primer segmento de trabajo)
+                work_segs = [s for s in segs if s['kind'] == 'work']
+                expected_start = work_segs[0]['start'] if work_segs else self._expected_start_local(emp, d, is_rest)
 
-                events_raw = emp_days.get(d, [])
-                row = self._process_attendance_data(events_raw, expected_start)
+                # Construir eventos crudos del día (naive local)
+                events_raw = []
+                if d in emp_days:
+                    for event in emp_days[d]:
+                        event_time = event[0]  # datetime (puede venir aware local)
+                        event_type = event[1]  # 'in'/'out' (y quizá 'lunch_in'/'lunch_out')
 
-                has_attendance = bool(row['entrada'] or row['salida'])
+                        # Normaliza a naive (quitando tz si trae)
+                        if event_time and hasattr(event_time, 'tzinfo') and event_time.tzinfo:
+                            event_time = event_time.replace(tzinfo=None)
 
+                        events_raw.append((event_time, event_type))
+
+                # Procesa IN/OUT + Comida (explícita, inferida o por defecto)
+                row = self._process_attendance_data(events_raw, expected_start, is_rest,
+                                    planned_lunch=lunch_seg, planned_segments=segs)
+
+                # Asistencia robusta (no usar strings "00:00" como truthy)
+                has_attendance = row.pop('has_attendance', None)
+                if has_attendance is None:
+                    def _nz(x):  # no vacío y distinto de "00:00"
+                        return bool(x) and str(x) != '00:00'
+                    has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida'))
+
+                # Status base
                 if is_rest:
                     status = 'Descanso'
                     row['retardo'] = '00:00'
                     row['retardo_sec'] = 0
                 else:
-                    status = 'Falta' if not has_attendance else 'Asistencia'
+                    status = 'Asistencia' if has_attendance else 'Falta'
 
-                # leave del día
+                # Si hay leave ese día, predomina
                 leave = leave_idx.get(_as_date(d))
                 if leave:
                     status = leave.holiday_status_id.name or 'Tiempo libre'
@@ -347,26 +646,26 @@ class ReportAttendancePDF(models.AbstractModel):
                     'status': status,
                 })
 
-            # acumulado semanal de retardos
+            # Acumulado semanal de retardos (solo laborables con asistencia)
             from collections import defaultdict
             sum_week = defaultdict(int)
             for r in filas_tmp:
                 if not r['is_rest'] and r['has_attendance']:
                     sum_week[r['week_key']] += r.get('retardo_sec', 0)
 
-            # total de retardo del periodo (solo días laborables con asistencia)
+            # Total de retardo del periodo
             retardo_total_sec = sum(
                 r.get('retardo_sec', 0)
                 for r in filas_tmp
                 if not r['is_rest'] and r['has_attendance']
             )
 
+            # Normaliza filas para la salida (limpia llaves internas)
             filas = []
             for r in filas_tmp:
                 if r['status'] == 'Asistencia' and r.get('retardo_sec', 0) > 0:
                     if sum_week[r['week_key']] > THRESH_WEEK_SEC:
                         r['status'] = 'Retardo'
-                # limpiar llaves internas
                 for k in ('retardo_sec', 'd', 'week_key', 'is_rest', 'has_attendance'):
                     r.pop(k, None)
                 filas.append(r)
@@ -376,12 +675,24 @@ class ReportAttendancePDF(models.AbstractModel):
                 'dept': emp.department_id.name or '',
                 'ref': emp.barcode or emp.identification_id or 'no asignado',
                 'suc': getattr(emp, 'work_location_id', False) and emp.work_location_id.name or 'no asignada',
-                'retardo_total': _fmt_hhmm_from_seconds(retardo_total_sec),
+                'retardo_total': self._fmt_hhmm_from_seconds(retardo_total_sec) if hasattr(self, '_fmt_hhmm_from_seconds') else (
+                    f"{retardo_total_sec//3600:02d}:{(retardo_total_sec%3600)//60:02d}"
+                ),
                 'rows': filas,
             })
 
-        title = f"Registro de asistencia del {_title_spanish(ds['dfrom'])} al {_title_spanish(ds['dto'])}."
-        cpp = 4
+        # Título con fechas en TZ del usuario
+        tz = pytz.timezone(ds.get('tz') or 'UTC')
+
+        def _to_local(dt):
+            aware = pytz.utc.localize(dt) if getattr(dt, 'tzinfo', None) is None else dt.astimezone(pytz.UTC)
+            return aware.astimezone(tz)
+
+        start_local = _to_local(ds['dfrom'])
+        end_local   = _to_local(ds['dto'])
+
+        title = f"Registro de asistencia del {_title_spanish(start_local)} al {_title_spanish(end_local)}."
+        cpp = 4  # cards per page
 
         return {
             'doc_ids': docids,
