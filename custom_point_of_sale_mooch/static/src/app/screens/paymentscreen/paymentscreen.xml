@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="pos_txid_templates" xml:space="preserve">
+    <t t-inherit="point_of_sale.PaymentScreenMethods" t-inherit-mode="extension" owl="1">
+    <!-- Inserta el input antes del componente de líneas de pago -->
+    <xpath expr="//PaymentScreenPaymentLines" position="before">
+        <t t-if="requiresTxId">
+        <div class="o_pos_txid_box d-flex ">
+          <label class="small text-muted">Transaction ID</label>
+          <input type="text"
+                 class="form-control form-control-sm"
+                 placeholder="Terminacion de la Tarjeta"
+                 t-on-input="onTxInput"
+                 t-att-value="(selectedPaymentLine and selectedPaymentLine.transaction_id) or ''"/>
+        </div>
+      </t> 
+    </xpath>
+  </t>
+  
+</templates>
