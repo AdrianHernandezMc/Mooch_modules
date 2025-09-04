@@ -27,6 +27,7 @@ class StockPicking(models.Model):
         'purchase.invoice.tag',
         string="Facturas Proveedor traslados",
         help="Añade aquí tantas referencias de factura como necesites",
+        required=True,
     )
 
     # >>> Tu campo/compute existente (NO se cambia la lógica).
