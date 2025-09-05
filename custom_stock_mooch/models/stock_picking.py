@@ -45,6 +45,13 @@ class StockPicking(models.Model):
         copy=False,  # en backorders arranca False y lo ponemos explícitamente
     )
 
+    purchase_qty_zeroed = fields.Boolean(
+        string='Qty done en 0 (compras)',
+        default=False,
+        copy=False,
+        help="Marca que ya se puso qty_done=0 por primera vez en esta recepción de compra."
+    )
+
     # =============================
     # Computes (tuyos)
     # =============================
@@ -121,21 +128,41 @@ class StockPicking(models.Model):
     # =============================
     def _create_backorder(self):
         backorders = super()._create_backorder()
+
         for bo in backorders.filtered(lambda b: b.picking_type_code == 'incoming' and b.state not in ('done', 'cancel')):
             try:
+                # 1) ¿Es backorder de COMPRA?
+                is_purchase = bool(bo.purchase_id or (bo.backorder_id and bo.backorder_id.purchase_id))
+                if is_purchase:
+                    # Dejar TODAS las operaciones del backorder en 0 (primer arranque)
+                    if bo.move_line_ids:
+                        bo.move_line_ids.write({'qty_done': 0.0})
+                    # Si usas el flag sugerido
+                    if hasattr(bo, 'purchase_qty_zeroed') and not bo.purchase_qty_zeroed:
+                        bo.purchase_qty_zeroed = True
+
+                # 2) Destino por Departamento: heredar o recalcular
                 orig = bo.backorder_id
                 if orig and orig.location_dest_id:
+                    # Hereda destino del original
                     bo.location_dest_id = orig.location_dest_id.id
-                    bo.move_ids.filtered(lambda m: m.state not in ('done','cancel')).write({'location_dest_id': bo.location_dest_id.id})
-                    bo.move_line_ids.filtered(lambda l: getattr(l, 'state', False) not in ('done','cancel')).write({'location_dest_id': bo.location_dest_id.id})
+                    # Alinear moves/lines abiertos
+                    bo.move_ids.filtered(lambda m: m.state not in ('done','cancel')).write({
+                        'location_dest_id': bo.location_dest_id.id
+                    })
+                    bo.move_line_ids.filtered(lambda l: getattr(l, 'state', False) not in ('done','cancel')).write({
+                        'location_dest_id': bo.location_dest_id.id
+                    })
                     if hasattr(bo, 'dept_dest_applied'):
                         bo.dept_dest_applied = True
                 else:
-                    # Fallback: recalcular
+                    # Recalcular por departamento bajo la raíz correcta (soporta compras Vendors)
                     if hasattr(bo, '_auto_set_destination_on_receipt'):
                         bo._auto_set_destination_on_receipt(first_time_only=False, force=True)
+
             except Exception as e:
-                _logger.debug("Backorder destino por depto (%s) falló: %s", bo.name or bo.id, e)
+                _logger.debug("Backorder (parcial) ajustes compra/depto falló en %s: %s", bo.name or bo.id, e)
+
         return backorders
 
     # =============================
@@ -396,3 +423,24 @@ class StockPicking(models.Model):
             _logger.info("=================================")
         
         return True
+    
+    def _zero_qty_done_if_purchase_receipt(self, force=False):
+        """Pone qty_done=0 en TODAS las líneas de una recepción proveniente de COMPRA.
+        - Sólo aplica a pickings incoming con purchase_id
+        - No toca pickings done/cancel
+        - Si ya se aplicó antes, no vuelve a ejecutar (a menos que force=True)
+        """
+        for p in self.filtered(lambda r: r.picking_type_code == 'incoming'
+                                        and r.purchase_id
+                                        and r.state not in ('done', 'cancel')):
+            if p.purchase_qty_zeroed and not force:
+                continue
+
+            # Si aún no hay líneas, no truena: simplemente lo dejamos para el próximo hook
+            if p.move_line_ids:
+                # NO pisamos capturas del usuario: esto se usa al crear/confirmar/asignar
+                p.move_line_ids.write({'qty_done': 0.0})
+
+            # Marcar que ya inicializamos en 0
+            if not p.purchase_qty_zeroed:
+                p.purchase_qty_zeroed = True
