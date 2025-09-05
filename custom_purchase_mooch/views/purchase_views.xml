@@ -130,17 +130,17 @@
         </xpath>
         </field>
     </record>
-    <record id="purchase_order_view_buttons" model="ir.ui.view">
+    <!-- <record id="purchase_order_view_buttons" model="ir.ui.view">
         <field name="name">purchase.order.view.buttons</field>
         <field name="model">purchase.order</field>
         <field name="inherit_id" ref="purchase.purchase_order_form"/>
-        <field name="arch" type="xml">
+        <field name="arch" type="xml"> -->
             <!-- Agregar botón junto a los existentes -->
-            <xpath expr="//header//button[@name='action_check_budget']" position="before">
+            <!-- <xpath expr="//header//button[@name='action_check_budget']" position="before">
                 <button name="action_open_discount_wizard" string="Agregar Descuento Global" type="object" class="btn-primary" invisible="not (state == 'draft')"/>
             </xpath>
         </field>
-    </record>
+    </record> -->
     <record id="purchase_order_form_unlock_buttons_for_users" model="ir.ui.view">
       <field name="name">purchase.order.form.unlock.buttons.for.users</field>
       <field name="model">purchase.order</field>
@@ -168,6 +168,27 @@
           <attribute name="invisible">state != 'done'</attribute>
         </xpath>
 
+      </field>
+    </record>
+    <record id="view_move_form_inherit_global_discount_btn" model="ir.ui.view">
+      <field name="name">account.move.form.inherit.global.discount.btn</field>
+      <field name="model">account.move</field>
+      <field name="inherit_id" ref="account.view_move_form"/>
+      <field name="arch" type="xml">
+        <!-- Asegura que los campos usados en modifiers estén en la vista -->
+        <xpath expr="//form" position="inside">
+          <field name="state" invisible="1"/>
+          <field name="move_type" invisible="1"/>
+        </xpath>
+
+        <!-- Inserta el botón en el header SIN attrs -->
+        <xpath expr="//form/header" position="inside">
+          <button name="action_open_discount_wizard"
+                  string="Agregar Descuento Global"
+                  type="object"
+                  class="btn-primary"
+                  invisible="not (state == 'draft' and move_type in ['in_invoice', 'in_refund'])"/>
+        </xpath>
       </field>
     </record>
   </data>

@@ -64,3 +64,19 @@ class AccountMove(models.Model):
                                 'res_id': move.id,
                             })
         return res
+
+    def action_open_discount_wizard(self):
+        self.ensure_one()
+        return {
+            'name': 'Agregar Descuento Global',
+            'type': 'ir.actions.act_window',
+            'res_model': 'purchase.discount.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_model': 'account.move',
+                'active_id': self.id,
+                'active_ids': self.ids,
+                'default_move_id': self.id,  # lo recoge el wizard
+            }
+        }
