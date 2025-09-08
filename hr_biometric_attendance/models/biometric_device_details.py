@@ -251,10 +251,11 @@ class BiometricDeviceDetails(models.Model):
                     emp = self.env['hr.employee'].with_context(active_test=False).search([
                         ('device_id_num', '=', device_user_id),
                         ('company_id', '=', info.company_id.id),
+                        ('device_id', '=', info.id),  # 🔒 asegura que solo traiga del dispositivo correcto
                     ], limit=1)
                     if not emp:
-                        _logger.warning("[BIO] Empleado no encontrado para device_id_num=%s en %s. Log omitido.",
-                                        device_user_id, info.company_id.display_name)
+                        _logger.warning("[BIO] Empleado no encontrado para device_id_num=%s en %s (dispositivo %s). Log omitido.",
+                                        device_user_id, info.company_id.display_name, info.name)
                         continue
                     if not emp.device_id or emp.device_id.id != self.id:
                         emp.write({'device_id': self.id})
