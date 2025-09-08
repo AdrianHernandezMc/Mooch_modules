@@ -17,7 +17,6 @@ patch(PaymentScreen.prototype, {
         //this._super();
         // TicketScreen_onDoRefund bandera que proviene de point_of_sale_mooch.TicketScreen_onDoRefund    
         if (this.pos.TicketScreen_onDoRefund){
-            //alert("activado");
             const line = this.selectedPaymentLine;
             line.transaction_id = String(this.pos.sharedtcode);
             this.render();
