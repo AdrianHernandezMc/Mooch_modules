@@ -20,9 +20,6 @@ patch(Order.prototype, {
     //--- modifica linea de articulos ------
 
         const olines = this.get_orderlines?.() || [];
-
-        console.log("order:line",r.orderlines)
-        console.log("pack_lot_lines",r.pack_lot_lines)
         
         r.orderlines = (r.orderlines || []).map((line, idx) => {
             const oline_   = olines[idx];  //--emparejamos ids de  r.orderlines con olines
