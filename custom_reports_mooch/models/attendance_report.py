@@ -9,6 +9,8 @@ _logger = logging.getLogger(__name__)
 # ======= Constantes de formato =======
 SPANISH_WEEKDAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
 SPANISH_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+DASH = '-'
+GRACE_DAILY_SEC = 0
 
 def _fmt_hhmm_from_seconds(seconds):
     if seconds is None:
@@ -623,16 +625,32 @@ class ReportAttendancePDF(models.AbstractModel):
                     status = 'Descanso'
                     row['retardo'] = '00:00'
                     row['retardo_sec'] = 0
+                    # --- NUEVO: pintar guiones en descanso ---
+                    row.update({
+                        'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                        'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
+                    })
                 else:
-                    status = 'Asistencia' if has_attendance else 'Falta'
-
+                    if has_attendance:
+                        status = 'Asistencia'
+                        # --- marcar retardo por día ---
+                        if int(row.get('retardo_sec', 0)) > GRACE_DAILY_SEC:
+                            status = 'Retardo'
+                    else:
+                        status = 'Falta'
+                        # --- pintar guiones en faltas ---
+                        row.update({
+                            'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                            'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
+                            'retardo': '00:00', 'retardo_sec': 0,
+                        })
                 # Si hay leave ese día, predomina
                 leave = leave_idx.get(_as_date(d))
                 if leave:
                     status = leave.holiday_status_id.name or 'Tiempo libre'
                     row.update({
-                        'entrada': '', 'comida_ini': '', 'comida_fin': '', 'salida': '',
-                        'h_trab': '00:00', 'h_comida': '00:00', 'h_extra': '00:00',
+                        'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                        'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
                         'retardo': '00:00', 'retardo_sec': 0,
                     })
 
