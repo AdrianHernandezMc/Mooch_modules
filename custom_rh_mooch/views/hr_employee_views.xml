@@ -6,7 +6,7 @@
     <field name="inherit_id" ref="hr.view_employee_form"/>
     <field name="arch" type="xml">
       <xpath expr="//notebook" position="inside">
-        <page string="Horarios" name="mooch_schedule_tab">
+        <page string="Horarios" name="mooch_schedule_tab" groups="hr.group_hr_user">
           <group>
             <separator string="Calendario de trabajo"/>
             <group>
@@ -28,7 +28,7 @@
             </group>
 
             <group>
-              <field name="rest_notes" placeholder="Notas u observaciones..." />
+              <field name="rest_notes" placeholder="Notas u observaciones..."/>
             </group>
           </group>
         </page>
