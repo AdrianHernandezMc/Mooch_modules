@@ -26,7 +26,7 @@ patch(PaymentScreen.prototype, {
             const { confirmed } = this.popup.add(ConfirmPopup, {
             title: _t("Facturacion al cliente"),
             body: _t(
-                "Favor de preguntar al cliente si necesita factura; si es así, registre los datos del cliente y la factura."
+                "Recordar al cliente que la facturación se realiza el mismo día."
             ),
         });
         }

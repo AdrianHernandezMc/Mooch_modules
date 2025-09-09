@@ -96,7 +96,7 @@ patch(TicketScreen.prototype, {
                
         const addcode_to_orderline =  order.get_orderlines()
         addcode_to_orderline.forEach(l => {
-            l.full_product_name += " - " + l.product.barcode ;   // refleja el cambio en memoria
+            l.full_product_name = l.full_product_name + " - " + l.product.barcode;   // refleja el cambio en memoria
         });
 
 /// **** Echo para los camios de producto ********
