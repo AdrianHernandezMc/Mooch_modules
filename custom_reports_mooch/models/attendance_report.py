@@ -349,6 +349,22 @@ class ReportAttendancePDF(models.AbstractModel):
                 elif p == 'out':
                     out_events.append(dt)
 
+        # <<< NUEVO: si no hay ninguna checada, no inferimos nada >>>
+        if not all_events:
+            logger.debug("Día sin checadas: no se infiere comida ni salida.")
+            return {
+                'entrada':    '00:00',
+                'comida_ini': '00:00',
+                'comida_fin': '00:00',
+                'salida':     '00:00',
+                'h_trab':     '00:00',
+                'h_comida':   '00:00',
+                'h_extra':    '00:00',
+                'retardo':    '00:00',
+                'retardo_sec': 0,
+                'has_attendance': False,
+            }
+
         all_events.sort(key=lambda x: x[0])
         all_times = [dt for dt, p in all_events]
 
@@ -440,16 +456,69 @@ class ReportAttendancePDF(models.AbstractModel):
         if is_sunday:
             logger.debug("Domingo detectado: ignorando checadas y ventana de comida.")
             lunch_out = lunch_in = None
-        # --- PASO 4: Horas trabajadas ---
+
+        # --- NUEVO: si falta salida, inferirla por calendario ---
+        anchor = None
+        if all_times:
+            anchor = max(all_times)  # último evento del día (in, out, lunch, etc.)
+        if lunch_in:
+            anchor = max(anchor or lunch_in, lunch_in)
+        if lunch_out:
+            anchor = max(anchor or lunch_out, lunch_out)
+        if first_in and anchor is None:
+            anchor = first_in
+
+        if last_out is None and planned_segments:
+            # Fin(es) programados de trabajo
+            work_ends = sorted(
+                [s['end'] for s in planned_segments if s.get('kind') == 'work']
+            )
+            if work_ends:
+                # Preferimos el fin más cercano no muy antes del último evento
+                TOL_BEFORE = timedelta(minutes=30)
+                candidates = [e for e in work_ends if (anchor is None or e >= (anchor - TOL_BEFORE))]
+                last_out = candidates[0] if candidates else work_ends[-1]
+                logger.debug("Salida inferida por calendario: %s (ancla=%s)", fmt(last_out), fmt(anchor))
+
+        if first_in and not last_out and not is_sunday and not is_rest:
+            # Tomamos como ancla el último tiempo conocido del día
+            last_known = max([t for t in (first_in, lunch_in, lunch_out) if t])
+
+            # Buscar la primera hora_fin de segmento 'work' >= ancla; si no hay, usar la última del día
+            work_ends = [s['end'] for s in (planned_segments or []) if s.get('kind') == 'work']
+            work_ends.sort()
+            cand = None
+            for e in work_ends:
+                if e >= (last_known or first_in):
+                    cand = e
+                    break
+            if cand is None and work_ends:
+                cand = work_ends[-1]
+
+            # Heurística: si sólo hubo lunch_out y está cerca del fin planificado, no contamos comida
+            from datetime import timedelta
+            if cand and lunch_out and not lunch_in and (cand - lunch_out) <= timedelta(minutes=90):
+                lunch_out = None
+                lunch_in = None
+
+            if cand and cand > first_in:
+                last_out = cand
+                logger.debug("Salida inferida por calendario: %s (ancla=%s)", fmt(last_out), fmt(last_known))
+
+        # --- PASO 4 (reemplazo): Horas trabajadas con traslape de comida ---
         work_secs = 0
         lunch_secs = 0
         if first_in and last_out and last_out > first_in:
             total_secs = int((last_out - first_in).total_seconds())
-            if lunch_out and lunch_in and lunch_in > lunch_out:
-                lunch_secs = int((lunch_in - lunch_out).total_seconds())
-                work_secs = max(0, total_secs - lunch_secs)
-            else:
-                work_secs = total_secs
+
+            # Restar solo la parte de comida que se traslapa con la jornada
+            if lunch_out and lunch_in:
+                lo = max(lunch_out, first_in)
+                li = min(lunch_in, last_out)
+                if li > lo:
+                    lunch_secs = int((li - lo).total_seconds())
+
+            work_secs = max(0, total_secs - lunch_secs)
 
         # --- PASO 5: Retardo ---
         retardo_sec = 0
@@ -644,11 +713,11 @@ class ReportAttendancePDF(models.AbstractModel):
                                     planned_lunch=lunch_seg, planned_segments=segs)
 
                 # Asistencia robusta (no usar strings "00:00" como truthy)
-                has_attendance = row.pop('has_attendance', None)
-                if has_attendance is None:
-                    def _nz(x):  # no vacío y distinto de "00:00"
-                        return bool(x) and str(x) != '00:00'
-                    has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida'))
+                has_attendance = bool(row.pop('has_attendance', False))
+                # if has_attendance is None:
+                #     def _nz(x):  # no vacío y distinto de "00:00"
+                #         return bool(x) and str(x) != '00:00'
+                #     has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida'))
 
                 # Status base
                 if is_rest:
