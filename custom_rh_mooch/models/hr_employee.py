@@ -42,3 +42,9 @@ class HrEmployee(models.Model):
         groups="hr.group_hr_user",
         help="Notas u observaciones sobre los días de descanso del empleado."
     )
+
+    is_administrative = fields.Boolean(
+        string="¿Es Administrativo?",
+        groups="hr.group_hr_user",
+        help="Si está activo, este empleado será considerado en el reporte especial de tiempos administrativos (entrada/comida/regreso/salida)."
+    )

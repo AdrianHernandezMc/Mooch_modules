@@ -15,6 +15,10 @@
                      options="{'no_open': False}"
                      context="{'default_company_id': company_id}"/>
             </group>
+            <separator string="Tipo de personal(Administrativo)"/>
+            <group>
+              <field name="is_administrative"/>
+            </group>
 
             <separator string="Días de descanso (semanal)"/>
             <group>
