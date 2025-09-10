@@ -22,12 +22,12 @@ patch(TicketScreen.prototype, {
         const destinationOrder = this.pos.get_order();
         if (destinationOrder) {
             try {
-                const ondoInventory =  await this.move_to_inventory();
+                //const ondoInventory =  await this.move_to_inventory();
 
-                if (!ondoInventory){
-                    this.pos.toRefundLines = {}
-                    return;
-                }
+                // if (!ondoInventory){
+                //     this.pos.toRefundLines = {}
+                //     return;
+                // }
 
                 this.pos.set_order(destinationOrder);
                 const partner = this.getSelectedPartner();       

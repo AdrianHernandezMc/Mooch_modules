@@ -17,7 +17,6 @@ patch(PaymentScreen.prototype, {
         //this._super();
         // TicketScreen_onDoRefund bandera que proviene de point_of_sale_mooch.TicketScreen_onDoRefund    
         if (this.pos.TicketScreen_onDoRefund){
-            //alert("activado");
             const line = this.selectedPaymentLine;
             line.transaction_id = String(this.pos.sharedtcode);
             this.render();
@@ -27,7 +26,7 @@ patch(PaymentScreen.prototype, {
             const { confirmed } = this.popup.add(ConfirmPopup, {
             title: _t("Facturacion al cliente"),
             body: _t(
-                "Favor de preguntar al cliente si necesita factura; si es así, registre los datos del cliente y la factura."
+                "Recordar al cliente que la facturación se realiza el mismo día."
             ),
         });
         }

@@ -1,0 +1,87 @@
+/* Caja base del popup */
+.popup {
+  display: flex;
+  flex-direction: column;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+
+/* Título */
+.title {
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 16px;
+  color: #8c1212;               /* usa color de texto oscuro típico */
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;       /* leve contraste como en Odoo */
+}
+
+/* Cuerpo */
+.body {
+  padding: 16px;
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #1f2937;
+}
+
+.body p {
+  margin: 0 0 8px;
+}
+
+/* “Keycaps” para atajos (útil si decides envolver teclas en <span class="keycap">Alt</span> + … ) */
+.keycap {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid #e5e7eb;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  color: #111827;
+  vertical-align: middle;
+}
+
+/* Pie con botones */
+.footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+/* Ajustes sutiles a los botones Bootstrap-like de Odoo */
+.btn {
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.btn-primary {
+  /* se respetan los colores del tema; solo realce */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .popup {
+    width: 96vw;
+    max-width: 96vw;
+  }
+  .body {
+    max-height: 55vh;
+  }
+}

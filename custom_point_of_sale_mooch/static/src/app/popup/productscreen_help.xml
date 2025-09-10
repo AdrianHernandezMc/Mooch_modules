@@ -1,0 +1,21 @@
+<templates id="custom_pos_templates" xml:space="preserve">
+  <t t-name="custom_pos.HotkeyHelpPopup" owl="1">
+    <div class="popup popup-confirm">
+      <div class="title"><t t-esc="props.title"/></div>
+      <div class="body">
+        <!-- Renderiza HTML que pasamos en props.body -->
+        <div t-raw="props.body"/>
+      </div>
+      <div class="footer">
+        <button class="btn btn-primary" t-on-click="confirm">
+          <t t-esc="props.confirmText"/>
+        </button>
+        <t t-if="props.cancelText">
+          <button class="btn btn-secondary" t-on-click="cancel">
+            <t t-esc="props.cancelText"/>
+          </button>
+        </t>
+      </div>
+    </div>
+  </t>
+</templates>
