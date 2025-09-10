@@ -505,6 +505,25 @@ class ReportAttendancePDF(models.AbstractModel):
                 last_out = cand
                 logger.debug("Salida inferida por calendario: %s (ancla=%s)", fmt(last_out), fmt(last_known))
 
+        # --- SANEAMIENTO: la comida nunca rebasa la salida ---
+        if last_out:
+            # Si la comida empieza en o después de la salida => se descarta
+            if lunch_out and lunch_out >= last_out:
+                logger.debug("Comida descartada: inicia %s >= salida %s",
+                             fmt(lunch_out), fmt(last_out))
+                lunch_out = None
+                lunch_in = None
+
+            # Si la comida termina después de la salida => recortar al momento de salida
+            elif lunch_in and lunch_in > last_out:
+                logger.debug("Comida recortada: fin %s > salida %s → fin=%s",
+                             fmt(lunch_in), fmt(last_out), fmt(last_out))
+                lunch_in = last_out
+                # Tras el recorte, si fin <= ini, descartar la comida
+                if lunch_out and lunch_in <= lunch_out:
+                    logger.debug("Comida inválida tras recorte (fin<=ini). Se descarta.")
+                    lunch_out = None
+                    lunch_in  = None
         # --- PASO 4 (reemplazo): Horas trabajadas con traslape de comida ---
         work_secs = 0
         lunch_secs = 0
