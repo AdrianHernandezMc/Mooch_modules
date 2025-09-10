@@ -9,6 +9,8 @@ _logger = logging.getLogger(__name__)
 # ======= Constantes de formato =======
 SPANISH_WEEKDAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
 SPANISH_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+DASH = '-'
+GRACE_DAILY_SEC = 0
 
 def _fmt_hhmm_from_seconds(seconds):
     if seconds is None:
@@ -311,6 +313,21 @@ class ReportAttendancePDF(models.AbstractModel):
         logger.debug("=== INICIANDO PROCESAMIENTO DE ASISTENCIA ===")
         logger.debug("Eventos crudos recibidos: %s", events_raw)
 
+        # --- Regla: en domingo NO se contabiliza comida ---
+        is_sunday = False
+        _ref = None
+        if events_raw:
+            _ref = events_raw[0][0]
+        elif planned_segments:
+            _ref = planned_segments[0].get('start')
+        elif expected_start:
+            _ref = expected_start
+        if _ref:
+            try:
+                is_sunday = (_ref.weekday() == 6)  # 6 = Domingo
+            except Exception:
+                is_sunday = False
+
         # --- PASO 1: Separar checadas por tipo ---
         all_events = []
         lunch_out_events = []
@@ -322,13 +339,31 @@ class ReportAttendancePDF(models.AbstractModel):
             if dt:
                 all_events.append((dt, p))
                 if p == 'lunch_out':
-                    lunch_out_events.append(dt)
+                    if not is_sunday:
+                        lunch_out_events.append(dt)
                 elif p == 'lunch_in':
-                    lunch_in_events.append(dt)
+                    if not is_sunday:
+                        lunch_in_events.append(dt)
                 elif p == 'in':
                     in_events.append(dt)
                 elif p == 'out':
                     out_events.append(dt)
+
+        # <<< NUEVO: si no hay ninguna checada, no inferimos nada >>>
+        if not all_events:
+            logger.debug("Día sin checadas: no se infiere comida ni salida.")
+            return {
+                'entrada':    '00:00',
+                'comida_ini': '00:00',
+                'comida_fin': '00:00',
+                'salida':     '00:00',
+                'h_trab':     '00:00',
+                'h_comida':   '00:00',
+                'h_extra':    '00:00',
+                'retardo':    '00:00',
+                'retardo_sec': 0,
+                'has_attendance': False,
+            }
 
         all_events.sort(key=lambda x: x[0])
         all_times = [dt for dt, p in all_events]
@@ -349,61 +384,66 @@ class ReportAttendancePDF(models.AbstractModel):
         logger.debug("Salida detectada: %s", fmt(last_out))
 
         # --- PASO 3: Detección de comida (igual que antes, prioriza checadas reales) ---
+        # --- PASO 3: Detección de comida ---
         lunch_out = lunch_in = None
         ls_plan, le_plan = (planned_lunch or (None, None))
         logger.debug("Comida planificada: %s a %s", fmt(ls_plan) if ls_plan else "None", fmt(le_plan) if le_plan else "None")
 
-        if lunch_out_events or lunch_in_events:
-            logger.debug("Checadas explícitas de comida detectadas")
+        # 3.1 Checadas explícitas (ignorando domingo)
+        if not is_sunday:
             if lunch_out_events and lunch_in_events:
                 lo = min(lunch_out_events)
                 li = max(lunch_in_events)
                 if li > lo:
                     lunch_out, lunch_in = lo, li
                     logger.debug("Ambos tipos válidos: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
-                else:
-                    valid_pairs = []
-                    for _lo in lunch_out_events:
-                        for _li in lunch_in_events:
-                            if _li > _lo:
-                                valid_pairs.append((_lo, _li, (_li - _lo).total_seconds()))
-                    if valid_pairs:
-                        valid_pairs.sort(key=lambda x: abs(x[2] - 3600))
-                        lunch_out, lunch_in, _ = valid_pairs[0]
-                        logger.debug("Par válido encontrado: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
-            if lunch_out_events and not lunch_out:
-                if ls_plan:
-                    lunch_out = min(lunch_out_events, key=lambda dt: abs(dt - ls_plan))
-                else:
-                    lunch_out = min(lunch_out_events)
-                logger.debug("Múltiples/único lunch_out -> elegido: %s", fmt(lunch_out))
-            if lunch_in_events and not lunch_in:
-                if le_plan:
-                    lunch_in = min(lunch_in_events, key=lambda dt: abs(dt - le_plan))
-                else:
-                    lunch_in = max(lunch_in_events)
-                logger.debug("Múltiples/único lunch_in -> elegido: %s", fmt(lunch_in))
 
-        if (lunch_out is None or lunch_in is None) and ls_plan and le_plan:
-            logger.debug("No hay checadas explícitas, usando calendario (ventana ampliada)")
-            from datetime import timedelta
+            elif lunch_out_events and not lunch_in_events:
+                # Sólo hay códigos 4 → usar primero/último como ventana de comida
+                lo_first = min(lunch_out_events)
+                lo_last  = max(lunch_out_events)
+                if lo_last > lo_first:
+                    dur = lo_last - lo_first
+                    if timedelta(minutes=20) <= dur <= timedelta(hours=2):
+                        lunch_out, lunch_in = lo_first, lo_last
+                        logger.debug("Solo lunch_out: usando primero y último: %s a %s", fmt(lunch_out), fmt(lunch_in))
+                # Si aún falta cerrar, asumir +60m (cap a salida si existe)
+                if lunch_out is None or lunch_in is None:
+                    lunch_out = lunch_out or lo_first
+                    li = lunch_out + timedelta(hours=1)
+                    if last_out and li > last_out:
+                        li = last_out
+                    lunch_in = lunch_in or li
+                    logger.debug("Solo lunch_out: sin par → asumiendo +60m: %s", fmt(lunch_in))
+
+            elif lunch_in_events and not lunch_out_events:
+                # Caso raro: sólo códigos 5 → asumir -60m
+                li = max(lunch_in_events)
+                lo = li - timedelta(hours=1)
+                lunch_out, lunch_in = lo, li
+                logger.debug("Solo lunch_in: asumiendo -60m: %s a %s", fmt(lunch_out), fmt(lunch_in))
+
+        # 3.2 Inferir por calendario (usar SOLO checadas de comida)
+        if not is_sunday and (lunch_out is None or lunch_in is None) and ls_plan and le_plan:
             TOL = timedelta(minutes=90)
             window_start = ls_plan - TOL
-            window_end = le_plan + TOL
-            checadas_en_comida = [dt for dt in all_times if window_start <= dt <= window_end]
-            if checadas_en_comida:
-                lunch_out = min(checadas_en_comida)
-                lunch_in = max(checadas_en_comida)
-                logger.debug("Comida inferida por checadas en ventana: %s a %s", fmt(lunch_out), fmt(lunch_in))
+            window_end   = le_plan + TOL
+            lunch_times = [dt for dt in (lunch_out_events + lunch_in_events)
+                        if window_start <= dt <= window_end]
+            if lunch_times:
+                lunch_out = lunch_out or min(lunch_times)
+                lunch_in  = lunch_in  or max(lunch_times)
+                logger.debug("Comida inferida por checadas de comida en ventana: %s a %s", fmt(lunch_out), fmt(lunch_in))
             else:
                 lunch_out, lunch_in = ls_plan, le_plan
                 logger.debug("Comida por calendario: %s a %s", fmt(lunch_out), fmt(lunch_in))
 
+        # 3.3 Validar duración
         if lunch_out and lunch_in:
             if lunch_in <= lunch_out:
                 lunch_in = lunch_out + timedelta(hours=1)
             lunch_duration = lunch_in - lunch_out
-            if not (timedelta(minutes=20) <= lunch_duration <= timedelta(hours=3)):
+            if not (timedelta(minutes=20) <= lunch_duration <= timedelta(hours=2)):
                 logger.debug("Duración de comida no válida (%s), descartando/completando por plan)", lunch_duration)
                 if ls_plan and le_plan:
                     lunch_out, lunch_in = ls_plan, le_plan
@@ -412,21 +452,101 @@ class ReportAttendancePDF(models.AbstractModel):
             else:
                 logger.debug("Duración de comida válida: %s", lunch_duration)
 
-        # --- PASO 4: Horas trabajadas ---
+        # 3.4 Domingo: se ignora comida
+        if is_sunday:
+            logger.debug("Domingo detectado: ignorando checadas y ventana de comida.")
+            lunch_out = lunch_in = None
+
+        # --- NUEVO: si falta salida, inferirla por calendario ---
+        anchor = None
+        if all_times:
+            anchor = max(all_times)  # último evento del día (in, out, lunch, etc.)
+        if lunch_in:
+            anchor = max(anchor or lunch_in, lunch_in)
+        if lunch_out:
+            anchor = max(anchor or lunch_out, lunch_out)
+        if first_in and anchor is None:
+            anchor = first_in
+
+        if last_out is None and planned_segments:
+            # Fin(es) programados de trabajo
+            work_ends = sorted(
+                [s['end'] for s in planned_segments if s.get('kind') == 'work']
+            )
+            if work_ends:
+                # Preferimos el fin más cercano no muy antes del último evento
+                TOL_BEFORE = timedelta(minutes=30)
+                candidates = [e for e in work_ends if (anchor is None or e >= (anchor - TOL_BEFORE))]
+                last_out = candidates[0] if candidates else work_ends[-1]
+                logger.debug("Salida inferida por calendario: %s (ancla=%s)", fmt(last_out), fmt(anchor))
+
+        if first_in and not last_out and not is_sunday and not is_rest:
+            # Tomamos como ancla el último tiempo conocido del día
+            last_known = max([t for t in (first_in, lunch_in, lunch_out) if t])
+
+            # Buscar la primera hora_fin de segmento 'work' >= ancla; si no hay, usar la última del día
+            work_ends = [s['end'] for s in (planned_segments or []) if s.get('kind') == 'work']
+            work_ends.sort()
+            cand = None
+            for e in work_ends:
+                if e >= (last_known or first_in):
+                    cand = e
+                    break
+            if cand is None and work_ends:
+                cand = work_ends[-1]
+
+            # Heurística: si sólo hubo lunch_out y está cerca del fin planificado, no contamos comida
+            from datetime import timedelta
+            if cand and lunch_out and not lunch_in and (cand - lunch_out) <= timedelta(minutes=90):
+                lunch_out = None
+                lunch_in = None
+
+            if cand and cand > first_in:
+                last_out = cand
+                logger.debug("Salida inferida por calendario: %s (ancla=%s)", fmt(last_out), fmt(last_known))
+
+        # --- SANEAMIENTO: la comida nunca rebasa la salida ---
+        if last_out:
+            # Si la comida empieza en o después de la salida => se descarta
+            if lunch_out and lunch_out >= last_out:
+                logger.debug("Comida descartada: inicia %s >= salida %s",
+                             fmt(lunch_out), fmt(last_out))
+                lunch_out = None
+                lunch_in = None
+
+            # Si la comida termina después de la salida => recortar al momento de salida
+            elif lunch_in and lunch_in > last_out:
+                logger.debug("Comida recortada: fin %s > salida %s → fin=%s",
+                             fmt(lunch_in), fmt(last_out), fmt(last_out))
+                lunch_in = last_out
+                # Tras el recorte, si fin <= ini, descartar la comida
+                if lunch_out and lunch_in <= lunch_out:
+                    logger.debug("Comida inválida tras recorte (fin<=ini). Se descarta.")
+                    lunch_out = None
+                    lunch_in  = None
+        # --- PASO 4 (reemplazo): Horas trabajadas con traslape de comida ---
         work_secs = 0
         lunch_secs = 0
         if first_in and last_out and last_out > first_in:
             total_secs = int((last_out - first_in).total_seconds())
-            if lunch_out and lunch_in and lunch_in > lunch_out:
-                lunch_secs = int((lunch_in - lunch_out).total_seconds())
-                work_secs = max(0, total_secs - lunch_secs)
-            else:
-                work_secs = total_secs
+
+            # Restar solo la parte de comida que se traslapa con la jornada
+            if lunch_out and lunch_in:
+                lo = max(lunch_out, first_in)
+                li = min(lunch_in, last_out)
+                if li > lo:
+                    lunch_secs = int((li - lo).total_seconds())
+
+            work_secs = max(0, total_secs - lunch_secs)
 
         # --- PASO 5: Retardo ---
         retardo_sec = 0
         if not is_rest and first_in and expected_start and first_in > expected_start:
             retardo_sec = int((first_in - expected_start).total_seconds())
+        # <<< NUEVO: contar retardo por minutos completos (ignorar segundos) >>>
+        if retardo_sec > 0:
+            retardo_sec = (retardo_sec // 60) * 60
+
 
         logger.debug("=== RESULTADO FINAL ===")
         logger.debug("Entrada: %s", fmt(first_in))
@@ -612,27 +732,43 @@ class ReportAttendancePDF(models.AbstractModel):
                                     planned_lunch=lunch_seg, planned_segments=segs)
 
                 # Asistencia robusta (no usar strings "00:00" como truthy)
-                has_attendance = row.pop('has_attendance', None)
-                if has_attendance is None:
-                    def _nz(x):  # no vacío y distinto de "00:00"
-                        return bool(x) and str(x) != '00:00'
-                    has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida'))
+                has_attendance = bool(row.pop('has_attendance', False))
+                # if has_attendance is None:
+                #     def _nz(x):  # no vacío y distinto de "00:00"
+                #         return bool(x) and str(x) != '00:00'
+                #     has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida'))
 
                 # Status base
                 if is_rest:
                     status = 'Descanso'
                     row['retardo'] = '00:00'
                     row['retardo_sec'] = 0
+                    # --- NUEVO: pintar guiones en descanso ---
+                    row.update({
+                        'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                        'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
+                    })
                 else:
-                    status = 'Asistencia' if has_attendance else 'Falta'
-
+                    if has_attendance:
+                        status = 'Asistencia'
+                        # --- marcar retardo por día ---
+                        if int(row.get('retardo_sec', 0)) > GRACE_DAILY_SEC:
+                            status = 'Retardo'
+                    else:
+                        status = 'Falta'
+                        # --- pintar guiones en faltas ---
+                        row.update({
+                            'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                            'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
+                            'retardo': '00:00', 'retardo_sec': 0,
+                        })
                 # Si hay leave ese día, predomina
                 leave = leave_idx.get(_as_date(d))
                 if leave:
                     status = leave.holiday_status_id.name or 'Tiempo libre'
                     row.update({
-                        'entrada': '', 'comida_ini': '', 'comida_fin': '', 'salida': '',
-                        'h_trab': '00:00', 'h_comida': '00:00', 'h_extra': '00:00',
+                        'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                        'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
                         'retardo': '00:00', 'retardo_sec': 0,
                     })
 

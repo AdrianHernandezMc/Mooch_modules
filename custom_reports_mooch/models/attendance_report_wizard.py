@@ -81,7 +81,7 @@ class AttendanceReportWizard(models.TransientModel):
         Ajusta eventos que cruzan medianoche y empareja entradas con salidas correctamente.
         """
         adjusted_events = []
-        
+
         for event_time, event_type, hour, minute in events:
             # Si el evento es entre medianoche y 6 AM, asignar al día anterior
             if 0 <= hour < 6:
@@ -90,7 +90,7 @@ class AttendanceReportWizard(models.TransientModel):
                 adjusted_events.append((adjusted_time, event_type, hour, minute))
             else:
                 adjusted_events.append((event_time, event_type, hour, minute))
-        
+
         return adjusted_events
 
     def group_events_by_workday(self, events_by_day):
@@ -98,9 +98,9 @@ class AttendanceReportWizard(models.TransientModel):
         Reagrupa eventos por día de trabajo, considerando turnos que cruzan medianoche.
         """
         from collections import defaultdict
-        
+
         workday_events = defaultdict(list)
-        
+
         for date_key, events in events_by_day.items():
             for event_time, event_type, hour, minute in events:
                 # Para eventos de salida después de medianoche, usar fecha del día anterior
@@ -108,9 +108,9 @@ class AttendanceReportWizard(models.TransientModel):
                     workday_date = event_time.date() - timedelta(days=1)
                 else:
                     workday_date = event_time.date()
-                
+
                 workday_events[workday_date].append((event_time, event_type, hour, minute))
-        
+
         return workday_events
     # ----------------- DATASET SOLO DESDE daily.attendance -----------------
     def _fetch_dataset(self):
@@ -140,7 +140,7 @@ class AttendanceReportWizard(models.TransientModel):
 
         # Traer logs crudos
         query = """
-            SELECT 
+            SELECT
                 id,
                 employee_id,
                 punching_day,
@@ -178,9 +178,9 @@ class AttendanceReportWizard(models.TransientModel):
             print(f"DEBUG _classify: v_att='{v_att}', v_punch='{v_punch}', s='{s}'")
 
             # Mapeo CORREGIDO de códigos numéricos específicos del reloj
-            # Basado en los datos que vimos: 
+            # Basado en los datos que vimos:
             # 0 = Entrada (in)
-            # 1 = Salida (out) 
+            # 1 = Salida (out)
             # 4 = Inicio comida (lunch_out) - Overtime In
             # 5 = Fin comida (lunch_in) - Overtime Out
             if s == '0':
@@ -228,15 +228,15 @@ class AttendanceReportWizard(models.TransientModel):
         for r in recs:
             when = r.get('punching_time')
             print(f"UTC: {when} - ATT_TYPE: {r['attendance_type']} - PUNCH_TYPE: {r['punch_type']}")
-            
+
             # UTC -> TZ del usuario
             if when.tzinfo is None:
                 localized_time = pytz.utc.localize(when).astimezone(tz)
             else:
                 localized_time = when.astimezone(tz)
-            
+
             print(f"LOCAL: {localized_time}")
-            
+
             punch = _classify(r.get('attendance_type'), r.get('punch_type'))
 
             per_emp_day[r['employee_id']][localized_time.date()].append(
@@ -254,10 +254,10 @@ class AttendanceReportWizard(models.TransientModel):
                     if adjusted_date not in adjusted_days:
                         adjusted_days[adjusted_date] = []
                     adjusted_days[adjusted_date].append((event_time, event_type, hour, minute))
-            
+
             # Luego reagrupar por día de trabajo
             workday_events = self.group_events_by_workday(adjusted_days)
-            
+
             # Reemplazar los días originales con los días de trabajo
             per_emp_day[emp_id] = workday_events
 
@@ -268,7 +268,7 @@ class AttendanceReportWizard(models.TransientModel):
 
         # ------------------ RESUMEN POR DÍA (incluye COMIDA) --------------------
         LUNCH_MIN = timedelta(minutes=30)   # mínimo para inferir comida
-        LUNCH_MAX = timedelta(hours=3)      # máximo razonable para comida
+        LUNCH_MAX = timedelta(hours=2)      # máximo razonable para comida
 
         def _hhmm(total_secs):
             total_secs = max(0, int(total_secs))
