@@ -543,23 +543,27 @@ class BiometricDeviceDetails(models.Model):
                     domain.append(('company_id', '=', info.company_id.id))
 
                 emp = Employee.search(domain, limit=1)
-                vals = {'name': user.name or ''}
+                # vals = {'name': user.name or ''}
                 # Asegura que el employee quede ligado al dispositivo actual
                 if not emp:
+                    # (Opcional) crear empleado si no existe; si prefieres no crear, comenta este bloque
                     create_vals = {
-                        'name': user.name or f'Empleado {device_user_id}',
+                        'name': user.name or f'Empleado {device_user_id}',  # se usa SOLO al crear
                         'device_id_num': device_user_id,
                         'device_id': info.id,
                         'company_id': info.company_id.id,
                     }
-                    # (Opcional) asigna dirección de trabajo si aplica
                     if info.address_id:
                         create_vals['address_id'] = info.address_id.id
                     Employee.create(create_vals)
                 else:
+                    vals = {}
                     if emp.device_id.id != info.id:
                         vals['device_id'] = info.id
-                    emp.write(vals)
+                    if emp.device_id_num != device_user_id:
+                        vals['device_id_num'] = device_user_id
+                    if vals:
+                        emp.write(vals)  # <- no incluye 'name'
 
     def set_user(self, employee_id):
         """Function to create or update users"""
