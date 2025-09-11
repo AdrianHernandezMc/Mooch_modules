@@ -538,17 +538,22 @@ class BiometricDeviceDetails(models.Model):
                 if not device_user_id:
                     continue
 
+                # Buscar SOLO por IDs (y empresa); opcional: amarra también al dispositivo
                 domain = [('device_id_num', '=', device_user_id)]
                 if info.company_id:
                     domain.append(('company_id', '=', info.company_id.id))
+                # Para ligar por dispositivo también:
+                domain.append(('device_id', '=', info.id))
 
                 emp = Employee.search(domain, limit=1)
-                # vals = {'name': user.name or ''}
-                # Asegura que el employee quede ligado al dispositivo actual
+
+                # ⚠️ Nunca preparar vals con 'name'
+                # vals = {'name': user.name or ''}   # <-- eliminar
+
                 if not emp:
-                    # (Opcional) crear empleado si no existe; si prefieres no crear, comenta este bloque
+                    # Si no quieres crear empleados nuevos desde el reloj, comenta este bloque completo
                     create_vals = {
-                        'name': user.name or f'Empleado {device_user_id}',  # se usa SOLO al crear
+                        'name': user.name or f'Empleado {device_user_id}',  # SOLO al crear
                         'device_id_num': device_user_id,
                         'device_id': info.id,
                         'company_id': info.company_id.id,
@@ -558,12 +563,12 @@ class BiometricDeviceDetails(models.Model):
                     Employee.create(create_vals)
                 else:
                     vals = {}
-                    if emp.device_id.id != info.id:
+                    if (not emp.device_id) or (emp.device_id.id != info.id):
                         vals['device_id'] = info.id
                     if emp.device_id_num != device_user_id:
                         vals['device_id_num'] = device_user_id
                     if vals:
-                        emp.write(vals)  # <- no incluye 'name'
+                        emp.write(vals)   # <- sin 'name'
 
     def set_user(self, employee_id):
         """Function to create or update users"""
