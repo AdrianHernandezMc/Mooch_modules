@@ -46,3 +46,20 @@ class HrEmployee(models.Model):
             'res_model': 'employee.biometric',
             'context': {'default_employee_id': self.id},
         }
+
+    # ⚠️ PROTECCIÓN CONTRA CAMBIOS DE NOMBRE DESDE DISPOSITIVO
+    def write(self, vals):
+        # Bloquear cambios de nombre que puedan venir de sincronización
+        if 'name' in vals:
+            # Verificar si viene de algún proceso de dispositivo
+            if self.env.context.get('from_device_sync') or \
+               'device_id' in vals or \
+               'device_id_num' in vals:
+                _logger.warning(
+                    "Bloqueado cambio de nombre para empleado %s desde sincronización de dispositivo",
+                    self.id
+                )
+                # No permitir cambiar el nombre
+                vals.pop('name', None)
+                
+        return super(HrEmployee, self).write(vals)
