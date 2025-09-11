@@ -522,7 +522,7 @@ class BiometricDeviceDetails(models.Model):
                     "Please Check the Connection"))
 
     def get_all_users(self):
-        """Sincroniza usuarios del biométrico sin duplicar empleados."""
+        """Sincroniza usuarios del biométrico SIN modificar nombres existentes."""
         for info in self:
             machine_ip = info.device_ip
             zk_port = info.port_number
@@ -544,28 +544,31 @@ class BiometricDeviceDetails(models.Model):
                 if not device_user_id:
                     continue
 
+                # Buscar empleado por device_id_num + compañía
                 domain = [('device_id_num', '=', device_user_id)]
                 if info.company_id:
                     domain.append(('company_id', '=', info.company_id.id))
 
                 emp = Employee.search(domain, limit=1)
-                vals = {'name': user.name or ''}
-                # Asegura que el employee quede ligado al dispositivo actual
+
                 if not emp:
-                    create_vals = {
-                        'name': user.name or f'Empleado {device_user_id}',
-                        'device_id_num': device_user_id,
-                        'device_id': info.id,
-                        'company_id': info.company_id.id,
-                    }
-                    # (Opcional) asigna dirección de trabajo si aplica
-                    if info.address_id:
-                        create_vals['address_id'] = info.address_id.id
-                    Employee.create(create_vals)
+                    # ⚠️ NO crear empleados automáticamente - solo registrar advertencia
+                    _logger.warning(
+                        "[BIO] Empleado no encontrado para device_id_num=%s. "
+                        "Configure el mapeo manualmente en Odoo primero.",
+                        device_user_id
+                    )
+                    continue
                 else:
-                    if emp.device_id.id != info.id:
-                        vals['device_id'] = info.id
-                    emp.write(vals)
+                    # ⚠️ SOLO actualizar campos del dispositivo, NUNCA el nombre
+                    update_vals = {}
+                    if (not emp.device_id) or (emp.device_id.id != info.id):
+                        update_vals['device_id'] = info.id
+                    if emp.device_id_num != device_user_id:
+                        update_vals['device_id_num'] = device_user_id
+                        
+                    if update_vals:
+                        emp.write(update_vals)
 
     def set_user(self, employee_id):
         """Function to create or update users"""

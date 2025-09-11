@@ -48,3 +48,24 @@ class HrEmployee(models.Model):
         groups="hr.group_hr_user",
         help="Si está activo, este empleado será considerado en el reporte especial de tiempos administrativos (entrada/comida/regreso/salida)."
     )
+    
+    device_id_num = fields.Char(string='Biometric Device ID', copy=False)
+    device_id = fields.Many2one('biometric.device.details', copy=False, readonly=True)
+    fingerprint_ids = fields.One2many('fingerprint.templates', 'employee_id')
+    
+    # ⚠️ PROTECCIÓN CONTRA CAMBIOS DE NOMBRE DESDE DISPOSITIVO
+    def write(self, vals):
+        # Bloquear cambios de nombre que puedan venir de sincronización
+        if 'name' in vals:
+            # Verificar si viene de algún proceso de dispositivo
+            if self.env.context.get('from_device_sync') or \
+               'device_id' in vals or \
+               'device_id_num' in vals:
+                _logger.warning(
+                    "Bloqueado cambio de nombre para empleado %s desde sincronización de dispositivo",
+                    self.id
+                )
+                # No permitir cambiar el nombre
+                vals.pop('name', None)
+                
+        return super(HrEmployee, self).write(vals)
