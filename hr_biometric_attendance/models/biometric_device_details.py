@@ -516,7 +516,7 @@ class BiometricDeviceDetails(models.Model):
                     "Please Check the Connection"))
 
     def get_all_users(self):
-        """Sincroniza usuarios del biométrico sin duplicar empleados."""
+        """Sincroniza usuarios del biométrico sin modificar nombres existentes."""
         for info in self:
             machine_ip = info.device_ip
             zk_port = info.port_number
@@ -538,37 +538,33 @@ class BiometricDeviceDetails(models.Model):
                 if not device_user_id:
                     continue
 
-                # Buscar SOLO por IDs (y empresa); opcional: amarra también al dispositivo
-                domain = [('device_id_num', '=', device_user_id)]
-                if info.company_id:
-                    domain.append(('company_id', '=', info.company_id.id))
-                # Para ligar por dispositivo también:
-                domain.append(('device_id', '=', info.id))
+                # Buscar empleado por ID del dispositivo y compañía
+                domain = [
+                    ('device_id_num', '=', device_user_id),
+                    ('company_id', '=', info.company_id.id),
+                    ('device_id', '=', info.id),
+                ]
 
                 emp = Employee.search(domain, limit=1)
 
-                # ⚠️ Nunca preparar vals con 'name'
-                # vals = {'name': user.name or ''}   # <-- eliminar
-
                 if not emp:
-                    # Si no quieres crear empleados nuevos desde el reloj, comenta este bloque completo
-                    create_vals = {
-                        'name': user.name or f'Empleado {device_user_id}',  # SOLO al crear
-                        'device_id_num': device_user_id,
-                        'device_id': info.id,
-                        'company_id': info.company_id.id,
-                    }
-                    if info.address_id:
-                        create_vals['address_id'] = info.address_id.id
-                    Employee.create(create_vals)
+                    # Si no existe el empleado, NO crear automáticamente
+                    # Solo registrar el warning
+                    _logger.warning(
+                        "[BIO] Empleado no encontrado para device_id_num=%s en %s. "
+                        "Use la función 'Set User' para crear el empleado correctamente.",
+                        device_user_id, info.company_id.display_name
+                    )
+                    continue
                 else:
+                    # Solo actualizar campos de dispositivo, NUNCA el nombre
                     vals = {}
                     if (not emp.device_id) or (emp.device_id.id != info.id):
                         vals['device_id'] = info.id
                     if emp.device_id_num != device_user_id:
                         vals['device_id_num'] = device_user_id
                     if vals:
-                        emp.write(vals)   # <- sin 'name'
+                        emp.write(vals)
 
     def set_user(self, employee_id):
         """Function to create or update users"""
