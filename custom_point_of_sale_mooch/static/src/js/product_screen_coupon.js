@@ -19,12 +19,11 @@ patch(ProductScreen.prototype, {
     //alert("Agrega producto a product_screen")
     const cfgId = this.pos.config.id;
     const pid = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
-    console.log("🟢 changes_product_id (RPC) =", pid);
+
     this.changesProductId = pid || null;
 
       const product = this.pos.db.get_product_by_id(pid);
-      console.log("product",product)
-    
+
       try {
          order.add_product(product, {
               quantity: 1,

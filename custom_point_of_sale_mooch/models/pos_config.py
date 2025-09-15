@@ -23,7 +23,13 @@ class PosConfig(models.Model):
         pid = int(raw) if raw.isdigit() and int(raw) > 0 else 0
         return pid or False
 
-
+    @api.model
+    def get_loyalty_program_id(self, config_id):
+        cfg = self.browse(config_id).sudo()
+        ICP = self.env["ir.config_parameter"].sudo().with_company(cfg.company_id)
+        raw = (ICP.get_param("voucher.loyalty_program_id") or "").strip()
+        pid = int(raw) if raw.isdigit() and int(raw) > 0 else 0
+        return pid or False
 
     # @api.depends("company_id")
     # def _compute_changes_product_id(self):

@@ -10,6 +10,18 @@ import { HotkeyHelpPopup } from "@custom_point_of_sale_mooch/app/popup/productsc
 import { registry } from "@web/core/registry";
 import { markup } from "@odoo/owl";
 
+function addMonthtoday(date = new Date()) {
+    const y = date.getFullYear();
+    const m = date.getMonth();  // 0=Ene
+    const d = date.getDate();
+    const targetM = m + 1;
+    const targetY = y + Math.floor(targetM / 12);
+    const targetMi = targetM % 12;
+    const daysInTarget = new Date(targetY, targetMi + 1, 0).getDate(); // último día del mes destino
+    const day = Math.min(d, daysInTarget);
+return new Date(targetY, targetMi, day);
+}
+
 const _superSetNumpadMode = ProductScreen.prototype.onNumpadClick;
 
 //Parcheamos el método que invoca el botón "Precio" (cambia el modo del Numpad)
@@ -44,8 +56,8 @@ patch(ProductScreen.prototype, {
 
         // Alt + h → muestra ayuda
         useHotkey("Alt+h", async (ev) => {
-            console.log('pos_popups →', registry.category('pos_popups').getAll())
-            console.log("HotkeyHelpPopup props:", this.props);
+            //console.log('pos_popups →', registry.category('pos_popups').getAll())
+            //console.log("HotkeyHelpPopup props:", this.props);
               await popup.add(HotkeyHelpPopup, {
                 title: "📖 Ayuda de Atajos",
                 body: markup(`
@@ -62,7 +74,7 @@ patch(ProductScreen.prototype, {
         // **************   para hacer pruebad en productscreen  *******************
         useHotkey("alt+x", (ev) => {
             const order = this.pos.order()
-            console.log("order", order);
+            //console.log("order", order);
         });
         
         // Alt + g para entrar a las ordenes guardadas
@@ -79,17 +91,15 @@ patch(ProductScreen.prototype, {
     },
 
     get productsToDisplay() {
-        // 1) Obtener el resultado ORIGINAL (ya filtrado/ordenado por Odoo)
         const original = this._super?.(...arguments) || [];
 
-        // 2) En algunos builds raros podría devolver IDs; conviértelos a objetos
         let list = original;
         if (typeof list?.[0] === "number") {
-        const { db } = this.pos;                    // NO reasignar this.pos
+        const { db } = this.pos;                    
         list = list.map((id) => db.get_product_by_id(id));
         }
 
-        // 3) Decorar nombres (conservar orden original; no volver a ordenar)
+        //  Decorar nombres (conservar orden original; no volver a ordenar)
         return list.map(decorateName);
     },
 
@@ -107,20 +117,80 @@ patch(ProductScreen.prototype, {
         return order.orderlines.reduce((sum, line) => sum + line.quantity, 0);
     },
 
+    async clickVale(){
+        const order = this.pos.get_order?.();
+        const amount_total = order?.get_total_with_tax?.() ?? 0;
+        console.log("Total",amount_total)
+        
+        const cfgId = this.pos.config.id;
+        const pid = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
+        console.log("pid",pid)
+        //this.changesProductId = pid || null;
+        let product = this.pos.db.get_product_by_id(pid);
+        product = product.name + '9992'
+        console.log("product",product)
+    },
+
+    async createvale(amount_total){
+        const { confirmed } = await this.popup.add(ConfirmPopup,{
+            title: 'Confirmar reembolso',
+            body: '¿Deseas crear un cupón?',
+            confirmText: 'Sí',
+            cancelText: 'No',
+        });
+
+        if (!confirmed) {
+          return;  
+        }
+        
+        const cfgId = this.pos.config.id; 
+        const loyaty_program_id =  this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
+        const companyId = this.pos.company?.id;   // ← ID de la compañía
+        console.log("companyId:", companyId);
+        const exp = addMonthtoday(new Date());
+        const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
+        console.log("dateAddOneMonth",dateAddOneMonth)
+        const order   = this.currentOrder;
+        const partner = order.client;
+        //const partnerId = partner ? partner.id : false;
+        const defaults = await this.orm.call(
+          'loyalty.card',        
+          'default_get',       
+          [ ['code'] ]  
+        );
+        
+        // Preparas el diccionario con todos los campos
+        const couponData = {
+          program_id:          loyaty_program_id,
+          company_id:          companyId,                // compañía
+          partner_id:          partner?.id || false,
+          code:                defaults.code,
+          expiration_date:     dateAddOneMonth,
+          points:              amount_total,
+          source_pos_order_id: order.id,         // referenciamos la venta
+        };
+        console.log(couponData)
+        
+        // Llamada RPC
+        // const couponId = await this.orm.create(
+        //   "loyalty.card",    // modelo
+        //   [ couponData ]     // aquí sí va un solo nivel de array
+        // );
+    },
+
     async change_price_desc(mode) {
         const { popup, orm } = this.env.services;
-        
-        // 1) Pedir NIP
         const nipRes = await popup.add(TextInputPopup, {
-            title: "Autorización requerida",
+            title: "Captura Autorizacion",
             body: "Ingresa el NIP del Gerente de Ventas:",
             placeholder: "NIP",
-            isPassword: true,
+            inputType: "password",
+           inputProps: { type: "password", autocomplete: "off" }, // ⬅️ fuerza tipo 
+            //isPassword: true,
             confirmText: "Validar",
             cancelText: "Cancelar",
         });
 
-        // Cancelado o vacío → no dejar entrar a "price"
         if (!nipRes.confirmed || !nipRes.payload) {
             return; 
         }
@@ -128,7 +198,6 @@ patch(ProductScreen.prototype, {
         const nip = String(nipRes.payload).trim();
         if (!nip) return;
 
-        // 2) Validar NIP en servidor
         let check = { ok: false, name: "" };
         try {
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
@@ -211,7 +280,6 @@ patch(ProductScreen.prototype, {
         }
 
         const current = line.get_discount(); 
-
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo descuento"),
             body:  _t("Ingresa el descuento en porcentaje (ej. 10 para 10%)."),
@@ -231,7 +299,6 @@ patch(ProductScreen.prototype, {
             });
             return;
         }
-
         line.set_discount(value);
     }
 });

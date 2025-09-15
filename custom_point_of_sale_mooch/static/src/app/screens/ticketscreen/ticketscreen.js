@@ -93,10 +93,12 @@ patch(TicketScreen.prototype, {
 
     async onClickOrder(order) {
         _superOnClickOrder.apply(this, arguments);
-               
+        
         const addcode_to_orderline =  order.get_orderlines()
         addcode_to_orderline.forEach(l => {
-            l.full_product_name = l.full_product_name + " - " + l.product.barcode;   // refleja el cambio en memoria
+            if (!l.full_product_name.includes(l.product.barcode)) {
+                 l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";   // refleja el cambio en memoria
+            }
         });
 
 /// **** Echo para los camios de producto ********
