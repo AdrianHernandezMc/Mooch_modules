@@ -39,15 +39,15 @@
                 </td>
               </tr>
             </table>
-          <t t-if="doc.barcode">
-            <div style="text-align:center; border: none; border-collapse: collapse;">
-              <img t-att-src="'/report/barcode/Code128/' + str(doc.barcode)"
-                  style="width: 100%; height: 8mm;"/>
-            </div>
-            <div style="text-align:center; font-size:17px; font-weight:bold; border: none; border-collapse: collapse;">
-              <t t-esc="doc.barcode"/>
-            </div>
-          </t>
+              <t t-if="doc.barcode">
+                <div style="text-align:center; border: none; border-collapse: collapse;">
+                  <img t-att-src="'/report/barcode/Code128/%s?width=300&amp;height=40&amp;humanreadable=0' % (doc.barcode or '')"
+                      style="width: 100%; height: 8mm;"/>
+                </div>
+                <div style="text-align:center; font-size:14px; font-weight:bold; border: none; border-collapse: collapse;">
+                  <t t-esc="doc.barcode"/>
+                </div>
+              </t>
           </div>
         </t>
       </t>
