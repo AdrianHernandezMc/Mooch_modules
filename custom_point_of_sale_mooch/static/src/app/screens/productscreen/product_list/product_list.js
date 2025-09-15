@@ -16,7 +16,7 @@ patch(ProductsWidget.prototype, {
         Object.assign(clone, p);
         const code = (p.default_code || "").trim();
         const base = p.display_name || "";
-        clone.display_name = code ? `${base} - ${code}` : base;
+        clone.display_name = code ? `${base} - [${code}]` : base;
         return clone;
     }
      

@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="product_screen_qty_sumline" xml:space="preserve">
     <t t-inherit="point_of_sale.ProductScreen" t-inherit-mode="extension" owl="1">
-    <xpath expr="//OrderWidget" position="after">
-        <div class="pos-total-items d-flex justify-content-between p-2">
-            <span>Cantidad de artículos:</span>
-            <span t-esc="getTotalItems()"/>
-        </div>
-    </xpath>
+        <!-- Agregamos la linea que suma los articulos seleccionados -->
+        <xpath expr="//OrderWidget" position="after">
+            <div class="pos-total-items d-flex justify-content-between p-2">
+                <span>Cantidad de artículos:</span>
+                <span t-esc="getTotalItems()"/>
+            </div>
+        </xpath>
+        <!-- Agrego el boton de Vales  -->
+        <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' control-buttons ')]" position="inside">
+            <button class="control-button btn btn-light rounded-0 fw-bolder" t-on-click="clickVale">
+                <i class="fa fa-ticket me-1" role="img" aria-label="Vale" title="Vale"></i>
+                Vale
+            </button>
+        </xpath>
     </t>
 </templates>
