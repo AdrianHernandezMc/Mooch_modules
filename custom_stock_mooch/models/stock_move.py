@@ -76,35 +76,102 @@ class StockMove(models.Model):
         return exceeded_moves
 
     def _action_done(self, cancel_backorder=False):
-        # Validación completa antes de procesar
+        # Validación completa antes de procesar - SOLO ADVERTENCIA, NO ERROR
         exceeded_moves = self.check_quantity_exceeded()
         
         if exceeded_moves:
-            error_message = _("No se puede validar la transferencia. Los siguientes productos exceden la cantidad demandada:\n\n")
+            # Mensaje formateado con saltos de línea y formato limpio
+            warning_message = _("⚠️ ADVERTENCIA: Los siguientes productos exceden la cantidad demandada:\n\n")
+            
+            for i, move_data in enumerate(exceeded_moves, 1):
+                warning_message += _("➡️ Producto %d: %s\n") % (i, move_data['product'])
+                warning_message += _("   • Solicitado: %s\n") % move_data['demanded']
+                warning_message += _("   • Recibido: %s\n") % move_data['received']
+                warning_message += _("   • Exceso: %s\n\n") % move_data['excess']
+            
+            # Mensaje alternativo más compacto
+            compact_message = _("⚠️ ADVERTENCIA: Productos con exceso de cantidad:\n\n")
             for move_data in exceeded_moves:
-                error_message += _("• %s: Solicitado %s, Recibido %s (Exceso: %s)\n") % (
+                compact_message += _("• %s: %s → %s (+%s)\n") % (
                     move_data['product'], 
                     move_data['demanded'], 
                     move_data['received'], 
                     move_data['excess']
                 )
             
-            raise ValidationError(error_message)
-        
+            # Mostrar advertencia en el log
+            _logger.warning("="*80)
+            _logger.warning("ADVERTENCIA DE CANTIDAD EXCEDIDA")
+            _logger.warning("="*80)
+            _logger.warning(compact_message)
+            _logger.warning("="*80)
+            
+            # Forzar el mensaje en la interfaz mediante el picking relacionado
+            pickings = self.mapped('picking_id')
+            for picking in pickings:
+                picking.message_post(
+                    body=warning_message,
+                    subject=_("⚠️ Advertencia: Cantidades excedidas"),
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_note'
+                )
+    
         return super(StockMove, self)._action_done(cancel_backorder)
 
 class StockMoveLine(models.Model):
     _inherit = 'stock.move.line'
 
+    def _show_warning_notification(self, message, title):
+        """Método para mostrar notificaciones de advertencia"""
+        # Registrar en log
+        _logger.warning("%s: %s", title, message)
+        
+        # Intentar mostrar notificación usando varios métodos
+        try:
+            # Método 1: Usar bus.bus si está disponible
+            if hasattr(self.env['bus.bus'], '_sendone'):
+                self.env['bus.bus']._sendone(
+                    self.env.user.partner_id,
+                    'display_notification',
+                    {
+                        'type': 'warning',
+                        'title': title,
+                        'message': message,
+                        'sticky': False,
+                    }
+                )
+                return True
+        except Exception as e:
+            _logger.debug("Método bus.bus falló: %s", e)
+        
+        try:
+            # Método 2: Crear un mensaje en el chatter del usuario
+            self.env.user.partner_id.message_post(
+                body=message,
+                subject=title,
+                message_type='comment',
+                subtype_xmlid='mail.mt_comment'
+            )
+            return True
+        except Exception as e:
+            _logger.debug("Método message_post falló: %s", e)
+        
+        return False
+
     @api.constrains('qty_done')
     def _check_qty_done_not_exceed(self):
-        """Validación en tiempo real en las líneas"""
+        """Validación en tiempo real en las líneas - SOLO ADVERTENCIA, NO ERROR"""
         for line in self:
             if line.move_id and line.qty_done > line.move_id.product_uom_qty:
-                raise ValidationError(_(
-                    "¡Cantidad excedida en línea!\n"
+                warning_message = _(
+                    "¡ADVERTENCIA: Cantidad excedida en línea!\n"
                     "Producto: %s\n"
-                    "No puede recibir %s cuando la cantidad demandada es %s"
+                    "Se está recibiendo %s cuando la cantidad demandada es %s"
                 ) % (line.product_id.display_name, 
                      line.qty_done, 
-                     line.move_id.product_uom_qty))
+                     line.move_id.product_uom_qty)
+                
+                self._show_warning_notification(
+                    warning_message, 
+                    _("Advertencia de cantidad")
+                )
