@@ -160,11 +160,13 @@ class ProductMooch(models.Model):
     enable_cost_base = fields.Boolean(
         string="Habilitar costo base",
         default=False,
+        tracking=True,
         help="Si está activo, el Precio de Contado/Crédito se calculará con base en 'Costo Base'."
     )
 
     cost_base = fields.Float(string="Costo Base",
                              store="True",
+                             tracking=True,
                              help="El Precio de Contado/Crédito se calculará con base en 'Costo Base'.")
 
     _sql_constraints = [
