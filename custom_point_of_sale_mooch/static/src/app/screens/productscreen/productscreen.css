@@ -7,3 +7,8 @@
     padding: 8px;
     border-radius: 4px;
 }
+.xx
+.masked {
+  -webkit-text-security: disc; /* Chrome/WebKit */
+  text-security: disc;         /* Prop. no estándar (fallback) */
+}

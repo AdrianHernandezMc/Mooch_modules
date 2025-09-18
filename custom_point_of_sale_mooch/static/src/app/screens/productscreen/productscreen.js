@@ -7,8 +7,9 @@ import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
 import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
 import { useService } from "@web/core/utils/hooks";
 import { HotkeyHelpPopup } from "@custom_point_of_sale_mooch/app/popup/productscreen_help";
-import { registry } from "@web/core/registry";
 import { markup } from "@odoo/owl";
+import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
+import { PasswordInputPopup } from "@custom_point_of_sale_mooch/app/popup/hide_passwordpopup";
 
 function addMonthtoday(date = new Date()) {
     const y = date.getFullYear();
@@ -64,7 +65,10 @@ patch(ProductScreen.prototype, {
                     <div style="text-align:left;">
                     <p><b>Alt + H</b> → Ayuda</p>
                     <p><b>Alt + P</b> → Activa de precios</p>
-                    <p><b>Alt + T</b> → Limpiar líneas de venta</p>
+        
+        ¿'90|AS
+        
+        .0<p><b>Alt + T</b> → Limpiar líneas de venta</p>
                     <p><b>Alt + D</b> → Activa descuento</p>
                     <p><b>Alt + G</b> → Activa ventas guardadas</p>
                     </div>`),
@@ -73,8 +77,22 @@ patch(ProductScreen.prototype, {
         
         // **************   para hacer pruebad en productscreen  *******************
         useHotkey("alt+x", (ev) => {
-            const order = this.pos.order()
-            //console.log("order", order);
+
+            const { confirmed, payload } =  this.popup.add(PasswordInputPopup, {
+                title: _t("NIP"),
+                body: _t("Ingresa el NIP del Gerente de Ventas:"),
+                confirmText: _t("Validar"),
+                cancelText: _t("Cancelar"),
+            });
+            // const { confirmed, payload } =  this.popup.add(TextInputPopup, {
+            //     title: _t("NIPccc"),
+            //     body: _t("Ingresa el NIP del Gerente de Ventas:"),
+            //     // ⬇️ Fuerza estilo de “oculto” vía clase CSS
+            //     isPassword: true,
+            //     inputProps: { class: "masked", autocomplete: "off", placeholder: "NIP" },
+            //     confirmText: _t("Validar"),
+            //     cancelText: _t("Cancelar"),
+            // });
         });
         
         // Alt + g para entrar a las ordenes guardadas
@@ -121,20 +139,13 @@ patch(ProductScreen.prototype, {
         const order = this.pos.get_order?.();
         const amount_total = order?.get_total_with_tax?.() ?? 0;
         console.log("Total",amount_total)
-        
-        const cfgId = this.pos.config.id;
-        const pid = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
-        console.log("pid",pid)
-        //this.changesProductId = pid || null;
-        let product = this.pos.db.get_product_by_id(pid);
-        product = product.name + '9992'
-        console.log("product",product)
+        await this.createvale(amount_total)
     },
 
     async createvale(amount_total){
         const { confirmed } = await this.popup.add(ConfirmPopup,{
-            title: 'Confirmar reembolso',
-            body: '¿Deseas crear un cupón?',
+            title: 'VALES/VOUCHER',
+            body: '¿Deseas crear un VALE por la cantidad de : '+ Math.round(((amount_total) *100) /100) +' pesos?',
             confirmText: 'Sí',
             cancelText: 'No',
         });
@@ -144,21 +155,22 @@ patch(ProductScreen.prototype, {
         }
         
         const cfgId = this.pos.config.id; 
-        const loyaty_program_id =  this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
+        const loyaty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
         const companyId = this.pos.company?.id;   // ← ID de la compañía
-        console.log("companyId:", companyId);
         const exp = addMonthtoday(new Date());
         const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
-        console.log("dateAddOneMonth",dateAddOneMonth)
         const order   = this.currentOrder;
         const partner = order.client;
+
         //const partnerId = partner ? partner.id : false;
         const defaults = await this.orm.call(
           'loyalty.card',        
           'default_get',       
           [ ['code'] ]  
         );
-        
+
+        console.log("loyaty_program_id",loyaty_program_id);
+
         // Preparas el diccionario con todos los campos
         const couponData = {
           program_id:          loyaty_program_id,
@@ -169,13 +181,31 @@ patch(ProductScreen.prototype, {
           points:              amount_total,
           source_pos_order_id: order.id,         // referenciamos la venta
         };
-        console.log(couponData)
+
+        console.log("couponData",couponData)
+
+        const product_id = await this.orm.call(
+            "loyalty.reward", "search_read",
+            [[["program_id", "=", loyaty_program_id]]],
+            { fields: ["discount_line_product_id"] }
+        );
         
-        // Llamada RPC
-        // const couponId = await this.orm.create(
-        //   "loyalty.card",    // modelo
-        //   [ couponData ]     // aquí sí va un solo nivel de array
-        // );
+        console.log("product_id",product_id[0].discount_line_product_id[0])
+        let product = this.pos.db.get_product_by_id(product_id[0].discount_line_product_id[0]);
+        product.display_name = product.display_name + " Code: " +  defaults.code
+        console.log('product',product)
+
+        order.add_product(product, {
+            quantity: 1,
+            price:    amount_total,
+            merge:    false,
+            uom_id:   [1, 'Unidad']
+        });
+return
+        const couponId = await this.orm.create(
+          "loyalty.card",    // modelo
+          [ couponData ]     // aquí sí va un solo nivel de array
+        );
     },
 
     async change_price_desc(mode) {
