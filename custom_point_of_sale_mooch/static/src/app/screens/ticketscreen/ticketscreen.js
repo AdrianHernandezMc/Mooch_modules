@@ -72,7 +72,7 @@ patch(TicketScreen.prototype, {
         if (method) {
             if (!method[0].transaction_id || method[0].transaction_id ==="" ) {
                 this.pos.sharedtcode= 0 
-                alert(this.pos.sharedtcode)
+                //alert(this.pos.sharedtcode)
             }
             else {
                     this.pos.sharedtcode = method[0].transaction_id

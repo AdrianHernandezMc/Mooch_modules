@@ -3,7 +3,6 @@ import { patch } from "@web/core/utils/patch";
 import { Order } from "@point_of_sale/app/store/models";
 
 patch(Order.prototype, {
-
   export_for_printing() {
     const r = super.export_for_printing(...arguments);
     
@@ -50,4 +49,5 @@ patch(Order.prototype, {
 
     return r;
   },
+
 });

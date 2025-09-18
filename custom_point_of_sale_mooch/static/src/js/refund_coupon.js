@@ -73,6 +73,7 @@ patch(TicketScreen.prototype, {
                   return
                 }
                 
+                let ordername = refundDetails[0].orderline.orderUid
                 // console.log("refundDetails",refundDetails)
                 // console.log("orden",refundDetails[0].orderline.orderUid)
 
@@ -91,7 +92,7 @@ patch(TicketScreen.prototype, {
                   //   );
               // *****
 
-                await ProductScreen.prototype._applyCoupon.call(this, totalRefund);
+                await ProductScreen.prototype._applyCoupon.call(this, totalRefund, ordername);
                 this.pos.showScreen("ProductScreen");
                 this.pos.activate_changes = true
                 //this.pos.toRefundLines = {};            

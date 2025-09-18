@@ -83,7 +83,7 @@ patch(PaymentScreen.prototype, {
             const ondoInventory = await this.apply_changes();
             console.log("ondoInventory",ondoInventory)
             if (!ondoInventory) {
-                alert("entro al retorno")
+                //alert("entro al retorno")
                return    
             }
         } 

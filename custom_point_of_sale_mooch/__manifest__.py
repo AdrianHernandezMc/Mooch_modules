@@ -30,6 +30,8 @@
         'custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.js',
         'custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.xml',
         'custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.css',
+        'custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.js',
+        'custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.xml',
         'custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.js',
         'custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.xml',
         'custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.css',
