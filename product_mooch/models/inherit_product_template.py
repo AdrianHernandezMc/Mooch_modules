@@ -2,6 +2,7 @@ from odoo import fields, models, api, _
 from odoo.exceptions import ValidationError
 from odoo.tools.misc import formatLang
 import logging
+from datetime import datetime
 _logger = logging.getLogger(__name__)
 
 class ProductMooch(models.Model):
@@ -168,6 +169,28 @@ class ProductMooch(models.Model):
                              store="True",
                              tracking=True,
                              help="El Precio de Contado/Crédito se calculará con base en 'Costo Base'.")
+
+
+    product_year = fields.Selection(
+                               selection='_get_years_list',
+                               string= "Año Producto",
+                               store = "True",
+                               tracking =True,
+                               required=True,
+                               help = "Asigne el año en que el que se esta dando de alta el producto")
+
+    category_type = fields.Selection(
+        selection=[
+            # ('',       _('— Sin tipo —')),
+            ('sale_type_clothes', _('Tipo Moda')),
+            ('sale_type_home', _('Tipo Basico'))
+        ],
+        string='Categoria Mooch',
+        help="Seleccione el tipo de categproa para el producto si es resurtido o no",
+        required=True,
+        tracking =True
+    )
+
 
     _sql_constraints = [
         ('unique_product_name', 'UNIQUE(name)',
@@ -550,3 +573,16 @@ class ProductMooch(models.Model):
                 raise ValidationError(_(
                     "Ya existe otro producto con el nombre:\n  «%s»"
                 ) % rec.name)
+                
+    @api.model
+    def _get_years_list(self):
+        """Genera lista dinámica de años"""
+        current_year = datetime.now().year
+        # Puedes ajustar el rango según tus necesidades
+        start_year = current_year - 5  # 10 años atrás
+        end_year = current_year + 15    # 10 años adelante
+        
+        years = []
+        for year in range(start_year, end_year + 1):
+            years.append((str(year), str(year)))
+        return years

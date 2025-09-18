@@ -87,6 +87,8 @@
                             <field name="sub_department_id" placeholder="Seleccione un Departamento" options="{'no_open': True, 'no_create': True}"/>
                             <field name="color_id" placeholder="Seleccione un Color" options="{'no_open': True, 'no_create': True}"/>
                             <field name="partner_name" string="Nombre Proveedor" placeholder="Ingresar Nombre proveedor" options="{'no_open': True, 'no_create': True}" />
+                            <field name="product_year" string="Año Producto" placeholder="Ingresar Año Producto" options="{'no_open': True, 'no_create': True}" />
+                            <field name="category_type" string="Categoria Mooch" placeholder="Ingresar Categoria Mooch" options="{'no_open': True, 'no_create': True}" />
                         </group>
                         <group>
                             <field name="type_id" placeholder="Seleccione un Tipo de Producto" options="{'no_open': True, 'no_create': True}"/>
