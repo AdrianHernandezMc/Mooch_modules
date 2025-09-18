@@ -143,9 +143,13 @@ patch(ProductScreen.prototype, {
     },
 
     async createvale(amount_total){
+        if (amount_total < 1){
+            amount_total = amount_total *-1
+        } 
+
         const { confirmed } = await this.popup.add(ConfirmPopup,{
             title: 'VALES/VOUCHER',
-            body: '¿Deseas crear un VALE por la cantidad de : '+ Math.round(((amount_total) *100) /100) +' pesos?',
+            body: '¿Deseas crear un VALE por la cantidad de : '+ Math.round(((amount_total*-1) *100) /100) +' pesos?',
             confirmText: 'Sí',
             cancelText: 'No',
         });
