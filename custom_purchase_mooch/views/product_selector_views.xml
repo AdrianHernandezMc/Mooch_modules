@@ -1,44 +1,57 @@
 <odoo>
-    <!-- Wizard de selección múltiple -->
-    <record id="view_product_selector_wizard_form" model="ir.ui.view">
-      <field name="name">product.selector.wizard.form</field>
-      <field name="model">product.selector.wizard</field>
-      <field name="arch" type="xml">
-        <form string="Seleccionar Productos">
-          <group>
-            <field name="purchase_id" readonly="1"/>
-            <field name="search_term"
-                  placeholder="Buscar por nombre o código"
-                  options="{'debounce': 300}"/>
-          </group>
-          <field name="selector_ids">
-            <tree editable="bottom">
-              <field name="x_selected"/>
-              <field name="product_id"/>
-              <field name="default_code"/>
-              <field name="product_qty"/>
-              <field name="price_unit"/>
-            </tree>
-          </field>
-          <footer>
-            <button name="action_confirm"
-                    type="object"
-                    string="Agregar a Orden de Compra"
-                    class="btn-primary"/>
-            <button string="Cancelar"
-                    class="btn-secondary"
-                    special="cancel"/>
-          </footer>
-        </form>
-      </field>
-    </record>
+  <!-- Wizard de selección múltiple -->
+  <record id="view_product_selector_wizard_form" model="ir.ui.view">
+    <field name="name">product.selector.wizard.form</field>
+    <field name="model">product.selector.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Seleccionar Productos">
+        <group>
+          <field name="purchase_id" readonly="1"/>
+          <field name="search_term"
+                 placeholder="Buscar por nombre, código o código de barras…"
+                 options="{'debounce': 300}"/>
+          <field name="limit_results"
+                 widget="integer"
+                 options="{'min': 10, 'max': 500}"
+                 help="Número máximo de resultados a mostrar"/>
+        </group>
+
+        <separator string="Resultados"/>
+
+        <!-- Importante: este O2M se rellena desde el onchange con name_search -->
+        <field name="selector_ids" nolabel="1" context="{'default_wizard_id': active_id}">
+          <tree editable="bottom" string="Productos">
+            <field name="x_selected"/>
+            <!-- many2one con name_search nativo de Odoo -->
+            <field name="product_id"
+                   options="{'no_create': True, 'no_create_edit': True}"
+                   domain="[('purchase_ok','=',True)]"/>
+            <field name="default_code"/>
+            <field name="barcode"/>
+            <field name="product_qty"/>
+            <field name="price_unit"/>
+          </tree>
+        </field>
+
+        <footer>
+          <button name="action_confirm"
+                  type="object"
+                  string="Agregar a Orden de Compra"
+                  class="btn-primary"/>
+          <button string="Cancelar"
+                  class="btn-secondary"
+                  special="cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
 
   <!-- Acción para abrir el wizard -->
-    <record id="action_product_selector_wizard" model="ir.actions.act_window">
-        <field name="name">Seleccionar Productos</field>
-        <field name="res_model">product.selector.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="view_id" ref="view_product_selector_wizard_form"/>
-        <field name="target">new</field>
-    </record>
+  <record id="action_product_selector_wizard" model="ir.actions.act_window">
+    <field name="name">Seleccionar Productos</field>
+    <field name="res_model">product.selector.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="view_id" ref="view_product_selector_wizard_form"/>
+    <field name="target">new</field>
+  </record>
 </odoo>
