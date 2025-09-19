@@ -1,5 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-  <!-- Wizard de selección múltiple -->
   <record id="view_product_selector_wizard_form" model="ir.ui.view">
     <field name="name">product.selector.wizard.form</field>
     <field name="model">product.selector.wizard</field>
@@ -8,45 +8,43 @@
         <group>
           <field name="purchase_id" readonly="1"/>
           <field name="search_term"
-                 placeholder="Buscar por nombre, código o código de barras…"
+                 placeholder="Buscar por nombre o código interno…"
                  options="{'debounce': 300}"/>
-          <field name="limit_results"
-                 widget="integer"
-                 options="{'min': 10, 'max': 500}"
-                 help="Número máximo de resultados a mostrar"/>
+          <field name="limit_results" widget="integer" options="{'min': 10, 'max': 500}"/>
+        </group>
+
+        <!-- Auxiliar para dominio -->
+        <group invisible="1">
+          <field name="dept_param_line_id"/>
         </group>
 
         <separator string="Resultados"/>
 
-        <!-- Importante: este O2M se rellena desde el onchange con name_search -->
-        <field name="selector_ids" nolabel="1" context="{'default_wizard_id': active_id}">
+        <field name="selector_ids" nolabel="1">
           <tree editable="bottom" string="Productos">
             <field name="x_selected"/>
-            <!-- many2one con name_search nativo de Odoo -->
             <field name="product_id"
                    options="{'no_create': True, 'no_create_edit': True}"
-                   domain="[('purchase_ok','=',True)]"/>
+                   domain="[
+                     ('purchase_ok','=',True),
+                     ('product_tmpl_id.department_id','=', parent.dept_param_line_id)
+                   ]"/>
             <field name="default_code"/>
             <field name="barcode"/>
+            <field name="dept_line_id"/>
             <field name="product_qty"/>
             <field name="price_unit"/>
           </tree>
         </field>
 
         <footer>
-          <button name="action_confirm"
-                  type="object"
-                  string="Agregar a Orden de Compra"
-                  class="btn-primary"/>
-          <button string="Cancelar"
-                  class="btn-secondary"
-                  special="cancel"/>
+          <button name="action_confirm" type="object" string="Agregar a Orden de Compra" class="btn-primary"/>
+          <button string="Cancelar" class="btn-secondary" special="cancel"/>
         </footer>
       </form>
     </field>
   </record>
 
-  <!-- Acción para abrir el wizard -->
   <record id="action_product_selector_wizard" model="ir.actions.act_window">
     <field name="name">Seleccionar Productos</field>
     <field name="res_model">product.selector.wizard</field>
