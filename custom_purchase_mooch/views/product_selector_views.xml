@@ -10,6 +10,7 @@
           <field name="search_term"
                  placeholder="Buscar por nombre o código interno…"
                  options="{'debounce': 300}"/>
+          <!-- Lista desplegable descendente -->
           <field name="limit_results"/>
         </group>
 
@@ -27,7 +28,7 @@
                    options="{'no_create': True, 'no_create_edit': True}"
                    domain="[
                      ('purchase_ok','=',True),
-                     ('product_tmpl_id.department_id','=', parent.dept_param_line_id)
+                     ('product_tmpl_id.department_id','=?', parent.dept_param_line_id)
                    ]"/>
             <field name="default_code"/>
             <field name="barcode"/>

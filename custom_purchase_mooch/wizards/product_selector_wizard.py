@@ -27,7 +27,7 @@ class ProductSelectorWizard(models.TransientModel):
     purchase_id = fields.Many2one('purchase.order', string='Orden de Compra')
 
     search_term = fields.Char(string='Buscar')
-    # ⬇️ Lista desplegable descendente; default 1000
+    # Lista desplegable descendente; default 1000
     limit_results = fields.Selection(
         selection=LIMIT_CHOICES,
         string='Resultados a mostrar',
@@ -48,7 +48,7 @@ class ProductSelectorWizard(models.TransientModel):
     # Helpers
     # --------------------------
     def _limit_int(self):
-        """Convierte el selection string a int (default 1000)."""
+        """Convierte el selection a int (default 1000)."""
         try:
             return int(self.limit_results or '1000')
         except Exception:
@@ -88,15 +88,18 @@ class ProductSelectorWizard(models.TransientModel):
         return False
 
     def _department_domain_for_products(self):
-        # ESTRICTO: solo depto del USUARIO; sin depto -> 0 resultados
+        """
+        Regla:
+        - Si el usuario TIENE depto → productos comprables de ese depto.
+        - Si NO tiene depto → TODOS los comprables (sin filtrar por depto).
+        """
         dept_line = self._map_user_dept_to_param_line()
         self.dept_param_line_id = dept_line.id if dept_line else False
-        if not dept_line:
-            return [('id', '=', 0)]
-        return [
-            ('purchase_ok', '=', True),
-            ('product_tmpl_id.department_id', '=', dept_line.id),
-        ]
+        base = [('purchase_ok', '=', True)]
+        if dept_line:
+            return base + [('product_tmpl_id.department_id', '=', dept_line.id)]
+        # sin depto → mostrar todo (comprables)
+        return base
 
     def _fetch_products_by_term(self, term, limit):
         Product = self.env['product.product'].with_context(**self._product_env_ctx())
@@ -167,13 +170,13 @@ class ProductSelectorWizard(models.TransientModel):
         po_partner = po.partner_id if po else False
         po_date = po.date_order if po else False
 
-        # Crear tmp con purchase_id (para vista), y limit_results ya por default '1000'
+        # Crear tmp con purchase_id (para vista), y limit_results default '1000'
         tmp = self.new({'purchase_id': purchase, 'limit_results': '1000'})
 
-        # fija dept_param_line_id (estricto por depto usuario)
+        # fija dept_param_line_id según usuario (si no hay, queda False)
         _ = tmp._department_domain_for_products()
 
-        initial_limit = 1000  # ← pedido: 1000 registros iniciales
+        initial_limit = 1000  # pedido: 1000 registros iniciales
         products = tmp._fetch_products_by_term(term=None, limit=initial_limit)
 
         lines = [(0, 0, {
@@ -236,7 +239,8 @@ class ProductProductSelector(models.TransientModel):
         'product.product',
         string='Producto',
         required=True,
-        domain="[('purchase_ok','=',True),('product_tmpl_id.department_id','=', parent.dept_param_line_id)]",
+        # Si hay depto del usuario, aplica; si no hay, se ignora (gracias a '=?') y muestra comprables.
+        domain="[('purchase_ok','=',True),('product_tmpl_id.department_id','=?', parent.dept_param_line_id)]",
         options="{'no_create': True, 'no_create_edit': True}",
     )
 
