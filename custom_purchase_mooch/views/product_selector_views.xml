@@ -10,7 +10,7 @@
           <field name="search_term"
                  placeholder="Buscar por nombre o código interno…"
                  options="{'debounce': 300}"/>
-          <field name="limit_results" widget="integer" options="{'min': 10, 'max': 500}"/>
+          <field name="limit_results"/>
         </group>
 
         <!-- Auxiliar para dominio -->

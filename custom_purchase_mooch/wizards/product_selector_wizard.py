@@ -7,14 +7,34 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+LIMIT_CHOICES = [
+    ('1000', '1000'),
+    ('750', '750'),
+    ('500', '500'),
+    ('250', '250'),
+    ('100', '100'),
+    ('50', '50'),
+    ('25', '25'),
+    ('10', '10'),
+]
+
+
 class ProductSelectorWizard(models.TransientModel):
     _name = 'product.selector.wizard'
     _description = 'Wizard para agregar productos a orden de compra'
 
     selector_ids = fields.One2many('product.product.selector', 'wizard_id', string='Productos')
     purchase_id = fields.Many2one('purchase.order', string='Orden de Compra')
+
     search_term = fields.Char(string='Buscar')
-    limit_results = fields.Integer(string='Límite resultados', default=200)
+    # ⬇️ Lista desplegable descendente; default 1000
+    limit_results = fields.Selection(
+        selection=LIMIT_CHOICES,
+        string='Resultados a mostrar',
+        default='1000',
+        required=True,
+        help="Cantidad de productos a listar y a usar en la búsqueda."
+    )
 
     # Auxiliar para el dominio del M2O en la vista
     dept_param_line_id = fields.Many2one(
@@ -25,9 +45,17 @@ class ProductSelectorWizard(models.TransientModel):
     )
 
     # --------------------------
-    # Contexto seguro (no leer purchase_id aquí)
+    # Helpers
     # --------------------------
+    def _limit_int(self):
+        """Convierte el selection string a int (default 1000)."""
+        try:
+            return int(self.limit_results or '1000')
+        except Exception:
+            return 1000
+
     def _product_env_ctx(self):
+        # Contexto seguro (no leer purchase_id aquí)
         return {
             'lang': self.env.user.lang,
             'company_id': self.env.company.id,
@@ -35,18 +63,11 @@ class ProductSelectorWizard(models.TransientModel):
             'display_default_code': True,
         }
 
-    # --------------------------
-    # Departamento SOLO del USUARIO actual
-    # --------------------------
     def _user_hr_department(self):
         # sudo para evitar reglas/permisos en hr.employee durante default_get
         emp = self.env['hr.employee'].sudo().search([('user_id', '=', self.env.uid)], limit=1)
         return emp.department_id if emp and emp.department_id else False
 
-    # --------------------------
-    # Mapear hr.department -> barcode.parameter.line('Departamento')
-    # (match por nombre: exacto o parcial). SIN fallbacks a PO.
-    # --------------------------
     def _map_user_dept_to_param_line(self):
         ParamLine = self.env['barcode.parameter.line']
         hr_dept = self._user_hr_department()
@@ -66,11 +87,8 @@ class ProductSelectorWizard(models.TransientModel):
                 return line
         return False
 
-    # --------------------------
-    # Dominio principal (ESTRICTO): solo depto del usuario
-    # Sin depto -> 0 resultados
-    # --------------------------
     def _department_domain_for_products(self):
+        # ESTRICTO: solo depto del USUARIO; sin depto -> 0 resultados
         dept_line = self._map_user_dept_to_param_line()
         self.dept_param_line_id = dept_line.id if dept_line else False
         if not dept_line:
@@ -80,9 +98,6 @@ class ProductSelectorWizard(models.TransientModel):
             ('product_tmpl_id.department_id', '=', dept_line.id),
         ]
 
-    # --------------------------
-    # Búsqueda secundaria: (name OR default_code) sobre el dominio principal
-    # --------------------------
     def _fetch_products_by_term(self, term, limit):
         Product = self.env['product.product'].with_context(**self._product_env_ctx())
         domain = self._department_domain_for_products()
@@ -96,13 +111,8 @@ class ProductSelectorWizard(models.TransientModel):
                      term, limit, len(products))
         return products
 
-    # --------------------------
-    # Precio proveedor (no dependas de self.purchase_id)
-    # --------------------------
     def _get_vendor_price(self, product, qty=1.0, partner=False, date=False, uom=False):
-        """
-        Permite inyectar partner/fecha desde el caller para evitar lecturas de purchase_id durante default_get.
-        """
+        """No dependas de self.purchase_id durante default_get; permite inyectar partner/fecha."""
         partner = partner or (self.purchase_id.partner_id if self.purchase_id else False)
         uom = uom or (product.uom_po_id or product.uom_id)
         date = date or (self.purchase_id.date_order if (self.purchase_id and self.purchase_id.date_order) else fields.Date.context_today(self))
@@ -115,7 +125,7 @@ class ProductSelectorWizard(models.TransientModel):
         return seller.price if seller else product.standard_price
 
     # --------------------------
-    # Confirmación
+    # Acciones
     # --------------------------
     def action_confirm(self):
         self.ensure_one()
@@ -134,7 +144,6 @@ class ProductSelectorWizard(models.TransientModel):
                 'price_unit': sel.price_unit,
                 'product_qty': sel.product_qty,
             }
-            # Analítica (si aplica en tu flujo)
             analytic_account = (
                 self.purchase_id.analytic_account_id if self.purchase_id and self.purchase_id.analytic_account_id else
                 getattr(product, 'analytic_account_id', False) or
@@ -147,7 +156,7 @@ class ProductSelectorWizard(models.TransientModel):
         return {'type': 'ir.actions.act_window_close'}
 
     # --------------------------
-    # Carga inicial (200)
+    # Defaults (carga inicial)
     # --------------------------
     @api.model
     def default_get(self, fields_list):
@@ -158,13 +167,13 @@ class ProductSelectorWizard(models.TransientModel):
         po_partner = po.partner_id if po else False
         po_date = po.date_order if po else False
 
-        # Crear tmp con purchase_id (para vista/uso posterior), pero sin leerlo en helpers
-        tmp = self.new({'purchase_id': purchase})
+        # Crear tmp con purchase_id (para vista), y limit_results ya por default '1000'
+        tmp = self.new({'purchase_id': purchase, 'limit_results': '1000'})
 
         # fija dept_param_line_id (estricto por depto usuario)
         _ = tmp._department_domain_for_products()
 
-        initial_limit = 200
+        initial_limit = 1000  # ← pedido: 1000 registros iniciales
         products = tmp._fetch_products_by_term(term=None, limit=initial_limit)
 
         lines = [(0, 0, {
@@ -178,12 +187,13 @@ class ProductSelectorWizard(models.TransientModel):
         res.update({
             'purchase_id': purchase,
             'dept_param_line_id': tmp.dept_param_line_id.id if tmp.dept_param_line_id else False,
+            'limit_results': '1000',
             'selector_ids': lines,
         })
         return res
 
     # --------------------------
-    # Onchange búsqueda
+    # Onchange búsqueda / límite
     # --------------------------
     @api.onchange('search_term', 'limit_results')
     def _onchange_search_term(self):
@@ -196,11 +206,10 @@ class ProductSelectorWizard(models.TransientModel):
             'x_selected': True,
         }) for l in sel]
 
-        limit = self.limit_results or 200
+        limit = self._limit_int()
         products = self._fetch_products_by_term(self.search_term, limit)
         nuevos = products.filtered(lambda p: p.id not in sel_ids)
 
-        # partner/fecha desde la PO real (ya existe en este punto)
         po = self.purchase_id
         po_partner = po.partner_id if po else False
         po_date = po.date_order if po and po.date_order else False
@@ -227,8 +236,7 @@ class ProductProductSelector(models.TransientModel):
         'product.product',
         string='Producto',
         required=True,
-        # UI: si hay depto del usuario, restringe al depto; si no, nada (porque servidor ya devuelve 0)
-        domain="[('purchase_ok','=',True),'&',('product_tmpl_id.department_id','!=', False),('product_tmpl_id.department_id','=', parent.dept_param_line_id)]",
+        domain="[('purchase_ok','=',True),('product_tmpl_id.department_id','=', parent.dept_param_line_id)]",
         options="{'no_create': True, 'no_create_edit': True}",
     )
 
@@ -236,7 +244,6 @@ class ProductProductSelector(models.TransientModel):
     default_code = fields.Char(related='product_id.default_code', string='Código Interno', store=False)
     barcode = fields.Char(related='product_id.barcode', string='Código de barras', store=False)
 
-    # (opcional) ver el departamento del producto en el tree
     dept_line_id = fields.Many2one(
         'barcode.parameter.line',
         string='Departamento',
