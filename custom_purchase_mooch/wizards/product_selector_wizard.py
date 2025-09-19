@@ -52,7 +52,10 @@ class ProductSelectorWizard(models.TransientModel):
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         purchase = self.env.context.get('active_id')
-        products = self.env['product.product'].search([])
+
+        # No cargar todos los productos de golpe
+        # Solo mostrar los primeros 20 como ejemplo
+        products = self.env['product.product'].with_context(prefetch_fields=False).search([], limit=20)
         lines = [
             (0, 0, {
                 'product_id': p.id,
@@ -69,7 +72,6 @@ class ProductSelectorWizard(models.TransientModel):
 
     @api.onchange('search_term')
     def _onchange_search_term(self):
-        # 1) Sacar las líneas ya seleccionadas (con sus qty y price tal cual las modificaste)
         sel = self.selector_ids.filtered(lambda l: l.x_selected)
         sel_ids   = sel.mapped('product_id.id')
         sel_cmds  = [
@@ -82,15 +84,17 @@ class ProductSelectorWizard(models.TransientModel):
             for l in sel
         ]
 
-        # 2) Buscar nuevos productos (filtrados por texto) y excluir ya seleccionados
         domain = []
         if self.search_term:
             domain = ['|',
-                      ('name', 'ilike', self.search_term),
-                      ('default_code', 'ilike', self.search_term)]
-        prods     = self.env['product.product'].search(domain)
-        nuevos    = prods.filtered(lambda p: p.id not in sel_ids)
-        new_cmds  = [
+                    ('name', 'ilike', self.search_term),
+                    ('default_code', 'ilike', self.search_term)]
+
+        # 🔹 Limitar resultados
+        prods = self.env['product.product'].with_context(prefetch_fields=False).search(domain, limit=50)
+        nuevos = prods.filtered(lambda p: p.id not in sel_ids)
+
+        new_cmds = [
             (0, 0, {
                 'product_id':  p.id,
                 'product_qty': 1.0,
@@ -100,7 +104,6 @@ class ProductSelectorWizard(models.TransientModel):
             for p in nuevos
         ]
 
-        # 3) Reemplazar la lista entero de una: vaciar (5) y luego todos los comandos
         self.selector_ids = [(5, 0, 0)] + sel_cmds + new_cmds
 
 
