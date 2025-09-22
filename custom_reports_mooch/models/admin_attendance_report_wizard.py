@@ -9,7 +9,7 @@ _logger = logging.getLogger(__name__)
 
 class AdminAttendanceReportWizard(models.TransientModel):
     _name = "admin.attendance.report.wizard"
-    _description = "Asistencias - Reporte Administrativos (PDF)"
+    _description = "Asistencias - Reporte Administrativos (PDF) - HR Attendance"
 
     @api.model
     def _default_date_from(self):
@@ -36,24 +36,15 @@ class AdminAttendanceReportWizard(models.TransientModel):
 
     include_signature = fields.Boolean(default=True)
 
-    # ---------------- Disparador del PDF ----------------
     def action_print_admin_pdf(self):
         self.ensure_one()
         _logger.info("action_print_admin_pdf llamado para wizard ID: %s", self.id)
         
-        # Generar dataset
         dataset = self.get_dataset()
         _logger.info("Dataset generado, empleados: %s", len(dataset.get('employees', [])))
         
-        # DEBUG: Verificar qué datos se están enviando
-        _logger.info("Datos enviados al reporte:")
-        _logger.info(" - Fecha desde: %s", dataset.get('dfrom'))
-        _logger.info(" - Fecha hasta: %s", dataset.get('dto'))
-        _logger.info(" - Empleados: %s", len(dataset.get('employees', [])))
-        _logger.info(" - Días: %s", len(dataset.get('day_list', [])))
-        
         return self.env.ref('custom_reports_mooch.action_attendance_admin_pdf').report_action(self, data={'form': dataset})
-    # ---------------- Helpers ----------------
+
     def _to_user_tz(self, dt, tz):
         if not dt:
             return None
@@ -61,21 +52,27 @@ class AdminAttendanceReportWizard(models.TransientModel):
             dt = pytz.UTC.localize(dt)
         return dt.astimezone(tz)
 
+    def _make_naive(self, dt, tz):
+        """Convierte datetime aware a naive en la zona horaria especificada"""
+        if not dt:
+            return None
+        if dt.tzinfo is not None:
+            return dt.astimezone(tz).replace(tzinfo=None)
+        return dt
+
     def _overlap_seconds_same_day(self, start_dt, end_dt, day_date, tz):
         """Segundos del tramo [start_dt, end_dt] que caen dentro del día local 'day_date'."""
         try:
             local_day_start = tz.localize(datetime.combine(day_date, time.min))
             local_day_end   = tz.localize(datetime.combine(day_date, time.max))
             
-            # Asegurar que las fechas estén en la misma zona horaria
             if start_dt.tzinfo is None:
                 start_dt = pytz.UTC.localize(start_dt)
             if end_dt and end_dt.tzinfo is None:
                 end_dt = pytz.UTC.localize(end_dt)
             
-            end_dt = end_dt or start_dt  # Si no hay check_out, usar check_in
+            end_dt = end_dt or start_dt
             
-            # Validar que end_dt no sea anterior a start_dt
             if end_dt < start_dt:
                 _logger.warning("End date before start date: %s < %s", end_dt, start_dt)
                 return 0
@@ -92,9 +89,6 @@ class AdminAttendanceReportWizard(models.TransientModel):
             return 0
 
     def _format_hhmm(self, seconds):
-        """
-        Convierte segundos a formato HH:MM
-        """
         if seconds is None:
             return "00:00"
         total = max(0, int(seconds or 0))
@@ -102,14 +96,81 @@ class AdminAttendanceReportWizard(models.TransientModel):
         m = (total % 3600) // 60
         return f"{h:02d}:{m:02d}"
 
-# ---------------- Dataset del reporte ----------------
+    def _is_rest_day(self, employee, date):
+        """Verifica si la fecha es día de descanso para el empleado"""
+        weekday = date.weekday()
+        rest_days_map = {
+            0: employee.rest_monday,
+            1: employee.rest_tuesday,
+            2: employee.rest_wednesday,
+            3: employee.rest_thursday,
+            4: employee.rest_friday,
+            5: employee.rest_saturday,
+            6: employee.rest_sunday,
+        }
+        return rest_days_map.get(weekday, False)
+
+    def _get_planned_work_hours(self, employee, date):
+        """Obtiene horas planificadas del calendario del empleado"""
+        cal = (
+            employee.resource_calendar_id or 
+            employee.company_id.resource_calendar_id or 
+            self.env.company.resource_calendar_id
+        )
+        
+        if not cal:
+            return None, None, None
+
+        dow = str(date.weekday())
+        lines = cal.attendance_ids.filtered(
+            lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == employee.resource_id)
+        ).sorted(key=lambda l: l.hour_from)
+
+        if not lines:
+            return None, None, None
+
+        # Primer segmento de trabajo
+        work_segments = [l for l in lines if not self._is_break_line(l)]
+        if not work_segments:
+            return None, None, None
+
+        first_segment = work_segments[0]
+        expected_start = self._hour_float_to_time(first_segment.hour_from, date)
+        
+        # Buscar segmento de comida
+        lunch_segment = None
+        for i in range(len(lines) - 1):
+            if not self._is_break_line(lines[i]) and not self._is_break_line(lines[i + 1]):
+                gap = lines[i + 1].hour_from - lines[i].hour_to
+                if gap >= 0.5:  # 30 minutos o más
+                    lunch_segment = (
+                        self._hour_float_to_time(lines[i].hour_to, date),
+                        self._hour_float_to_time(lines[i + 1].hour_from, date)
+                    )
+                    break
+
+        # Último segmento de trabajo
+        last_segment = work_segments[-1]
+        expected_end = self._hour_float_to_time(last_segment.hour_to, date)
+
+        return expected_start, lunch_segment, expected_end
+
+    def _is_break_line(self, line):
+        """Determina si una línea del calendario es descanso/comida"""
+        name = (line.name or '').lower()
+        return any(keyword in name for keyword in ['descanso', 'comida', 'almuerzo', 'lunch', 'break'])
+
+    def _hour_float_to_time(self, hour_float, date):
+        """Convierte 9.5 a datetime(2025-09-22 09:30:00)"""
+        hh = int(hour_float)
+        mm = int(round((hour_float - hh) * 60))
+        return datetime.combine(date, time(hh, mm))
+
     def get_dataset(self):
-        """
-        Construye el dataset consumido por QWeb
-        """
+        """Construye el dataset consumido por QWeb - DETECCIÓN CORRECTA DE COMIDA"""
         self.ensure_one()
-        _logger.info("=== GENERANDO DATASET CON LÓGICA DE STATUS ===")
-        _logger.info("Fecha from: %s, Fecha to: %s", self.date_from, self.date_to)
+        _logger.info("=== GENERANDO DATASET CON DETECCIÓN CORRECTA DE COMIDA ===")
+        
         tz = pytz.timezone(self.env.user.tz or 'UTC')
 
         dfrom = fields.Datetime.from_string(self.date_from)
@@ -134,18 +195,16 @@ class AdminAttendanceReportWizard(models.TransientModel):
             domain.append(('work_location_id', '=', self.work_location_id.id))
         employees = self.employee_ids or self.env['hr.employee'].search(domain, order='work_location_id,name')
 
-        # ===== NUEVO: Obtener ausencias (vacaciones, permisos) =====
-        # Buscar leaves (ausencias) en el rango de fechas
+        # ===== AUSENCIAS (VACACIONES/PERMISOS) =====
         Leave = self.env['hr.leave']
         leave_domain = [
             ('employee_id', 'in', employees.ids),
-            ('state', '=', 'validate'),  # Solo ausencias aprobadas
+            ('state', '=', 'validate'),
             ('date_from', '<=', dto_local.date()),
             ('date_to', '>=', dfrom_local.date()),
         ]
         leaves = Leave.search(leave_domain)
         
-        # Crear índice de ausencias por empleado y día
         leave_index = defaultdict(dict)
         for leave in leaves:
             start_date = max(leave.date_from.date(), dfrom_local.date())
@@ -158,113 +217,113 @@ class AdminAttendanceReportWizard(models.TransientModel):
                     'type': 'leave'
                 }
                 current_date += timedelta(days=1)
-        # ===== FIN NUEVO =====
 
-        # Asistencias que toquen el rango
+        # ===== ASISTENCIAS HR.ATTENDANCE =====
         Attend = self.env['hr.attendance']
         att_domain = [
-            ('employee_id', 'in', employees.ids or [-1]),
+            ('employee_id', 'in', employees.ids),
             '|',
-            '&',  # Asistencias que empezaron Y terminaron en el rango
-                ('check_in', '>=', dfrom),
-                ('check_in', '<=', dto),
-            '&',  # O asistencias que empezaron antes pero terminaron en el rango
-                ('check_in', '<', dfrom),
-                ('check_out', '>=', dfrom),
+            '&', ('check_in', '>=', dfrom), ('check_in', '<=', dto),
+            '&', ('check_in', '<', dfrom), ('check_out', '>=', dfrom),
         ]
         atts = Attend.search(att_domain, order='employee_id, check_in')
 
-        # DEBUG: Verificar cuántas asistencias se encontraron
-        _logger.info("Asistencias encontradas: %s", len(atts))
-        for att in atts:
-            _logger.info(" - Empleado: %s, Check-in: %s, Check-out: %s", 
-                        att.employee_id.name, att.check_in, att.check_out)
-
-# ===== VALIDAR Y FILTRAR ASISTENCIAS CON DATOS INCORRECTOS =====
+        # Filtrar asistencias válidas
         valid_atts = []
         for att in atts:
             if att.check_out and att.check_out < att.check_in:
                 _logger.warning("Asistencia con check_out anterior a check_in: %s", att.id)
                 continue
-            
-            if att.check_out and (att.check_out - att.check_in) > timedelta(days=1):
-                _logger.warning("Asistencia con duración mayor a 1 día: %s (%.1f días)", 
-                            att.id, (att.check_out - att.check_in).total_seconds() / 86400)
-            
             valid_atts.append(att)
 
-        # CONVERTIR la lista de vuelta a un Recordset de Odoo
         att_ids = [att.id for att in valid_atts]
         atts = self.env['hr.attendance'].browse(att_ids)
-        _logger.info("Asistencias válidas después de filtrar: %s", len(atts))
-# ===== FIN VALIDACIÓN =====
 
-        LUNCH_MIN = timedelta(minutes=30)
-        LUNCH_MAX = timedelta(hours=2)
-
+        # ===== PROCESAMIENTO MEJORADO - DETECCIÓN CORRECTA DE COMIDA =====
         per_emp_day_summary = defaultdict(dict)
 
         for emp in employees:
             emp_id = emp.id
-            emp_atts = atts.filtered(lambda a, emp=emp: a.employee_id.id == emp.id and (a.check_out or a.check_in) >= dfrom and a.check_in <= dto)
+            emp_atts = atts.filtered(lambda a: a.employee_id.id == emp.id)
 
-            # Convertir a TZ local
-            intervals = []
-            for a in emp_atts:
-                cin = self._to_user_tz(a.check_in, tz)
-                cout = self._to_user_tz(a.check_out, tz) if a.check_out else None
-                intervals.append((cin, cout))
+            # Agrupar asistencias COMPLETAS por día (check_in + check_out)
+            day_asistencias = defaultdict(list)
+            for att in emp_atts:
+                cin = self._to_user_tz(att.check_in, tz)
+                cout = self._to_user_tz(att.check_out, tz) if att.check_out else None
+                
+                # Solo considerar asistencias completas (con check_out)
+                if cout:
+                    day_asistencias[cin.date()].append((cin, cout))  # (entrada, salida)
 
             for day in day_list:
-                ins  = []
-                outs = []
-                work_secs = 0
+                asistencias = day_asistencias.get(day, [])
+                asistencias.sort(key=lambda x: x[0])  # Ordenar por hora de entrada
 
-                for cin, cout in intervals:
-                    work_secs += self._overlap_seconds_same_day(cin, cout or cin, day, tz)
-                    if cin.date() == day:
-                        ins.append(cin)
-                    if cout and cout.date() == day:
-                        outs.append(cout)
-
-                first_in = ins and min(ins) or None
-                last_out = outs and max(outs) or None
-
-                # Detectar tiempo de comida
-                local_points = []
-                local_day_start = tz.localize(datetime.combine(day, time.min))
-                local_day_end   = tz.localize(datetime.combine(day, time.max))
-                for cin, cout in intervals:
-                    s = max(cin, local_day_start)
-                    e = min(cout or cin, local_day_end)
-                    if e > s:
-                        local_points.append((s, e))
-                local_points.sort(key=lambda x: x[0])
-
+                # ===== DETECCIÓN CORRECTA DE COMIDA =====
                 lunch_out = None
                 lunch_in = None
-                max_gap = timedelta(0)
-                for (s1, e1), (s2, e2) in zip(local_points, local_points[1:]):
-                    gap = s2 - e1
-                    if LUNCH_MIN <= gap <= LUNCH_MAX and gap > max_gap:
-                        max_gap = gap
-                        lunch_out = e1
-                        lunch_in = s2
+                first_in = None
+                last_out = None
+                
+                if len(asistencias) >= 2:
+                    # Para detectar comida: necesitamos al menos 2 asistencias
+                    # La comida está entre el check_out de la primera y el check_in de la segunda
+                    primera_asistencia = asistencias[0]
+                    segunda_asistencia = asistencias[1]
+                    
+                    # Salida a comer = check_out de la primera asistencia
+                    lunch_out = primera_asistencia[1]  # 10:25
+                    # Regreso de comer = check_in de la segunda asistencia  
+                    lunch_in = segunda_asistencia[0]   # 10:26
+                    
+                    # Verificar que sea un tiempo razonable para comida (30min - 2hrs)
+                    tiempo_comida = lunch_in - lunch_out
+                    if not (timedelta(minutes=30) <= tiempo_comida <= timedelta(hours=2)):
+                        # Si no es un tiempo razonable, no es comida
+                        lunch_out = None
+                        lunch_in = None
+                
+                # Primera entrada y última salida del día
+                if asistencias:
+                    first_in = asistencias[0][0]  # Primera entrada del día
+                    last_out = asistencias[-1][1]  # Última salida del día
+                
+                # Si solo hay una asistencia, usar esa para entrada/salida
+                elif len(asistencias) == 1:
+                    first_in = asistencias[0][0]
+                    last_out = asistencias[0][1]
 
-                lunch_secs = int(max_gap.total_seconds()) if lunch_out and lunch_in else 0
-                fmt = lambda dt: dt and dt.strftime('%H:%M') or '—'
+                # Log para debugging
+                _logger.debug("Día %s - Asistencias: %s", day, [
+                    (cin.strftime('%H:%M'), cout.strftime('%H:%M')) for cin, cout in asistencias
+                ])
+                _logger.debug("Comida detectada: %s a %s", 
+                            lunch_out.strftime('%H:%M') if lunch_out else "None", 
+                            lunch_in.strftime('%H:%M') if lunch_in else "None")
 
-                # ===== LÓGICA MEJORADA DE STATUS =====
+                # Calcular horas trabajadas (considerando comida)
+                work_secs = 0
+                if first_in and last_out and last_out > first_in:
+                    # Sumar tiempo de todas las asistencias
+                    for cin, cout in asistencias:
+                        work_secs += int((cout - cin).total_seconds())
+                    
+                    # Restar tiempo de comida si se detectó
+                    if lunch_out and lunch_in:
+                        work_secs -= int((lunch_in - lunch_out).total_seconds())
+
+                # ===== LÓGICA DE STATUS (MANTENER EXACTA) =====
                 status = "Asistencia"
                 retardo_seconds = 0
                 
-                # 1. Verificar si es día de descanso
+                # 1. Verificar día de descanso
                 is_rest_day = self._is_rest_day(emp, day)
                 if is_rest_day:
                     status = "Descanso"
-                    work_secs = 0  # No contar horas en día de descanso
+                    work_secs = 0
                 
-                # 2. Verificar si hay ausencia (vacaciones/permisos)
+                # 2. Verificar ausencias
                 elif day in leave_index.get(emp_id, {}):
                     leave_info = leave_index[emp_id][day]
                     leave_type = leave_info['status']
@@ -278,31 +337,40 @@ class AdminAttendanceReportWizard(models.TransientModel):
                             status = "Permiso s/goce"
                     else:
                         status = leave_type
-                    work_secs = 0  # No contar horas en ausencia
+                    work_secs = 0
                 
-                # 3. Verificar asistencia normal
-                elif work_secs == 0:
+                # 3. Verificar si hay asistencia
+                elif not first_in and not last_out:
                     status = "Falta"
                 
-                # 4. Verificar retardo (menos de 8 horas)
-                elif work_secs < 28800:  # 8 horas = 28800 segundos
-                    status = "Retardo"
-                    expected_seconds = 28800
-                    retardo_seconds = expected_seconds - work_secs
+                # 4. Verificar retardo
+                elif first_in:
+                    expected_start, lunch_segment, expected_end = self._get_planned_work_hours(emp, day)
+                    
+                    if expected_start:
+                        first_in_naive = self._make_naive(first_in, tz)
+                        expected_start_naive = expected_start
+                        
+                        if first_in_naive and expected_start_naive and first_in_naive > expected_start_naive:
+                            retardo_seconds = int((first_in_naive - expected_start_naive).total_seconds())
+                            if retardo_seconds > 300:  # 5 minutos de tolerancia
+                                status = "Retardo"
                 
-                # 5. Asistencia completa
+                # 5. Asistencia normal
                 else:
                     status = "Asistencia"
-                # ===== FIN LÓGICA DE STATUS =====
 
+                # Formatear resultados
+                fmt = lambda dt: dt and dt.strftime('%H:%M') or '—'
                 day_str = day.strftime('%Y-%m-%d')
+                
                 per_emp_day_summary[emp_id][day_str] = {
                     'first_in_s': fmt(first_in),
-                    'lunch_out_s': fmt(lunch_out),
-                    'lunch_in_s': fmt(lunch_in),
-                    'last_out_s': fmt(last_out),
+                    'lunch_out_s': fmt(lunch_out),  # Salida a comer (check_out primera)
+                    'lunch_in_s': fmt(lunch_in),    # Regreso de comer (check_in segunda)
+                    'last_out_s': fmt(last_out),    # Salida final (check_out última)
                     'work_str': self._format_hhmm(work_secs),
-                    'lunch_str': self._format_hhmm(lunch_secs),
+                    'lunch_str': self._format_hhmm(int((lunch_in - lunch_out).total_seconds()) if lunch_out and lunch_in else 0),
                     'retardo': self._format_hhmm(retardo_seconds),
                     'status': status
                 }
@@ -318,11 +386,11 @@ class AdminAttendanceReportWizard(models.TransientModel):
                 'work_location_name': emp.work_location_id.name if emp.work_location_id else '—',
             })
 
-        _logger.info("Dataset generado exitosamente")
+        _logger.info("Dataset con detección correcta de comida generado exitosamente")
         _logger.info("Empleados: %s, Días: %s", len(employees_data), len(day_list))
 
         return {
-            'title': "Reporte Administrativos (Asistencias)",
+            'title': "Reporte Administrativos (Asistencias) - HR",
             'employees': employees_data,
             'day_list': [day.strftime('%Y-%m-%d') for day in day_list],
             'per_emp_day_summary': dict(per_emp_day_summary),
@@ -332,25 +400,3 @@ class AdminAttendanceReportWizard(models.TransientModel):
             'include_signature': self.include_signature,
             'cards_per_page': 2,
         }
-
-    # ===== NUEVO MÉTODO: Verificar día de descanso =====
-    def _is_rest_day(self, employee, date):
-        """
-        Verifica si la fecha es día de descanso para el empleado
-        basado en su calendario de trabajo
-        """
-        # Obtener día de la semana (0=lunes, 6=domingo)
-        weekday = date.weekday()
-        
-        # Mapear días de descanso del empleado
-        rest_days_map = {
-            0: employee.rest_monday,    # Lunes
-            1: employee.rest_tuesday,   # Martes
-            2: employee.rest_wednesday, # Miércoles
-            3: employee.rest_thursday,  # Jueves
-            4: employee.rest_friday,    # Viernes
-            5: employee.rest_saturday,  # Sábado
-            6: employee.rest_sunday,    # Domingo
-        }
-        
-        return rest_days_map.get(weekday, False)
