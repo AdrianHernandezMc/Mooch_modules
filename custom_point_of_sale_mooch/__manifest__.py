@@ -12,6 +12,8 @@
         'views/pos_payment_method_views.xml',
     ],
     'assets': {'point_of_sale._assets_pos': [
+        "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/order_receipt.js",
+        'custom_point_of_sale_mooch/static/src/js/pos_store.js',
         'custom_point_of_sale_mooch/static/src/js/order_selector.js',
         'custom_point_of_sale_mooch/static/src/js/product_screen_coupon.js',
         'custom_point_of_sale_mooch/static/src/js/refund_coupon.js',
@@ -41,7 +43,6 @@
         #'custom_point_of_sale_mooch/static/src/js/fixes/safe_global_discount.js',
     ],
     "point_of_sale.assets_prod": [
-    "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/order_receipt.js",
     "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/receipt_screen.xml",
     "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/order_receipt.css",
     ],

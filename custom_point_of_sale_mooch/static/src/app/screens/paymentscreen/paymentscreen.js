@@ -4,8 +4,20 @@ import { _t } from "@web/core/l10n/translation";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { useState } from "@odoo/owl";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; // Odoo 17
+import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; 
 import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
+
+function addMonthtoday(date = new Date()) {
+    const y = date.getFullYear();
+    const m = date.getMonth();  // 0=Ene
+    const d = date.getDate();
+    const targetM = m + 1;
+    const targetY = y + Math.floor(targetM / 12);
+    const targetMi = targetM % 12;
+    const daysInTarget = new Date(targetY, targetMi + 1, 0).getDate(); // último día del mes destino
+    const day = Math.min(d, daysInTarget);
+return new Date(targetY, targetMi, day);
+}
 
 patch(PaymentScreen.prototype, {
     setup() {
@@ -15,7 +27,7 @@ patch(PaymentScreen.prototype, {
     },
     async onMounted() {
         //this._super();
-        // TicketScreen_onDoRefund bandera que proviene de point_of_sale_mooch.TicketScreen_onDoRefund    
+        // TicketScreen_onDoRefund bandera que proviene de point_of_sale_mooch.TicketScreen_onDoRefund
         if (this.pos.TicketScreen_onDoRefund){
             const line = this.selectedPaymentLine;
             line.transaction_id = String(this.pos.sharedtcode);
@@ -47,16 +59,16 @@ patch(PaymentScreen.prototype, {
         const method = line?.payment_method;
 
         if (!method) return false;
-    
+
         return !!method.require_transaction_id;
     },
-    
+
     onTxInput(ev) {
         const val = ev.target.value.trim();
         this.pos.txState.value = val;
         const line = this.selectedPaymentLine;
         if (line) {
-            line.transaction_id = val; 
+            line.transaction_id = val;
         }
     },
 
@@ -78,26 +90,89 @@ patch(PaymentScreen.prototype, {
         const cfgId = this.pos.config.id;
         const product_id = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
         const existe = order_iines.some(line => line.product.id === product_id);
-        
+
         if (existe) {
             const ondoInventory = await this.apply_changes();
-            console.log("ondoInventory",ondoInventory)
             if (!ondoInventory) {
-                //alert("entro al retorno")
-               return    
+               return
             }
-        } 
+        }
         // ************************************************
 
-        return super.validateOrder(...arguments);
+
+        /*********************************** */
+              /********* Agrego el vale al programa */
+        const cfgIdv = this.pos.config.id;
+        const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgIdv], {});
+        const exist_vale = order_iines.some(line => line.product.id === loyalty_program_id);
+        console.log(exist_vale)
+        
+        await super.validateOrder(...arguments);
+
+        const orderbeforebackend = this.pos.get_order();
+
+        if (existe) {
+            const crate_vale = this.create_vale(orderbeforebackend,loyalty_program_id)
+            if (!crate_vale) {
+                alert("error_vale")
+               return
+            }
+        }
     },
+
+    async create_vale(order,loyaty_program_id){
+    try {
+        const companyId = this.pos.company?.id;   // ← ID de la compañía
+        const exp = addMonthtoday(new Date());
+        const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
+        const partner = order.client;
+        const lines = (order?.get_orderlines?.() || []).filter(
+            (l) => l?.product?.id === order.product_voucher_id
+        );
+
+        let totalWithTax = (lines || []).reduce((acc, l) => {
+            const p = l.get_all_prices?.();
+            return acc + (p?.priceWithTax ?? 0);
+        }, 0);
+        totalWithTax = totalWithTax.toFixed(2);
+
+        console.log("order",order.server_id)
+
+        // Preparas el diccionario con todos los campos
+        const couponData = {
+          program_id:          loyaty_program_id,
+          company_id:          companyId,                // compañía
+          partner_id:          partner?.id || false,
+          code:                order.voucher_code,
+          expiration_date:     dateAddOneMonth,
+          points:              totalWithTax,
+          source_pos_order_id: order.server_id,         // referenciamos la venta
+        };
+
+        console.log("couponData",couponData)
+        const couponId = await this.orm.create(
+          "loyalty.card",    // modelo
+          [ couponData ]     // aquí sí va un solo nivel de array
+        );
+
+        return false;
+
+    } catch (err) {
+         await this.popup.add(ErrorPopup, {
+                title: "Error",
+                body: err,
+                confirmText: "OK",
+            });
+        return false;
+    }
+
+    },
+
 
     async apply_changes() {
         const details = Object.values(this.pos.toRefundLines);
         const refundDetails =  details.filter(d => d.qty > 0).map(d => d.orderline);
         const detallesArray = Object.values(refundDetails);
-        console.log("details",details)
-        console.log("refundDetails",refundDetails)
 
         if (!detallesArray.length) {
             alert("selecciona un articulo");
@@ -115,9 +190,9 @@ patch(PaymentScreen.prototype, {
         const locations = res[backendId] || [];
         const firstLoc = locations[0];
         const order_name = await this.orm.call(
-            "pos.order",   
-            "read",              
-            [[backendId]],          
+            "pos.order",
+            "read",
+            [[backendId]],
             { fields: ["name"] }
         );
 
@@ -129,7 +204,7 @@ patch(PaymentScreen.prototype, {
         await this.save_tbl_changes(refundDetails);
         let ondoInventory = false
         ondoInventory =  await this.move_to_inventory(detallesArray, backendId,firstLoc)
-        return ondoInventory 
+        return ondoInventory
     },
 
      async save_tbl_changes(refundDetails) {
@@ -137,7 +212,7 @@ patch(PaymentScreen.prototype, {
         const destinationOrder = this.pos.get_order();
         const origin_id = refundDetails.map(d => d.orderBackendId);
         const productId_origin =  refundDetails.map(d => d.productId);
-        console.log("detalle_changes",refundDetails)
+
         await this.orm.call(
             'pos.changes',
             'poschanges_links_pre',
@@ -156,8 +231,6 @@ patch(PaymentScreen.prototype, {
             const productId = detail.productId;
             const qty = detail.qty;
             const newQty = qty; //*-1;
-            
-            console.log("product_id",productId)
 
             // //5.0 Actualizo cada orderline en negativo
             const lineIds = await this.orm.call(
@@ -199,7 +272,6 @@ patch(PaymentScreen.prototype, {
                 { fields: ["id"] }                       // kwargs
             );
             if (!pt) {
-                console.log("pt",pt)
                 alert("No existe un tipo de operación de entrada configurado.......");
                 return false
             }
@@ -234,10 +306,7 @@ patch(PaymentScreen.prototype, {
             await this.orm.call("stock.picking", "action_assign",     [[pickingId]]);
             await this.orm.call("stock.picking", "button_validate",   [[pickingId]]);
       }
-      alert("true");
       return true
     }
-
-
 });
 

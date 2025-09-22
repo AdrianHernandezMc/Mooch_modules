@@ -3,6 +3,8 @@
   <!-- Heredamos la plantilla del recibo -->
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
     
+
+
     <!-- Insertar DESPUÉS del bloque que itera paymentlines -->
     <xpath expr="//div[contains(@class,'paymentlines') and @t-foreach='props.data.paymentlines']" position="after">
       <div class="paymentlines items-count">

@@ -3,7 +3,7 @@ import { patch } from "@web/core/utils/patch";
 import { TicketScreen } from "@point_of_sale/app/screens/ticket_screen/ticket_screen";
 import { useService } from "@web/core/utils/hooks";
 import { useState, onMounted } from "@odoo/owl";
-import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
+import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; 
 
 const _superOnClickOrder = TicketScreen.prototype.onClickOrder;
 const _superSetup = TicketScreen.prototype.setup;
@@ -43,7 +43,28 @@ patch(TicketScreen.prototype, {
 
     async onDoRefund() {
         this.clearOrderlines() //** limpio todas las lineas de la orden acutal*/
+       
+        // const order = this.pos.get_order()
         
+        // const selectedOrder2 = this.getSelectedOrder();
+
+        // console.log("selectedOrder",selectedOrder2)
+        // console.log(this.pos.toRefundLines)
+
+        // // const Detect_changes_vourcher = Object.values(this.pos.toRefundLines)
+        // // .filter(d => d.productid == order.product_changes_id || d.productid == order.product_voucher_id);
+
+        // const Detect_changes_vourcher = Object.values(this.pos.toRefundLines)
+        // .filter(d => d?.orderline?.productId == order.product_voucher_id || d?.orderline?.productId == order.product_changes_id);
+
+        // if (Detect_changes_vourcher.length > 0){
+        //     alert("No puedes hacer devociones de vales o cambios")
+        //     return 
+        // }
+        // console.log(Detect_changes_vourcher)
+
+        // return
+
         const selectedOrder = this.getSelectedOrder();
         const orderBackendId = selectedOrder.backendId; // o selectedOrder.id según tu flujo
         this.pos.TicketScreen_onDoRefund = false
@@ -67,7 +88,6 @@ patch(TicketScreen.prototype, {
             return acc + (Math.round(((line*1.16) *100) /100)*-1);
         }, 0);
 
-        console.log("method",method);
         
         if (method) {
             if (!method[0].transaction_id || method[0].transaction_id ==="" ) {
@@ -93,12 +113,51 @@ patch(TicketScreen.prototype, {
 
     async onClickOrder(order) {
         _superOnClickOrder.apply(this, arguments);
+        this.clearRefundlines()
+
+        const orderBackendId = order.backendId
+        /******************* agrego los codigos al producot  */
+        let pos_changes = await this.orm.call(
+            "pos.changes",          
+            "search_read",          
+            [[["dest_id", "=", orderBackendId]]], 
+            { fields: ["default_code", "origin_reference"] }
+        );     
         
+        let changes_order = ""; 
+        let change_codes = "";
+        for (const rd of pos_changes) {
+            change_codes = change_codes  + " - [" + rd.default_code + "]" || "";
+            changes_order = rd.origin_reference;
+        }
+        
+        change_codes = "ord: " + changes_order + " " + change_codes;
+        order.changes_codes = change_codes;
+        
+        /** agreamos el codigo del vale al producto */
+        let pos_voucher_code = await this.orm.call(
+            "loyalty.card",          
+            "search_read",          
+            [[["source_pos_order_id", "=", orderBackendId]]], 
+            { fields: ["code"] }
+        ); 
+
         const addcode_to_orderline =  order.get_orderlines()
         addcode_to_orderline.forEach(l => {
-            if (!l.full_product_name.includes(l.product.barcode)) {
-                 l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";   // refleja el cambio en memoria
+            
+            if (!l.full_product_name.includes(l.product.barcode) && l.product.id !== order.product_changes_id && l.product.id !== order.product_voucher_id) {
+                l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";   // refleja el cambio en memoria
             }
+            console.log("Code", l.full_product_name,pos_voucher_code[0].code)
+            if (!l.full_product_name.includes(change_codes) && l.product.id == order.product_changes_id){
+                l.full_product_name = l.full_product_name + change_codes
+            }
+            if (pos_voucher_code){
+                if (!l.full_product_name.includes(pos_voucher_code[0].code) && l.product.id == order.product_voucher_id){
+                    
+                     l.full_product_name = l.full_product_name + " - " + pos_voucher_code[0].code
+                 } 
+             }
         });
 
 /// **** Echo para los camios de producto ********
