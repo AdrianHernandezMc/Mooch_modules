@@ -208,7 +208,7 @@ patch(ProductScreen.prototype, {
 
         order.add_product(product, {
             quantity: 1,
-            price:    amount_total/1.16,
+            price:    amount_total,
             merge:    false,
             uom_id:   [1, 'Unidad']
         });

@@ -3,7 +3,6 @@ import { patch } from "@web/core/utils/patch";
 import { TicketScreen } from "@point_of_sale/app/screens/ticket_screen/ticket_screen";
 import { useService } from "@web/core/utils/hooks";
 import { useState, onMounted } from "@odoo/owl";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; 
 
 const _superOnClickOrder = TicketScreen.prototype.onClickOrder;
 const _superSetup = TicketScreen.prototype.setup;
