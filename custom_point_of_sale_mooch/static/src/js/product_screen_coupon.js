@@ -13,17 +13,19 @@ patch(ProductScreen.prototype, {
     _superSetup.apply(this, arguments);
   },
 
-  async _applyCoupon(totalRefund, ordername) {
+  async _applyCoupon(totalRefund, ordername, refund_codes) {
     const order = this.pos.get_order();
-    //alert("Agrega producto a product_screen")
     const cfgId = this.pos.config.id;
     const pid = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
 
     this.changesProductId = pid || null;
 
     let product = this.pos.db.get_product_by_id(pid);
-    product.display_name = product.display_name + " ord: " + ordername
-    
+    product.display_name = product.name;
+    product.display_name = product.display_name + "     Ord: " + ordername + " "+ refund_codes;
+    order.changes_codes = "Ord: " + ordername + " "+ refund_codes;
+    console.log("order",order)
+
     try {
       order.add_product(product, {
           quantity: 1,
@@ -31,7 +33,6 @@ patch(ProductScreen.prototype, {
           merge:    false,
           uom_id:   [1, 'Unidad']
     });
-
     } catch (error) {
       return alert(error.message || 'Error al activar el cupón');
     }
