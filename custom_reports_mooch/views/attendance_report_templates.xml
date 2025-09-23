@@ -46,7 +46,8 @@
         }
         .att-tr .val {
           font-size: 10px;
-          font-weight:700; }  /* número pequeño y legible */
+          font-weight:700;
+        }
         .tbl{
             width: 100%;
             border-collapse: collapse;
@@ -63,26 +64,24 @@
             border: 1px solid #333;
             height: 24px;
         }
-        /* Contenedor para organizar 2 tarjetas por fila */
         .card-row {
             width: 100%;
             display: block;
             margin-bottom: 1px;
         }
-        .clearfix {
-            clear: both;
-        }
-        /* === NUEVO: control de anchos y ajuste del Status === */
-        .tbl { table-layout: fixed; }  /* respeta anchos del */
+        .clearfix { clear: both; }
+
+        /* === Control de anchos y ajuste del Status === */
+        .tbl { table-layout: fixed; }
         .tbl col.w-date   { width: 16%; }
-        .tbl col.w-time   { width: 16%; }   /* Entrada / Comida ini / fin / Salida */
-        .tbl col.w-work   { width: 14%; }   /* H. trabajadas / H. comida / Retardo */
-        .tbl col.w-status { width: 29%; }  /* más espacio para Status */
+        .tbl col.w-time   { width: 16%; }
+        .tbl col.w-work   { width: 14%; }
+        .tbl col.w-status { width: 29%; }
 
-        .nowrap      { white-space: nowrap; }              /* HH:MM en una línea */
-        .status-cell { white-space: normal; word-break: break-word; } /* Status completo */
+        .nowrap      { white-space: nowrap; }
+        .status-cell { white-space: normal; word-break: break-word; }
 
-        /* ====== AÑADIDO: estilos de status ====== */
+        /* ====== estilos de status ====== */
         .status-pill {
             padding: 2px 2px;
             border-radius: 6px;
@@ -98,10 +97,34 @@
         .st-purple { background: #6a1b9a; }  /* Vacaciones */
         .st-teal   { background: #00695c; }  /* Permiso c/goce */
         .st-gray   { background: #455a64; }  /* Permiso s/goce */
+
+        /* ====== NUEVO: estilos del encabezado del reporte ====== */
+        .main-title{
+            text-align:center;
+            font-size:16px;
+            font-weight:800;
+            margin: 2px 0 0 0;
+        }
+        .subtitle{
+            text-align:center;
+            font-size:11px;
+            color:#444;
+            margin: 2px 0 6px 0;
+        }
       </style>
 
       <div class="page">
+        <!-- ====== NUEVO: Encabezado del reporte ====== -->
+        <div class="main-title">
+          Reporte Operativos (Asistencias) - HR
+        </div>
+        <div class="subtitle">
+          Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
+        </div>
+
+        <!-- (Opcional) Si quieres seguir mostrando la variable 'title' que ya tenías:
         <div class="att-title"><t t-esc="title"/></div>
+        -->
 
         <!-- CORRECCIÓN: Cambiar idx por c_index -->
         <t t-foreach="cards" t-as="c" t-foreach-index="c_index">
@@ -117,7 +140,6 @@
             </div>
 
             <table class="tbl">
-              <!-- NUEVO: distribución de anchos por columna -->
               <colgroup>
                 <col class="w-date"/>
                 <col class="w-time"/><col class="w-time"/><col class="w-time"/><col class="w-time"/>
@@ -174,12 +196,14 @@
                 </t>
               </tbody>
             </table>
+
             <div class="att-tr" style="text-align:right;">
               <div>
                 <small>Tiempo Total Retardo:</small>
                 <span class="val"><t t-esc="c['retardo_total']"/></span>
               </div>
             </div>
+
             <t t-if="include_signature">
               <div style="margin-top:1px;">
                 <div class="sign"></div>

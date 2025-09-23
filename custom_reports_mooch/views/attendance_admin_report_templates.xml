@@ -9,17 +9,17 @@
       <!-- PREPARAR DATASET CORRECTAMENTE -->
       <t t-set="root_data" t-value="data or {}"/>
       <t t-set="report_data" t-value="root_data.get('form', {}) or {}"/>
-      <t t-set="title" t-value="report_data.get('title', 'Reporte Administrativos (Asistencias)')"/>
-
-      <!-- Arrays para meses en español -->
-      <t t-set="spanish_months" t-value="['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']"/>
+      
+      <!-- Arrays para días y meses en español -->
+      <t t-set="spanish_days" t-value="['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']"/>
+      <t t-set="spanish_months" t-value="['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']"/>
       
       <!-- Obtener primer y último día del reporte -->
       <t t-set="day_list" t-value="report_data.get('day_list', [])"/>
       <t t-set="first_day" t-value="day_list[0] if day_list else ''"/>
       <t t-set="last_day" t-value="day_list[-1] if day_list else ''"/>
       
-      <!-- Formatear fechas en español -->
+      <!-- Formatear fechas en español para el rango -->
       <t t-set="first_date_formatted">
         <t t-if="first_day">
           <t t-set="first_parts" t-value="first_day.split('-')"/>
@@ -42,6 +42,17 @@
         </t>
       </t>
 
+      <!-- Crear título personalizado -->
+      <t t-set="custom_title">
+        Reporte Administrativos (Asistencias) - HR
+      </t>
+
+      <!-- Configurar correctamente las variables para el layout -->
+      <t t-set="o" t-value="docs[0] if docs else None"/>
+      <t t-set="report_name" t-value="custom_title"/>
+      <t t-set="title" t-value="custom_title"/>
+      <t t-set="subtitle" t-value="''"/>
+
       <!-- tarjetas por hoja (default 4) -->
       <t t-set="cpp" t-value="4"/>
       <style>
@@ -60,7 +71,7 @@
             grid-template-columns: 80px 1fr 1fr;
             grid-gap: 8px;
             align-items: center;
-            margin-bottom: 6px;
+            margin-bottom: 2px;
         }
         .att-head .pic{
             width: 80px;
@@ -123,7 +134,8 @@
         .st-teal   { background: #00695c; }  /* Permiso c/goce */
         .st-gray   { background: #455a64; }  /* Permiso s/goce */
 
-        .header-date {
+        /* Estilo para el header personalizado */
+        .custom-header {
             text-align: center;
             margin-bottom: 15px;
             padding: 6px;
@@ -132,106 +144,164 @@
             font-size: 12px;
             font-weight: bold;
         }
+        
+        /* Estilo para el título principal */
+        .main-title {
+            text-align: center;
+            margin-bottom: 5px;
+            padding: 8px;
+            background: #e9ecef;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        /* Estilo para el subtítulo con fechas */
+        .subtitle {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 6px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        /* Asegurar que el contenido principal empiece después del header */
+        .main-content {
+            margin-top: 20px;
+        }
+
+        /* Override del título del layout para usar nuestro título personalizado */
+        .header .title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
       </style>
 
-      <!-- AGREGAR ETIQUETA MAIN REQUERIDA -->
       <main>
         <div class="page">
-          <div class="att-title"><t t-esc="title"/></div>
-
-          <!-- ENCABEZADO CON RANGO DE FECHAS EN ESPAÑOL -->
-          <div class="header-date">
+          <!-- Título principal independiente -->
+          <div class="main-title">
+            Reporte Administrativos (Asistencias) - HR
+          </div>
+          
+          <!-- Subtítulo con fechas -->
+          <div class="subtitle">
             Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
           </div>
 
-          <!-- CORRECCIÓN: Usar emp_index en lugar de c_index -->
-          <t t-foreach="report_data.get('employees', [])" t-as="emp" t-emp-index="emp_index">
-            <div class="att-card" t-att-style="'width:%s;' % '48%'">
-              <div class="att-head">
-                <div class="att-kv">
-                  <div><small>No.Empleado:</small> <t t-esc="emp['barcode'] or 'no asignado'"/></div>
-                  <div><t t-esc="emp['name']"/></div>
-                  <div><small>Departamento:</small> <t t-esc="emp['department_name']"/></div>
-                  <div><small>Sucursal:</small> <t t-esc="emp['work_location_name'] or '—'"/></div>
+          <div class="main-content">
+            <t t-foreach="report_data.get('employees', [])" t-as="emp">
+              <div class="att-card" t-att-style="'width:%s;' % '48%'">
+                <div class="att-head">
+                  <div class="att-kv">
+                    <div><small>No.Empleado:</small> <t t-esc="emp['barcode'] or 'no asignado'"/></div>
+                    <div><t t-esc="emp['name']"/></div>
+                    <div><small>Departamento:</small> <t t-esc="emp['department_name']"/></div>
+                    <div><small>Sucursal:</small> <t t-esc="emp['work_location_name'] or '—'"/></div>
+                  </div>
                 </div>
+
+                <table class="tbl">
+                  <colgroup>
+                    <col class="w-date"/>
+                    <col class="w-time"/><col class="w-time"/><col class="w-time"/><col class="w-time"/>
+                    <col class="w-work"/><col class="w-work"/><col class="w-work"/>
+                    <col class="w-status"/>
+                  </colgroup>
+
+                  <thead>
+                    <tr>
+                      <th rowspan="2">Fecha</th>
+                      <th colspan="4">Checadas</th>
+                      <th rowspan="2">Horas trabajadas</th>
+                      <th rowspan="2">Horas de comida</th>
+                      <th rowspan="2">Retardo</th>
+                      <th rowspan="2">Status</th>
+                    </tr>
+                    <tr>
+                      <th>Entrada</th>
+                      <th>Inicia Comida</th>
+                      <th>Termina Comida</th>
+                      <th>Salida</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <t t-foreach="report_data.get('day_list', [])" t-as="d_str">
+                      <!-- ACCESO CORRECTO A LOS DATOS -->
+                      <t t-set="emp_data" t-value="report_data.get('per_emp_day_summary', {}).get(str(emp['id']), {})"/>
+                      <t t-set="day_data" t-value="emp_data.get(d_str, {})"/>
+                      <t t-set="status" t-value="day_data.get('status', 'Falta')"/>
+                      
+                      <!-- Formatear fecha individual como lun/09/sep -->
+                      <t t-set="date_parts" t-value="d_str.split('-')"/>
+                      <t t-set="year" t-value="date_parts[0]"/>
+                      <t t-set="month_num" t-value="date_parts[1]"/>
+                      <t t-set="day_num" t-value="date_parts[2]"/>
+                      
+                      <!-- SIMULACIÓN SIMPLE DEL DÍA DE LA SEMANA -->
+                      <!-- Esto es una aproximación básica. Para mayor precisión necesitarías pasar el día de la semana desde Python -->
+                      <t t-set="day_index" t-value="(int(day_num) % 7)"/>
+                      <t t-set="day_name" t-value="spanish_days[day_index]"/>
+                      <t t-set="month_name" t-value="spanish_months[int(month_num)-1]"/>
+                      <t t-set="formatted_date" t-value="'%s/%s/%s' % (day_name, day_num, month_name)"/>
+                      
+                      <tr>
+                        <td class="nowrap" style="text-align:center;"><t t-esc="formatted_date"/></td>
+
+                        <!-- Checadas -->
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('first_in_s', '—')"/></td>
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_out_s', '—')"/></td>
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_in_s', '—')"/></td>
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('last_out_s', '—')"/></td>
+
+                        <!-- Totales -->
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('work_str', '00:00')"/></td>
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_str', '00:00')"/></td>
+                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('retardo', '00:00')"/></td>
+
+                        <td class="status-cell" style="text-align:center;">
+                          <span t-att-class="'status-pill ' + (
+                              'st-green'  if status=='Asistencia'      else
+                              ('st-orange' if status=='Retardo'        else
+                              ('st-red'    if status=='Falta'          else
+                              ('st-blue'   if status=='Descanso'       else
+                              ('st-purple' if status=='Vacaciones'     else
+                              ('st-teal'   if status=='Permiso c/goce' else
+                              'st-gray'))))) )">
+                            <t t-esc="status"/>
+                          </span>
+                        </td>
+                      </tr>
+                    </t>
+                  </tbody>
+                </table>
+                
+                <t t-if="report_data.get('include_signature')">
+                  <div style="margin-top:1px;">
+                    <div class="sign"></div>
+                    <div style="text-align:center; font-weight:1000; margin-top:1px;">Nombre y Firma del empleado</div>
+                  </div>
+                </t>
               </div>
 
-              <table class="tbl">
-                <colgroup>
-                  <col class="w-date"/>
-                  <col class="w-time"/><col class="w-time"/><col class="w-time"/><col class="w-time"/>
-                  <col class="w-work"/><col class="w-work"/><col class="w-work"/>
-                  <col class="w-status"/>
-                </colgroup>
-
-                <thead>
-                  <tr>
-                    <th rowspan="2">Fecha</th>
-                    <th colspan="4">Checadas</th>
-                    <th rowspan="2">Horas trabajadas</th>
-                    <th rowspan="2">Horas de comida</th>
-                    <th rowspan="2">Retardo</th>
-                    <th rowspan="2">Status</th>
-                  </tr>
-                  <tr>
-                    <th>Entrada</th>
-                    <th>Inicia Comida</th>
-                    <th>Termina Comida</th>
-                    <th>Salida</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <t t-foreach="report_data.get('day_list', [])" t-as="d_str">
-                    <!-- ACCESO CORRECTO A LOS DATOS -->
-                    <t t-set="emp_data" t-value="report_data.get('per_emp_day_summary', {}).get(str(emp['id']), {})"/>
-                    <t t-set="day_data" t-value="emp_data.get(d_str, {})"/>
-                    <t t-set="status" t-value="day_data.get('status', 'Falta')"/>
-                    
-                    <tr>
-                      <td><t t-esc="d_str"/></td>
-
-                      <!-- Checadas -->
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('first_in_s', '—')"/></td>
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_out_s', '—')"/></td>
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_in_s', '—')"/></td>
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('last_out_s', '—')"/></td>
-
-                      <!-- Totales -->
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('work_str', '00:00')"/></td>
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_str', '00:00')"/></td>
-                      <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('retardo', '00:00')"/></td>
-
-                      <td class="status-cell" style="text-align:center;">
-                        <span t-att-class="'status-pill ' + (
-                            'st-green'  if status=='Asistencia'      else
-                            ('st-orange' if status=='Retardo'        else
-                            ('st-red'    if status=='Falta'          else
-                            ('st-blue'   if status=='Descanso'       else
-                            ('st-purple' if status=='Vacaciones'     else
-                            ('st-teal'   if status=='Permiso c/goce' else
-                            'st-gray'))))) )">
-                          <t t-esc="status"/>
-                        </span>
-                      </td>
-                    </tr>
-                  </t>
-                </tbody>
-              </table>
-              
-              <t t-if="report_data.get('include_signature')">
-                <div style="margin-top:1px;">
-                  <div class="sign"></div>
-                  <div style="text-align:center; font-weight:1000; margin-top:1px;">Nombre y Firma del empleado</div>
+              <!-- Control de paginación -->
+              <t t-if="cpp and emp_index is not None and (((emp_index + 1) % cpp) == 0) and ((emp_index + 1) != len(report_data.get('employees', [])))">
+                <div style="page-break-after:always;"></div>
+                <!-- Headers que se repetirán en cada nueva página -->
+                <div class="main-title">
+                  Reporte Administrativos (Asistencias) - HR
+                </div>
+                <div class="subtitle">
+                  Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
                 </div>
               </t>
-            </div>
-
-            <!-- CORRECCIÓN: Usar emp_index en lugar de c_index -->
-            <t t-if="cpp and (((emp_index + 1) % cpp) == 0) and ((emp_index + 1) != len(report_data.get('employees', [])))">
-              <div style="page-break-after:always;"></div>
             </t>
-          </t>
+          </div>
         </div>
       </main>
     </t>

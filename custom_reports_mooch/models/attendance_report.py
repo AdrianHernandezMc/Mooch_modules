@@ -826,6 +826,8 @@ class ReportAttendancePDF(models.AbstractModel):
 
         start_local = _to_local(ds['dfrom'])
         end_local   = _to_local(ds['dto'])
+        first_date_formatted = _title_spanish(start_local)
+        last_date_formatted  = _title_spanish(end_local)
 
         title = f"Registro de asistencia del {_title_spanish(start_local)} al {_title_spanish(end_local)}."
         cpp = 4  # cards per page
@@ -839,4 +841,6 @@ class ReportAttendancePDF(models.AbstractModel):
             'cards_per_page': cpp,
             'card_width': '48%',
             'include_signature': wiz.include_signature,
+            'first_date_formatted': first_date_formatted,
+            'last_date_formatted': last_date_formatted,
         }
