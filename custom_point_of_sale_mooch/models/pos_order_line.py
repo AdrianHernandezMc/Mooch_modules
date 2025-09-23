@@ -163,4 +163,3 @@ class PosOrder(models.Model):
 
 
 
-

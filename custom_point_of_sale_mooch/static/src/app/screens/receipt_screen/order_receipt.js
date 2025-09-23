@@ -2,6 +2,11 @@
 import { patch } from "@web/core/utils/patch";
 import { Order } from "@point_of_sale/app/store/models";
 
+function daysInMonth(date) {
+  const y = date.getFullYear();
+  const m = date.getMonth();         // 0=enero, 11=diciembre
+  return new Date(y, m + 1, 0).getDate();  // último día del mes → # de días
+}
 
 patch(Order.prototype, {
     setup() {
@@ -55,7 +60,7 @@ patch(Order.prototype, {
 
   export_for_printing() {
     const r = super.export_for_printing(...arguments);
-        
+        console.log("Reprint")
         r.tax_details = [];
         r.amount_total = r.amount_total + r.rounding_applied;
         r.rounding_applied = null;
@@ -103,21 +108,22 @@ patch(Order.prototype, {
         });
 
     //--- Agrego lineas para la impesion del voucher 
-      const voucher_code = olines[0]?.order?.voucher_code ?? null
+       const voucher_code = olines[0]?.order?.voucher_code ?? null
       if (!voucher_code){
           r.new_coupon_info = [];
       }
       else {
-        const base = Array.isArray(this.new_coupon_info) && this.new_coupon_info.length
-          ? this.new_coupon_info
-          : [{
-              // fallback: arma 1 cupón si no hay nada en this.new_coupon_info
+        let dateexpire = new Date();            // hoy (Date)
+        dateexpire.setDate(dateexpire.getDate() + 30);  
+        dateexpire = dateexpire.toISOString().slice(0, 10);
+        const base = 
+           [{
               code: this.voucher_code || "",
               program_name: "Vales",
-              expiration_date: new Date().toISOString().slice(0, 10) + 30,   // o una fecha real si la tienes
+              expiration_date: dateexpire,   // o una fecha real si la tienes
         }];
         r.new_coupon_info = base
-      }
+       }
 
     return r;
   },
