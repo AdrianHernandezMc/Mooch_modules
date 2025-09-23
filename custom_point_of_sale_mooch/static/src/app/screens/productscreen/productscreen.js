@@ -81,23 +81,8 @@ patch(ProductScreen.prototype, {
             //     confirmText: _t("Validar"),
             //     cancelText: _t("Cancelar"),
             // });
-
-            const olines = this.get_orderlines?.() || [];
-            olines.voucher_code = "12345-aa"
-            console.log("olines.voucher_code",olines.voucher_code);
-
-            const order = this.pos.get_order();
-            if (!Array.isArray(order.new_coupon_info)) order.new_coupon_info = [];
-                order.new_coupon_info.push({
-                code: "0445-0b63-4d88",
-                program_name: "Vales",
-                expiration_date: null,     // en vez de false, mejor null
-                amount: 100,               // ← campo extra
-                barcode_type: "Code128",   // ← campo extra
-            });
-            // fuerza reactividad si no ves refresco:
-            order.new_coupon_info = [...order.new_coupon_info];
-            console.log("order",order)
+            console.log("correcoupn",Object.values(this.currentOrder.couponPointChanges))
+        
         });
         
         // Alt + g para entrar a las ordenes guardadas
@@ -161,6 +146,7 @@ patch(ProductScreen.prototype, {
     },
 
     async createvale_screen(amount_total){
+        console.log("amount_total",amount_total)
         if (amount_total > 0) {
             await this.popup.add(ErrorPopup, {
                 title: "Error",
@@ -206,12 +192,44 @@ patch(ProductScreen.prototype, {
         product.display_name = product.name
         product.display_name = product.display_name + " Code: " +  defaults.code
 
+        console.log(Object.values(this.currentOrder.couponPointChanges))
+
         order.add_product(product, {
             quantity: 1,
             price:    amount_total,
             merge:    false,
             uom_id:   [1, 'Unidad']
         });
+
+        if (!this.currentOrder.couponPointChanges || Array.isArray(this.currentOrder.couponPointChanges)) {
+            this.currentOrder.couponPointChanges = {};
+        }
+        const changes = this.currentOrder.couponPointChanges;
+        // 2) Intenta encontrar una entrada existente por program_id
+        let entry =
+        Object.values(changes).find(v => Number(v?.program_id) === Number(loyalty_program_id));
+
+        // 3) Si NO existe, créala y guárdala con una clave estable
+        if (!entry) {
+        entry = {
+            points: amount_total,
+            code: defaults.code,
+            program_id: loyalty_program_id,
+            coupon_id: -2,
+            appliedRules: [loyalty_program_id],
+            expiration_date: new Date() + 30,   // ajusta si necesitas
+        };
+        // Usa el program_id como clave (string). Si no puedes, usa un uuid/timestamp.
+        const key = String(loyalty_program_id);
+        changes[key] = entry;
+        }
+
+        // 4) Modifica los campos deseados
+        //entry.points  = NEW_POINTS;
+        //entry.barcode = NEW_BARCODE;
+
+        //console.log("✅ couponPointChanges:", this.currentOrder.couponPointChanges);
+
 
         const product_voucher_id =  await this.env.services.orm.call(
         "loyalty.reward",

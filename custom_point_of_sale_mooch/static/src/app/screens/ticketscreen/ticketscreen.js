@@ -115,6 +115,8 @@ patch(TicketScreen.prototype, {
         this.clearRefundlines()
 
         const orderBackendId = order.backendId
+        //console.log("order",order)
+
         /******************* agrego los codigos al producot  */
         let pos_changes = await this.orm.call(
             "pos.changes",          
@@ -130,7 +132,7 @@ patch(TicketScreen.prototype, {
             changes_order = rd.origin_reference;
         }
         
-        change_codes = "ord: " + changes_order + " " + change_codes;
+        change_codes = " "+ changes_order + " " + change_codes;
         order.changes_codes = change_codes;
         
         /** agreamos el codigo del vale al producto */
@@ -140,18 +142,19 @@ patch(TicketScreen.prototype, {
             [[["source_pos_order_id", "=", orderBackendId]]], 
             { fields: ["code"] }
         ); 
-
+        order.voucher_code = pos_voucher_code
+        console.log("order",order)
         const addcode_to_orderline =  order.get_orderlines()
-        addcode_to_orderline.forEach(l => {
-            
+        addcode_to_orderline.forEach(l => {    
             if (!l.full_product_name.includes(l.product.barcode) && l.product.id !== order.product_changes_id && l.product.id !== order.product_voucher_id) {
                 l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";   // refleja el cambio en memoria
             }
-            console.log("Code", l.full_product_name,pos_voucher_code[0].code)
+
             if (!l.full_product_name.includes(change_codes) && l.product.id == order.product_changes_id){
                 l.full_product_name = l.full_product_name + change_codes
             }
-            if (pos_voucher_code){
+
+            if (pos_voucher_code.length > 0){
                 if (!l.full_product_name.includes(pos_voucher_code[0].code) && l.product.id == order.product_voucher_id){
                     
                      l.full_product_name = l.full_product_name + " - " + pos_voucher_code[0].code

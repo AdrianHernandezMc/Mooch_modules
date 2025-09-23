@@ -6,6 +6,7 @@ import { useState } from "@odoo/owl";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; 
 import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
+import { useService } from "@web/core/utils/hooks";
 
 function addMonthtoday(date = new Date()) {
     const y = date.getFullYear();
@@ -24,6 +25,8 @@ patch(PaymentScreen.prototype, {
         super.setup();
         this.pos = usePos();
         this.pos.txState = useState({ value: "" });
+        this.orm = useService("orm");
+        this.rpc = useService("rpc");
     },
     async onMounted() {
         //this._super();
@@ -99,25 +102,27 @@ patch(PaymentScreen.prototype, {
         }
         // ************************************************
 
-
         /*********************************** */
               /********* Agrego el vale al programa */
-        const cfgIdv = this.pos.config.id;
-        const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgIdv], {});
-        const exist_vale = order_iines.some(line => line.product.id === loyalty_program_id);
-        console.log(exist_vale)
-        
-        await super.validateOrder(...arguments);
+        //const cfgIdv = this.pos.config.id;
+        //const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgIdv], {});
+        //console.log(order.product_voucher_id)
+        const exist_vale = order_iines.some(line => line.product.id === order.product_voucher_id);
 
-        const orderbeforebackend = this.pos.get_order();
+         if (!exist_vale) {
+            this.currentOrder.couponPointChanges = []
+         } 
 
-        if (existe) {
-            const crate_vale = this.create_vale(orderbeforebackend,loyalty_program_id)
-            if (!crate_vale) {
-                alert("error_vale")
-               return
-            }
-        }
+        super.validateOrder(...arguments);
+
+        // if (exist_vale) {
+        //     alert("Entro")
+        //     const crate_vale = this.create_vale(orderbeforebackend,loyalty_program_id)
+        //     if (!crate_vale) {
+        //         alert("error_vale")
+        //        return
+        //     }
+        // }
     },
 
     async create_vale(order,loyaty_program_id){
