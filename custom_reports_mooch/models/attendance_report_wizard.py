@@ -368,4 +368,5 @@ class AttendanceReportWizard(models.TransientModel):
             'dto': dto,
             'tz': self.env.user.tz or 'UTC',
             'include_signature': self.include_signature,
+            'cards_per_page': 4,
         }

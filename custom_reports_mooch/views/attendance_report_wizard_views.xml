@@ -27,7 +27,7 @@
 
   <!-- Acción “normal” para abrir el wizard (si quieres desde menú) -->
   <record id="action_attendance_report_wizard" model="ir.actions.act_window">
-    <field name="name">Asistencias PDF</field>
+    <field name="name">Reporte Operativos</field>
     <field name="res_model">attendance.report.wizard</field>
     <field name="view_mode">form</field>
     <field name="target">new</field>
@@ -35,12 +35,12 @@
 
   <!-- Menú opcional (puedes dejarlo o no) -->
   <menuitem id="menu_attendance_report_root"
-            name="Reporte Asistencias"
+            name="Reportes Asistencias"
             parent="hr_attendance.menu_hr_attendance_root"
             sequence="61"
             groups="base.group_user"/>
   <menuitem id="menu_attendance_report_open"
-            name="Imprimir PDF"
+            name="Reporte Operativos"
             parent="menu_attendance_report_root"
             action="action_attendance_report_wizard"
             sequence="1"

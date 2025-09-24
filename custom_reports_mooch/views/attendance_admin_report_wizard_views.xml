@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- Vista del wizard (administrativos) -->
+  <record id="view_admin_attendance_report_wizard_form" model="ir.ui.view">
+    <field name="name">admin.attendance.report.wizard.form</field>
+    <field name="model">admin.attendance.report.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Reporte Administrativos">
+        <group>
+          <group>
+            <field name="date_from"/>
+            <field name="date_to"/>
+            <field name="work_location_id" options="{'no_open': False, 'no_create': True}"/>
+            <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"
+                   domain="[('active','=',True), ('is_administrative','=',True)]"/>
+            <field name="include_signature"/>
+          </group>
+        </group>
+        <footer>
+          <!-- Cambiado a type='object' para que QWeb reciba el doc del wizard -->
+          <button string="Imprimir PDF" type="object" name="action_print_admin_pdf" class="btn-primary"/>
+          <button string="Cancelar" special="cancel" class="btn-secondary"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <!-- Acción para abrir el wizard -->
+  <record id="action_admin_attendance_report_wizard" model="ir.actions.act_window">
+    <field name="name">Reporte Administrativos</field>
+    <field name="res_model">admin.attendance.report.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+  </record>
+
+  <!-- Menú debajo de “Imprimir PDF” -->
+  <menuitem id="menu_admin_attendance_report_open"
+            name="Reporte Administrativos"
+            parent="custom_reports_mooch.menu_attendance_report_root"
+            action="action_admin_attendance_report_wizard"
+            sequence="2"
+            groups="base.group_user"/>
+</odoo>
