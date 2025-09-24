@@ -73,10 +73,10 @@
 
         /* === Control de anchos y ajuste del Status === */
         .tbl { table-layout: fixed; }
-        .tbl col.w-date   { width: 16%; }
-        .tbl col.w-time   { width: 16%; }
-        .tbl col.w-work   { width: 14%; }
-        .tbl col.w-status { width: 29%; }
+        .tbl col.w-date   { width: 18%; }   <!-- Aumentado -->
+        .tbl col.w-time   { width: 18%; }   <!-- Aumentado -->
+        .tbl col.w-work   { width: 18%; }   <!-- Aumentado -->
+        .tbl col.w-status { width: 32%; }   <!-- Aumentado -->
 
         .nowrap      { white-space: nowrap; }
         .status-cell { white-space: normal; word-break: break-word; }
@@ -111,20 +111,23 @@
             color:#444;
             margin: 2px 0 6px 0;
         }
+
+        /* ====== NUEVO: contenedor para el header que se repetirá ====== */
+        .page-header {
+            margin-bottom: 5px;
+        }
       </style>
 
       <div class="page">
-        <!-- ====== NUEVO: Encabezado del reporte ====== -->
-        <div class="main-title">
-          Reporte Operativos (Asistencias) - HR
+        <!-- ====== ENCABEZADO QUE SE REPETIRÁ EN CADA PÁGINA ====== -->
+        <div class="page-header">
+          <div class="main-title">
+            Reporte Operativos (Asistencias) - HR
+          </div>
+          <div class="subtitle">
+            Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
+          </div>
         </div>
-        <div class="subtitle">
-          Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
-        </div>
-
-        <!-- (Opcional) Si quieres seguir mostrando la variable 'title' que ya tenías:
-        <div class="att-title"><t t-esc="title"/></div>
-        -->
 
         <!-- CORRECCIÓN: Cambiar idx por c_index -->
         <t t-foreach="cards" t-as="c" t-foreach-index="c_index">
@@ -143,7 +146,7 @@
               <colgroup>
                 <col class="w-date"/>
                 <col class="w-time"/><col class="w-time"/><col class="w-time"/><col class="w-time"/>
-                <col class="w-work"/><col class="w-work"/><col class="w-work"/>
+                <col class="w-work"/><col class="w-work"/>
                 <col class="w-status"/>
               </colgroup>
 
@@ -151,7 +154,7 @@
                 <tr>
                   <th rowspan="2">Fecha</th>
                   <th colspan="4">Checadas</th>
-                  <th rowspan="2">Horas trabajadas</th>
+                  <!-- QUITADO: Horas trabajadas -->
                   <th rowspan="2">Horas de comida</th>
                   <th rowspan="2">Retardo</th>
                   <th rowspan="2">Status</th>
@@ -175,8 +178,7 @@
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['comida_fin']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['salida']"/></td>
 
-                    <!-- Totales -->
-                    <td class="nowrap" style="text-align:center;"><t t-esc="r['h_trab']"/></td>
+                    <!-- Totales - QUITADO: Horas trabajadas -->
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['h_comida']"/></td>
                     <td class="nowrap" style="text-align:center;"><t t-esc="r['retardo']"/></td>
 
@@ -212,9 +214,18 @@
             </t>
           </div>
 
-          <!-- CORRECCIÓN: Cambiar idx por c_index -->
-          <t t-if="cpp and (((c_index + 1) % cpp) == 0)">
+          <!-- CORRECCIÓN: Cambiar idx por c_index y agregar header en cada nueva página -->
+          <t t-if="cpp and (((c_index + 1) % cpp) == 0) and ((c_index + 1) != len(cards))">
             <div style="page-break-after:always;"></div>
+            <!-- ====== REPETIR ENCABEZADO EN CADA NUEVA PÁGINA ====== -->
+            <div class="page-header">
+              <div class="main-title">
+                Reporte Operativos (Asistencias) - HR
+              </div>
+              <div class="subtitle">
+                Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
+              </div>
+            </div>
           </t>
         </t>
       </div>

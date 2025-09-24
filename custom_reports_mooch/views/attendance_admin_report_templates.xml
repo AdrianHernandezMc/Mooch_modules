@@ -5,20 +5,20 @@
       <t t-set="doc_ids" t-value="doc_ids"/>
       <t t-set="docs" t-value="docs"/>
       <t t-set="doc_model" t-value="doc_model"/>
-      
+
       <!-- PREPARAR DATASET CORRECTAMENTE -->
       <t t-set="root_data" t-value="data or {}"/>
       <t t-set="report_data" t-value="root_data.get('form', {}) or {}"/>
-      
+
       <!-- Arrays para días y meses en español -->
       <t t-set="spanish_days" t-value="['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']"/>
       <t t-set="spanish_months" t-value="['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']"/>
-      
+
       <!-- Obtener primer y último día del reporte -->
       <t t-set="day_list" t-value="report_data.get('day_list', [])"/>
       <t t-set="first_day" t-value="day_list[0] if day_list else ''"/>
       <t t-set="last_day" t-value="day_list[-1] if day_list else ''"/>
-      
+
       <!-- Formatear fechas en español para el rango -->
       <t t-set="first_date_formatted">
         <t t-if="first_day">
@@ -30,7 +30,7 @@
           <t t-esc="first_day_num"/> de <t t-esc="first_month_name"/> de <t t-esc="first_year"/>
         </t>
       </t>
-      
+
       <t t-set="last_date_formatted">
         <t t-if="last_day">
           <t t-set="last_parts" t-value="last_day.split('-')"/>
@@ -144,7 +144,7 @@
             font-size: 12px;
             font-weight: bold;
         }
-        
+
         /* Estilo para el título principal */
         .main-title {
             text-align: center;
@@ -155,7 +155,7 @@
             font-size: 14px;
             font-weight: bold;
         }
-        
+
         /* Estilo para el subtítulo con fechas */
         .subtitle {
             text-align: center;
@@ -166,7 +166,7 @@
             font-size: 12px;
             font-weight: bold;
         }
-        
+
         /* Asegurar que el contenido principal empiece después del header */
         .main-content {
             margin-top: 2px;
@@ -187,7 +187,7 @@
           <div class="main-title">
             Reporte Administrativos (Asistencias) - HR
           </div>
-          
+
           <!-- Subtítulo con fechas -->
           <div class="subtitle">
             Registro de asistencia del <t t-esc="first_date_formatted"/> al <t t-esc="last_date_formatted"/>
@@ -235,19 +235,19 @@
                       <t t-set="emp_data" t-value="report_data.get('per_emp_day_summary', {}).get(str(emp['id']), {})"/>
                       <t t-set="day_data" t-value="emp_data.get(d_str, {}) or {}"/>
                       <t t-set="status" t-value="day_data.get('status', 'Falta')"/>
-                      
+
                       <!-- Formatear fecha individual como lun/09/sep -->
                       <t t-set="date_parts" t-value="d_str.split('-')"/>
                       <t t-set="year" t-value="date_parts[0]"/>
                       <t t-set="month_num" t-value="date_parts[1]"/>
                       <t t-set="day_num" t-value="date_parts[2]"/>
-                      
+
                       <!-- Día de la semana -->
                       <t t-set="day_index" t-value="(int(day_num) % 7)"/>
                       <t t-set="day_name" t-value="spanish_days[day_index]"/>
                       <t t-set="month_name" t-value="spanish_months[int(month_num)-1]"/>
                       <t t-set="formatted_date" t-value="'%s/%s/%s' % (day_name, day_num, month_name)"/>
-                      
+
                       <tr>
                         <td class="nowrap" style="text-align:center;"><t t-esc="formatted_date"/></td>
 
@@ -298,7 +298,7 @@
                     <t t-esc="total_retardo"/>
                   </span>
                 </div>
-                
+
                 <t t-if="report_data.get('include_signature')">
                   <div style="margin-top:1px;">
                     <div class="sign"></div>

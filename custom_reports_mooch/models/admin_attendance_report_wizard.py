@@ -386,14 +386,44 @@ class AdminAttendanceReportWizard(models.TransientModel):
                 'work_location_name': emp.work_location_id.name if emp.work_location_id else '—',
             })
 
+        # ===== CALCULAR TOTAL DE RETARDOS POR EMPLEADO =====
+        per_emp_total_retardo = {}
+
+        for emp in employees:
+            emp_id = emp.id
+            total_retardo_minutos = 0
+            
+            for day in day_list:
+                day_str = day.strftime('%Y-%m-%d')
+                day_data = per_emp_day_summary.get(emp_id, {}).get(day_str, {})
+                retardo_str = day_data.get('retardo', '00:00')
+                
+                # Convertir "HH:MM" a minutos
+                if retardo_str and retardo_str != '00:00' and retardo_str != '—':
+                    try:
+                        hours, minutes = map(int, retardo_str.split(':'))
+                        total_retardo_minutos += hours * 60 + minutes
+                    except (ValueError, AttributeError):
+                        # Si hay error en la conversión, ignorar
+                        pass
+            
+            # Convertir minutos totales a formato "HH:MM"
+            total_hours = total_retardo_minutos // 60
+            total_minutes = total_retardo_minutos % 60
+            per_emp_total_retardo[str(emp_id)] = f"{total_hours:02d}:{total_minutes:02d}"
+
+        _logger.info("Total de retardos calculados para %s empleados", len(per_emp_total_retardo))
+
         _logger.info("Dataset con detección correcta de comida generado exitosamente")
         _logger.info("Empleados: %s, Días: %s", len(employees_data), len(day_list))
+
 
         return {
             'title': "Reporte Administrativos (Asistencias) - HR",
             'employees': employees_data,
             'day_list': [day.strftime('%Y-%m-%d') for day in day_list],
             'per_emp_day_summary': dict(per_emp_day_summary),
+            'per_emp_total_retardo': per_emp_total_retardo,
             'dfrom': dfrom_local.strftime('%Y-%m-%d %H:%M'),
             'dto': dto_local.strftime('%Y-%m-%d %H:%M'),
             'tz': self.env.user.tz or 'UTC',
