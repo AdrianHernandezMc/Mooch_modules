@@ -167,21 +167,23 @@ class AdminAttendanceReportWizard(models.TransientModel):
         return datetime.combine(date, time(hh, mm))
 
     def get_dataset(self):
-        """Construye el dataset consumido por QWeb - DETECCIÓN CORRECTA DE COMIDA"""
+        """Construye el dataset consumido por QWeb - CORRECCIÓN DE FECHAS"""
         self.ensure_one()
-        _logger.info("=== GENERANDO DATASET CON DETECCIÓN CORRECTA DE COMIDA ===")
-        
+        _logger.info("=== GENERANDO DATASET CON FECHAS CORREGIDAS ===")
+
         tz = pytz.timezone(self.env.user.tz or 'UTC')
 
-        dfrom = fields.Datetime.from_string(self.date_from)
-        dto   = fields.Datetime.from_string(self.date_to)
-        if dfrom > dto:
-            dfrom, dto = dto, dfrom
+        # Fechas del filtro (en UTC para consultas)
+        dfrom_utc = fields.Datetime.from_string(self.date_from)
+        dto_utc = fields.Datetime.from_string(self.date_to)
+        if dfrom_utc > dto_utc:
+            dfrom_utc, dto_utc = dto_utc, dfrom_utc
 
-        # Rango en zona del usuario
-        dfrom_local = self._to_user_tz(dfrom, tz)
-        dto_local   = self._to_user_tz(dto, tz)
+        # Convertir a local SOLO para display
+        dfrom_local = self._to_user_tz(dfrom_utc, tz)
+        dto_local = self._to_user_tz(dto_utc, tz)
 
+        # Lista de días (local) para el reporte
         day_list = []
         cur = dfrom_local.date()
         end = dto_local.date()
@@ -195,20 +197,28 @@ class AdminAttendanceReportWizard(models.TransientModel):
             domain.append(('work_location_id', '=', self.work_location_id.id))
         employees = self.employee_ids or self.env['hr.employee'].search(domain, order='work_location_id,name')
 
-        # ===== AUSENCIAS (VACACIONES/PERMISOS) =====
+        # ===== AUSENCIAS (VACACIONES/PERMISOS) - CONSULTA EN UTC =====
         Leave = self.env['hr.leave']
         leave_domain = [
             ('employee_id', 'in', employees.ids),
             ('state', '=', 'validate'),
-            ('date_from', '<=', dto_local.date()),
-            ('date_to', '>=', dfrom_local.date()),
+            ('date_from', '<=', dto_utc),  # USAR UTC para consulta
+            ('date_to', '>=', dfrom_utc),  # USAR UTC para consulta
         ]
         leaves = Leave.search(leave_domain)
-        
+
         leave_index = defaultdict(dict)
         for leave in leaves:
-            start_date = max(leave.date_from.date(), dfrom_local.date())
-            end_date = min(leave.date_to.date(), dto_local.date())
+            # Convertir fechas del leave a local para comparar con day_list
+            leave_date_from_local = self._to_user_tz(leave.date_from, tz).date() if leave.date_from else None
+            leave_date_to_local = self._to_user_tz(leave.date_to, tz).date() if leave.date_to else None
+            
+            if not leave_date_from_local or not leave_date_to_local:
+                continue
+                
+            # Usar las fechas CONVERTIDAS a local
+            start_date = max(leave_date_from_local, dfrom_local.date())
+            end_date = min(leave_date_to_local, dto_local.date())
             
             current_date = start_date
             while current_date <= end_date:
@@ -216,15 +226,16 @@ class AdminAttendanceReportWizard(models.TransientModel):
                     'status': leave.holiday_status_id.name,
                     'type': 'leave'
                 }
+                _logger.info("AUSENCIA: %s - %s: %s", leave.employee_id.name, current_date, leave.holiday_status_id.name)
                 current_date += timedelta(days=1)
 
-        # ===== ASISTENCIAS HR.ATTENDANCE =====
+        # ===== ASISTENCIAS HR.ATTENDANCE - CONSULTA EN UTC =====
         Attend = self.env['hr.attendance']
         att_domain = [
             ('employee_id', 'in', employees.ids),
             '|',
-            '&', ('check_in', '>=', dfrom), ('check_in', '<=', dto),
-            '&', ('check_in', '<', dfrom), ('check_out', '>=', dfrom),
+            '&', ('check_in', '>=', dfrom_utc), ('check_in', '<=', dto_utc),  # USAR UTC
+            '&', ('check_in', '<', dfrom_utc), ('check_out', '>=', dfrom_utc),  # USAR UTC
         ]
         atts = Attend.search(att_domain, order='employee_id, check_in')
 
