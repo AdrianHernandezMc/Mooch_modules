@@ -60,8 +60,8 @@
             display: inline-block;
             vertical-align: top;
             border: 1px solid #333;
-            padding: 8px;
-            margin: 6px 6px 0px 0;
+            padding: 4px;
+            margin: 4px 4px 0px 0;
             page-break-inside: avoid;
             width: 48%;
             box-sizing: border-box;
@@ -109,10 +109,10 @@
         }
         /* === NUEVO: control de anchos y ajuste del Status === */
         .tbl { table-layout: fixed; }  /* respeta anchos del */
-        .tbl col.w-date   { width: 16%; }
-        .tbl col.w-time   { width: 16%; }   /* Entrada / Comida ini / fin / Salida */
-        .tbl col.w-work   { width: 14%; }   /* H. trabajadas / H. comida / Retardo */
-        .tbl col.w-status { width: 29%; }  /* más espacio para Status */
+        .tbl col.w-date   { width: 18%; }
+        .tbl col.w-time   { width: 18%; }   /* Entrada / Comida ini / fin / Salida */
+        .tbl col.w-work   { width: 20%; }   /* H. comida / Retardo */
+        .tbl col.w-status { width: 36%; }   /* más espacio para Status */
 
         .nowrap      { white-space: nowrap; }              /* HH:MM en una línea */
         .status-cell { white-space: normal; word-break: break-word; } /* Status completo */
@@ -137,8 +137,8 @@
         /* Estilo para el header personalizado */
         .custom-header {
             text-align: center;
-            margin-bottom: 15px;
-            padding: 6px;
+            margin-bottom: 2px;
+            padding: 2px;
             background: #f9f9f9;
             border: 1px solid #ddd;
             font-size: 12px;
@@ -148,8 +148,8 @@
         /* Estilo para el título principal */
         .main-title {
             text-align: center;
-            margin-bottom: 5px;
-            padding: 8px;
+            margin-bottom: 2px;
+            padding: 4px;
             background: #e9ecef;
             border: 1px solid #ccc;
             font-size: 14px;
@@ -159,8 +159,8 @@
         /* Estilo para el subtítulo con fechas */
         .subtitle {
             text-align: center;
-            margin-bottom: 15px;
-            padding: 6px;
+            margin-bottom: 2px;
+            padding: 4px;
             background: #f9f9f9;
             border: 1px solid #ddd;
             font-size: 12px;
@@ -169,7 +169,7 @@
         
         /* Asegurar que el contenido principal empiece después del header */
         .main-content {
-            margin-top: 20px;
+            margin-top: 2px;
         }
 
         /* Override del título del layout para usar nuestro título personalizado */
@@ -209,7 +209,7 @@
                   <colgroup>
                     <col class="w-date"/>
                     <col class="w-time"/><col class="w-time"/><col class="w-time"/><col class="w-time"/>
-                    <col class="w-work"/><col class="w-work"/><col class="w-work"/>
+                    <col class="w-work"/><col class="w-work"/>
                     <col class="w-status"/>
                   </colgroup>
 
@@ -217,7 +217,6 @@
                     <tr>
                       <th rowspan="2">Fecha</th>
                       <th colspan="4">Checadas</th>
-                      <th rowspan="2">Horas trabajadas</th>
                       <th rowspan="2">Horas de comida</th>
                       <th rowspan="2">Retardo</th>
                       <th rowspan="2">Status</th>
@@ -232,9 +231,9 @@
 
                   <tbody>
                     <t t-foreach="report_data.get('day_list', [])" t-as="d_str">
-                      <!-- ACCESO CORRECTO A LOS DATOS -->
+                      <!-- CORRECCIÓN: Obtener day_data correctamente -->
                       <t t-set="emp_data" t-value="report_data.get('per_emp_day_summary', {}).get(str(emp['id']), {})"/>
-                      <t t-set="day_data" t-value="emp_data.get(d_str, {})"/>
+                      <t t-set="day_data" t-value="emp_data.get(d_str, {}) or {}"/>
                       <t t-set="status" t-value="day_data.get('status', 'Falta')"/>
                       
                       <!-- Formatear fecha individual como lun/09/sep -->
@@ -243,8 +242,7 @@
                       <t t-set="month_num" t-value="date_parts[1]"/>
                       <t t-set="day_num" t-value="date_parts[2]"/>
                       
-                      <!-- SIMULACIÓN SIMPLE DEL DÍA DE LA SEMANA -->
-                      <!-- Esto es una aproximación básica. Para mayor precisión necesitarías pasar el día de la semana desde Python -->
+                      <!-- Día de la semana -->
                       <t t-set="day_index" t-value="(int(day_num) % 7)"/>
                       <t t-set="day_name" t-value="spanish_days[day_index]"/>
                       <t t-set="month_name" t-value="spanish_months[int(month_num)-1]"/>
@@ -254,15 +252,26 @@
                         <td class="nowrap" style="text-align:center;"><t t-esc="formatted_date"/></td>
 
                         <!-- Checadas -->
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('first_in_s', '—')"/></td>
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_out_s', '—')"/></td>
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_in_s', '—')"/></td>
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('last_out_s', '—')"/></td>
+                        <td class="nowrap" style="text-align:center;">
+                          <t t-esc="day_data.get('first_in_s', '—')"/>
+                        </td>
+                        <td class="nowrap" style="text-align:center;">
+                          <t t-esc="day_data.get('lunch_out_s', '—')"/>
+                        </td>
+                        <td class="nowrap" style="text-align:center;">
+                          <t t-esc="day_data.get('lunch_in_s', '—')"/>
+                        </td>
+                        <td class="nowrap" style="text-align:center;">
+                          <t t-esc="day_data.get('last_out_s', '—')"/>
+                        </td>
 
-                        <!-- Totales -->
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('work_str', '00:00')"/></td>
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('lunch_str', '00:00')"/></td>
-                        <td class="nowrap" style="text-align:center;"><t t-esc="day_data.get('retardo', '00:00')"/></td>
+                        <!-- Totales (sin Horas trabajadas) -->
+                        <td class="nowrap" style="text-align:center;">
+                          <t t-esc="day_data.get('lunch_str', '00:00')"/>
+                        </td>
+                        <td class="nowrap" style="text-align:center;">
+                          <t t-esc="day_data.get('retardo', '00:00')"/>
+                        </td>
 
                         <td class="status-cell" style="text-align:center;">
                           <span t-att-class="'status-pill ' + (
@@ -280,6 +289,15 @@
                     </t>
                   </tbody>
                 </table>
+
+                <!-- TOTAL DE RETARDO FUERA DE LA TABLA -->
+                <div style="text-align: right; margin-top: 1px; margin-bottom: 1px;">
+                  <small>Tiempo Total Retardo:</small>
+                  <span style="font-weight: bold; margin-left: 8px;">
+                    <t t-set="total_retardo" t-value="report_data.get('per_emp_total_retardo', {}).get(str(emp['id']), '00:00')"/>
+                    <t t-esc="total_retardo"/>
+                  </span>
+                </div>
                 
                 <t t-if="report_data.get('include_signature')">
                   <div style="margin-top:1px;">
