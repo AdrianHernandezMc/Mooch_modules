@@ -39,10 +39,10 @@ class AdminAttendanceReportWizard(models.TransientModel):
     def action_print_admin_pdf(self):
         self.ensure_one()
         _logger.info("action_print_admin_pdf llamado para wizard ID: %s", self.id)
-        
+
         dataset = self.get_dataset()
         _logger.info("Dataset generado, empleados: %s", len(dataset.get('employees', [])))
-        
+
         return self.env.ref('custom_reports_mooch.action_attendance_admin_pdf').report_action(self, data={'form': dataset})
 
     def _to_user_tz(self, dt, tz):
@@ -65,24 +65,24 @@ class AdminAttendanceReportWizard(models.TransientModel):
         try:
             local_day_start = tz.localize(datetime.combine(day_date, time.min))
             local_day_end   = tz.localize(datetime.combine(day_date, time.max))
-            
+
             if start_dt.tzinfo is None:
                 start_dt = pytz.UTC.localize(start_dt)
             if end_dt and end_dt.tzinfo is None:
                 end_dt = pytz.UTC.localize(end_dt)
-            
+
             end_dt = end_dt or start_dt
-            
+
             if end_dt < start_dt:
                 _logger.warning("End date before start date: %s < %s", end_dt, start_dt)
                 return 0
-            
+
             lo = max(start_dt, local_day_start)
             hi = min(end_dt, local_day_end)
-            
+
             if hi <= lo:
                 return 0
-                
+
             return int((hi - lo).total_seconds())
         except Exception as e:
             _logger.error("Error en _overlap_seconds_same_day: %s", e)
@@ -113,11 +113,11 @@ class AdminAttendanceReportWizard(models.TransientModel):
     def _get_planned_work_hours(self, employee, date):
         """Obtiene horas planificadas del calendario del empleado"""
         cal = (
-            employee.resource_calendar_id or 
-            employee.company_id.resource_calendar_id or 
+            employee.resource_calendar_id or
+            employee.company_id.resource_calendar_id or
             self.env.company.resource_calendar_id
         )
-        
+
         if not cal:
             return None, None, None
 
@@ -136,7 +136,7 @@ class AdminAttendanceReportWizard(models.TransientModel):
 
         first_segment = work_segments[0]
         expected_start = self._hour_float_to_time(first_segment.hour_from, date)
-        
+
         # Buscar segmento de comida
         lunch_segment = None
         for i in range(len(lines) - 1):
@@ -212,14 +212,14 @@ class AdminAttendanceReportWizard(models.TransientModel):
             # Convertir fechas del leave a local para comparar con day_list
             leave_date_from_local = self._to_user_tz(leave.date_from, tz).date() if leave.date_from else None
             leave_date_to_local = self._to_user_tz(leave.date_to, tz).date() if leave.date_to else None
-            
+
             if not leave_date_from_local or not leave_date_to_local:
                 continue
-                
+
             # Usar las fechas CONVERTIDAS a local
             start_date = max(leave_date_from_local, dfrom_local.date())
             end_date = min(leave_date_to_local, dto_local.date())
-            
+
             current_date = start_date
             while current_date <= end_date:
                 leave_index[leave.employee_id.id][current_date] = {
@@ -262,7 +262,7 @@ class AdminAttendanceReportWizard(models.TransientModel):
             for att in emp_atts:
                 cin = self._to_user_tz(att.check_in, tz)
                 cout = self._to_user_tz(att.check_out, tz) if att.check_out else None
-                
+
                 # Solo considerar asistencias completas (con check_out)
                 if cout:
                     day_asistencias[cin.date()].append((cin, cout))  # (entrada, salida)
@@ -276,30 +276,30 @@ class AdminAttendanceReportWizard(models.TransientModel):
                 lunch_in = None
                 first_in = None
                 last_out = None
-                
+
                 if len(asistencias) >= 2:
                     # Para detectar comida: necesitamos al menos 2 asistencias
                     # La comida está entre el check_out de la primera y el check_in de la segunda
                     primera_asistencia = asistencias[0]
                     segunda_asistencia = asistencias[1]
-                    
+
                     # Salida a comer = check_out de la primera asistencia
                     lunch_out = primera_asistencia[1]  # 10:25
                     # Regreso de comer = check_in de la segunda asistencia  
                     lunch_in = segunda_asistencia[0]   # 10:26
-                    
+
                     # Verificar que sea un tiempo razonable para comida (30min - 2hrs)
                     tiempo_comida = lunch_in - lunch_out
                     if not (timedelta(minutes=30) <= tiempo_comida <= timedelta(hours=2)):
                         # Si no es un tiempo razonable, no es comida
                         lunch_out = None
                         lunch_in = None
-                
+
                 # Primera entrada y última salida del día
                 if asistencias:
                     first_in = asistencias[0][0]  # Primera entrada del día
                     last_out = asistencias[-1][1]  # Última salida del día
-                
+
                 # Si solo hay una asistencia, usar esa para entrada/salida
                 elif len(asistencias) == 1:
                     first_in = asistencias[0][0]
@@ -319,7 +319,7 @@ class AdminAttendanceReportWizard(models.TransientModel):
                     # Sumar tiempo de todas las asistencias
                     for cin, cout in asistencias:
                         work_secs += int((cout - cin).total_seconds())
-                    
+
                     # Restar tiempo de comida si se detectó
                     if lunch_out and lunch_in:
                         work_secs -= int((lunch_in - lunch_out).total_seconds())
@@ -327,18 +327,18 @@ class AdminAttendanceReportWizard(models.TransientModel):
                 # ===== LÓGICA DE STATUS (MANTENER EXACTA) =====
                 status = "Asistencia"
                 retardo_seconds = 0
-                
+
                 # 1. Verificar día de descanso
                 is_rest_day = self._is_rest_day(emp, day)
                 if is_rest_day:
                     status = "Descanso"
                     work_secs = 0
-                
+
                 # 2. Verificar ausencias
                 elif day in leave_index.get(emp_id, {}):
                     leave_info = leave_index[emp_id][day]
                     leave_type = leave_info['status']
-                    
+
                     if 'vacacion' in leave_type.lower() or 'vacación' in leave_type.lower():
                         status = "Vacaciones"
                     elif 'permiso' in leave_type.lower():
@@ -349,24 +349,24 @@ class AdminAttendanceReportWizard(models.TransientModel):
                     else:
                         status = leave_type
                     work_secs = 0
-                
+
                 # 3. Verificar si hay asistencia
                 elif not first_in and not last_out:
                     status = "Falta"
-                
+
                 # 4. Verificar retardo
                 elif first_in:
                     expected_start, lunch_segment, expected_end = self._get_planned_work_hours(emp, day)
-                    
+
                     if expected_start:
                         first_in_naive = self._make_naive(first_in, tz)
                         expected_start_naive = expected_start
-                        
+
                         if first_in_naive and expected_start_naive and first_in_naive > expected_start_naive:
                             retardo_seconds = int((first_in_naive - expected_start_naive).total_seconds())
                             if retardo_seconds > 300:  # 5 minutos de tolerancia
                                 status = "Retardo"
-                
+
                 # 5. Asistencia normal
                 else:
                     status = "Asistencia"
@@ -374,7 +374,7 @@ class AdminAttendanceReportWizard(models.TransientModel):
                 # Formatear resultados
                 fmt = lambda dt: dt and dt.strftime('%H:%M') or '—'
                 day_str = day.strftime('%Y-%m-%d')
-                
+
                 per_emp_day_summary[emp_id][day_str] = {
                     'first_in_s': fmt(first_in),
                     'lunch_out_s': fmt(lunch_out),  # Salida a comer (check_out primera)
@@ -403,12 +403,12 @@ class AdminAttendanceReportWizard(models.TransientModel):
         for emp in employees:
             emp_id = emp.id
             total_retardo_minutos = 0
-            
+
             for day in day_list:
                 day_str = day.strftime('%Y-%m-%d')
                 day_data = per_emp_day_summary.get(emp_id, {}).get(day_str, {})
                 retardo_str = day_data.get('retardo', '00:00')
-                
+
                 # Convertir "HH:MM" a minutos
                 if retardo_str and retardo_str != '00:00' and retardo_str != '—':
                     try:
@@ -417,7 +417,7 @@ class AdminAttendanceReportWizard(models.TransientModel):
                     except (ValueError, AttributeError):
                         # Si hay error en la conversión, ignorar
                         pass
-            
+
             # Convertir minutos totales a formato "HH:MM"
             total_hours = total_retardo_minutos // 60
             total_minutes = total_retardo_minutos % 60
