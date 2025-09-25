@@ -648,60 +648,133 @@ class ReportAttendancePDF(models.AbstractModel):
 
     # ---------- Armado del reporte ----------
     def _get_report_values(self, docids, data=None):
-        # Wizard y dataset
+        # --- 1) Obtener dataset: primero de data['form'], si no, del wizard ---
         wiz = self.env['attendance.report.wizard'].browse(docids)[:1]
-        ds = wiz._fetch_dataset()  # { employees, day_list, per_emp_day, dfrom, dto, tz, include_signature, ... }
+        ds = None
+        if data and isinstance(data, dict) and data.get('form'):
+            ds = data['form']
+        else:
+            ds = wiz._fetch_dataset()  # { employees, day_list, per_emp_day, dfrom, dto, tz, include_signature, ... }
 
-        # Empleados del dataset o fallback
-        employees = list(ds.get('employees') or self.env['hr.employee'].search([('active', '=', True)]))
+        # --- Helpers de normalización (por si viene del snapshot/JSON) ---
+        from datetime import datetime, date, time as dtime, timedelta
+        import pytz
 
-        # Lista de días (date) del dataset o fallback
-        def _as_date(dt):
-            return dt.date() if hasattr(dt, 'date') else dt
+        def _as_dt(v):
+            if v is None:
+                return None
+            if isinstance(v, datetime):
+                return v
+            if isinstance(v, str):
+                # ISO o formato Odoo
+                try:
+                    return fields.Datetime.from_string(v)
+                except Exception:
+                    try:
+                        return datetime.fromisoformat(v)
+                    except Exception:
+                        return None
+            return v
+
+        def _as_date(v):
+            if v is None:
+                return None
+            if isinstance(v, date) and not isinstance(v, datetime):
+                return v
+            if isinstance(v, datetime):
+                return v.date()
+            if isinstance(v, str):
+                try:
+                    return fields.Date.from_string(v)
+                except Exception:
+                    try:
+                        return datetime.fromisoformat(v).date()
+                    except Exception:
+                        return None
+            return v
+
         def _iter_days(d1, d2):
-            from datetime import timedelta
             cur = d1
             while cur <= d2:
                 yield cur
                 cur += timedelta(days=1)
 
-        dfrom_d = _as_date(ds['dfrom'])
-        dto_d   = _as_date(ds['dto'])
-        day_list = list(ds.get('day_list') or _iter_days(dfrom_d, dto_d))
+        # dfrom/dto
+        dfrom = _as_dt(ds.get('dfrom'))
+        dto   = _as_dt(ds.get('dto'))
 
+        # employees (puede venir recordset o lista de ids)
+        emp_val = ds.get('employees')
+        if getattr(emp_val, 'ids', False):
+            employees = list(emp_val)
+        elif isinstance(emp_val, (list, tuple, set)) and emp_val and isinstance(next(iter(emp_val)), int):
+            employees = list(self.env['hr.employee'].browse(list(emp_val)))
+        else:
+            employees = list(self.env['hr.employee'].search([('active', '=', True)]))
+
+        # day_list (puede venir de fechas serializadas)
+        raw_days = ds.get('day_list')
+        if raw_days:
+            day_list = [_as_date(d) for d in raw_days]
+            day_list = [d for d in day_list if d]  # limpia None
+        else:
+            day_list = list(_iter_days(_as_date(dfrom), _as_date(dto)))
+
+        # per_emp_day (si viene del snapshot, las llaves de día podrían ser strings)
+        per_emp_day_all = ds.get('per_emp_day', {}) or {}
+        norm_per_emp = {}
+        for emp_key, day_map in per_emp_day_all.items():
+            try:
+                emp_id_int = int(emp_key)
+            except Exception:
+                emp_id_int = emp_key
+            new_day_map = {}
+            if isinstance(day_map, dict):
+                for k, events in day_map.items():
+                    kd = _as_date(k)
+                    fixed_events = []
+                    if isinstance(events, (list, tuple)):
+                        for ev in events:
+                            # esperado: [(dt, 'in'/'out'/'lunch_in'/'lunch_out'), ...]
+                            if isinstance(ev, (list, tuple)) and ev:
+                                t = _as_dt(ev[0])
+                                typ = ev[1] if len(ev) > 1 else None
+                                fixed_events.append((t, typ))
+                    new_day_map[kd] = fixed_events
+            norm_per_emp[emp_id_int] = new_day_map
+
+        # --- 2) Armado de tarjetas (lógica original + fixes) ---
         cards = []
         THRESH_WEEK_SEC = 10 * 60  # 10 minutos acumulables/semana
+
+        # Constantes esperadas
+        DASH = '-'  # asegúrate que coincide con tu template
+        GRACE_DAILY_SEC_LOCAL = globals().get('GRACE_DAILY_SEC', 0)
 
         for emp in employees:
             filas_tmp = []
 
-            # Índice por día del dataset (si existe)
-            per_emp_day_all = ds.get('per_emp_day', {}) or {}
-            emp_days = per_emp_day_all.get(emp.id)
-
+            emp_days = norm_per_emp.get(emp.id)
             # Fallback: si no hay datos del checador para el empleado, arma desde hr.attendance
             if not emp_days:
-                emp_days = self._build_events_index_from_attendance(emp, ds['dfrom'], ds['dto'])
+                emp_days = self._build_events_index_from_attendance(emp, dfrom, dto)
 
             # Índice de ausencias (vacaciones, permisos, etc.)
-            leave_idx = self._build_leave_index(emp, ds['dfrom'], ds['dto'])
+            leave_idx = self._build_leave_index(emp, dfrom, dto)
 
             for d in day_list:
                 is_rest = self._is_rest_day(emp, d)
-                
-                # Obtener segmentos del calendario
+
+                # Segs planeados
                 segs = self._planned_segments(emp, d)
-                
-                # ENCONTRAR EL SEGMENTO DE COMIDA (break)
+
+                # Detectar break planeado
                 lunch_seg = None
                 for s in segs:
-                    if s['kind'] == 'break':
+                    if s.get('kind') == 'break':
                         lunch_seg = (s['start'], s['end'])
                         break
-                
-                # Si no hay segmento de break, buscar cualquier intervalo largo (>1h) entre trabajo
                 if not lunch_seg and len(segs) >= 2:
-                    # Buscar el hueco más grande entre segmentos de trabajo
                     max_gap = timedelta(0)
                     for i in range(len(segs) - 1):
                         if segs[i]['kind'] == 'work' and segs[i + 1]['kind'] == 'work':
@@ -709,41 +782,40 @@ class ReportAttendancePDF(models.AbstractModel):
                             if gap > max_gap and gap >= timedelta(minutes=30):
                                 max_gap = gap
                                 lunch_seg = (segs[i]['end'], segs[i + 1]['start'])
-                
-                # Entrada esperada (primer segmento de trabajo)
-                work_segs = [s for s in segs if s['kind'] == 'work']
+
+                # Entrada esperada
+                work_segs = [s for s in segs if s.get('kind') == 'work']
                 expected_start = work_segs[0]['start'] if work_segs else self._expected_start_local(emp, d, is_rest)
 
-                # Construir eventos crudos del día (naive local)
+                # Eventos del día
                 events_raw = []
-                if d in emp_days:
+                if emp_days and d in emp_days:
                     for event in emp_days[d]:
-                        event_time = event[0]  # datetime (puede venir aware local)
-                        event_type = event[1]  # 'in'/'out' (y quizá 'lunch_in'/'lunch_out')
-
-                        # Normaliza a naive (quitando tz si trae)
-                        if event_time and hasattr(event_time, 'tzinfo') and event_time.tzinfo:
-                            event_time = event_time.replace(tzinfo=None)
-
+                        event_time = _as_dt(event[0])
+                        event_type = event[1]
+                        if event_time and getattr(event_time, 'tzinfo', None):
+                            event_time = event_time.replace(tzinfo=None)  # a naive local
                         events_raw.append((event_time, event_type))
 
-                # Procesa IN/OUT + Comida (explícita, inferida o por defecto)
-                row = self._process_attendance_data(events_raw, expected_start, is_rest,
-                                    planned_lunch=lunch_seg, planned_segments=segs)
+                row = self._process_attendance_data(
+                    events_raw, expected_start, is_rest,
+                    planned_lunch=lunch_seg, planned_segments=segs,
+                )
 
-                # Asistencia robusta (no usar strings "00:00" como truthy)
-                has_attendance = bool(row.pop('has_attendance', False))
-                # if has_attendance is None:
-                #     def _nz(x):  # no vacío y distinto de "00:00"
-                #         return bool(x) and str(x) != '00:00'
-                #     has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida'))
+                # --- FIX: detección robusta de asistencia ---
+                has_attendance = row.pop('has_attendance', None)
+                if has_attendance is None:
+                    def _nz(x):
+                        s = '' if x is None else str(x).strip()
+                        return bool(s) and s not in ('00:00', DASH, '—', '--')
+                    has_attendance = _nz(row.get('entrada')) or _nz(row.get('salida')) \
+                                    or _nz(row.get('comida_ini')) or _nz(row.get('comida_fin'))
 
                 # Status base
                 if is_rest:
                     status = 'Descanso'
                     row['retardo'] = '00:00'
                     row['retardo_sec'] = 0
-                    # --- NUEVO: pintar guiones en descanso ---
                     row.update({
                         'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
                         'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
@@ -751,17 +823,16 @@ class ReportAttendancePDF(models.AbstractModel):
                 else:
                     if has_attendance:
                         status = 'Asistencia'
-                        # --- marcar retardo por día ---
-                        if int(row.get('retardo_sec', 0)) > GRACE_DAILY_SEC:
+                        if int(row.get('retardo_sec', 0)) > GRACE_DAILY_SEC_LOCAL:
                             status = 'Retardo'
                     else:
                         status = 'Falta'
-                        # --- pintar guiones en faltas ---
                         row.update({
                             'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
                             'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
                             'retardo': '00:00', 'retardo_sec': 0,
                         })
+
                 # Si hay leave ese día, predomina
                 leave = leave_idx.get(_as_date(d))
                 if leave:
@@ -796,7 +867,7 @@ class ReportAttendancePDF(models.AbstractModel):
                 if not r['is_rest'] and r['has_attendance']
             )
 
-            # Normaliza filas para la salida (limpia llaves internas)
+            # Normaliza filas para salida
             filas = []
             for r in filas_tmp:
                 if r['status'] == 'Asistencia' and r.get('retardo_sec', 0) > 0:
@@ -818,14 +889,27 @@ class ReportAttendancePDF(models.AbstractModel):
             })
 
         # Título con fechas en TZ del usuario
-        tz = pytz.timezone(ds.get('tz') or 'UTC')
+        tzname = ds.get('tz') or 'UTC'
+        try:
+            tz = pytz.timezone(tzname)
+        except Exception:
+            tz = pytz.timezone('UTC')
 
         def _to_local(dt):
+            if dt is None:
+                return None
             aware = pytz.utc.localize(dt) if getattr(dt, 'tzinfo', None) is None else dt.astimezone(pytz.UTC)
             return aware.astimezone(tz)
 
-        start_local = _to_local(ds['dfrom'])
-        end_local   = _to_local(ds['dto'])
+        start_local = _to_local(dfrom)
+        end_local   = _to_local(dto)
+
+        def _title_spanish(dt):
+            # Usa tu versión existente si ya la tienes definida en el archivo
+            meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+            dias  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+            return f"{dias[dt.weekday()]} {dt.day} de {meses[dt.month-1]} {dt.year}"
+
         first_date_formatted = _title_spanish(start_local)
         last_date_formatted  = _title_spanish(end_local)
 
@@ -840,7 +924,7 @@ class ReportAttendancePDF(models.AbstractModel):
             'cards': cards,
             'cards_per_page': cpp,
             'card_width': '48%',
-            'include_signature': wiz.include_signature,
+            'include_signature': bool(ds.get('include_signature', True) if isinstance(ds, dict) else getattr(wiz, 'include_signature', True)),
             'first_date_formatted': first_date_formatted,
             'last_date_formatted': last_date_formatted,
         }

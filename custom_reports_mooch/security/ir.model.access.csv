@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_attendance_report_wizard,attendance.report.wizard,model_attendance_report_wizard,base.group_user,1,0,1,0
 access_admin_attendance_report_wizard,admin.attendance.report.wizard,model_admin_attendance_report_wizard,base.group_user,1,0,1,0
+access_att_report_snapshot_user,att.report.snapshot user,model_att_report_snapshot,base.group_user,1,1,1,0

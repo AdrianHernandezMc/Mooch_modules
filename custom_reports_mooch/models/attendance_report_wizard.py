@@ -1,9 +1,11 @@
-# -*- coding: utf-8 -*-
 from odoo import api, models, fields, _
+import logging
+_logger = logging.getLogger('custom_reports_mooch.snapshot')
 from datetime import datetime, date, time, timedelta
 from collections import defaultdict
 import pytz
 import logging
+from odoo.exceptions import UserError
 class AttendanceReportWizard(models.TransientModel):
     _name = "attendance.report.wizard"
     _description = "Asistencias - Reporte PDF (desde daily.attendance)"
@@ -370,3 +372,89 @@ class AttendanceReportWizard(models.TransientModel):
             'include_signature': self.include_signature,
             'cards_per_page': 4,
         }
+
+    def action_print_pdf(self):
+        self.ensure_one()
+        ds = self._fetch_dataset()              # <- ESTE es el dataset “verdadero”
+        return self.env.ref('custom_reports_mooch.action_attendance_pdf').report_action(
+            self, data={'form': ds}
+        )
+
+    def action_save_snapshot(self):
+        # Log de entrada
+        _logger.info("SNAP_BTN: click -> self.ids=%s context=%s", self.ids, self.env.context)
+
+        # ¿El registro sigue vivo?
+        rec = self[:1].exists()
+        _logger.info("SNAP_BTN: exists.ids=%s", rec.ids if rec else [])
+
+        if not rec:
+            # loguea lo que el cliente envió (a veces hay un res_id viejo en params)
+            _logger.error("SNAP_BTN: wizard ya no existe; params=%s", self.env.context.get('params'))
+            raise UserError(_("Este asistente ya no existe (expiró/limpieza). Vuelve a abrirlo y reintenta."))
+
+        # Loguear valores clave del wizard (sin saturar logs)
+        safe_fields = ['date_from','date_to','employee_ids','work_location_id','include_signature']
+        try:
+            vals = rec.read(safe_fields)[0]
+        except Exception:
+            vals = {f: '<unreadable>' for f in safe_fields}
+        _logger.info("SNAP_BTN: wizard vals=%s", vals)
+
+        # 1) Mismo dataset que usa Imprimir
+        try:
+            ds = rec._fetch_dataset()
+            _logger.info(
+                "SNAP_BTN: dataset listo (tz=%s, dfrom=%s, dto=%s, emps=%s, day_list=%s)",
+                ds.get('tz'), ds.get('dfrom'), ds.get('dto'),
+                (ds.get('employees').ids if hasattr(ds.get('employees'), 'ids') else ds.get('employees')),
+                len(ds.get('day_list') or [])
+            )
+        except Exception:
+            _logger.exception("SNAP_BTN: fallo armando dataset")
+            raise
+
+        # 2) Crear snapshot base
+        Snap = rec.env['att.report.snapshot']
+        emps = ds.get('employees')
+        emp_ids = emps if isinstance(emps, list) else getattr(emps, 'ids', [])
+        dfrom = ds['dfrom']; dto = ds['dto']
+        kind  = rec._context.get('report_kind','general')
+        loc   = getattr(rec, 'work_location_id', False)
+        name  = "Operativos" if kind == 'general' else "Administrativos"
+        name += f" {getattr(dfrom,'date',lambda: dfrom)()}..{getattr(dto,'date',lambda: dto)()}"
+        if loc:
+            name += f" ({loc.name})"
+
+        _logger.info("SNAP_BTN: creando snapshot name=%s kind=%s emp_ids=%s", name, kind, emp_ids)
+
+        snap = Snap.create({
+            'name': name,
+            'period_type': 'custom',
+            'date_from': dfrom,
+            'date_to': dto,
+            'report_kind': kind,
+            'work_location_id': loc.id if loc else False,
+            'employee_ids': [(6, 0, emp_ids)],
+            'include_signature': bool(ds.get('include_signature', True)),
+        })
+
+        # 3) Congelar con el dataset (aquí se guardan los datos)
+        try:
+            _logger.info("SNAP_BTN: congelando snapshot id=%s ...", snap.id)
+            snap.action_freeze_from_wizard_dataset(ds)
+            _logger.info("SNAP_BTN: snapshot %s congelado OK", snap.id)
+        except Exception:
+            _logger.exception("SNAP_BTN: fallo congelando snapshot id=%s", snap.id)
+            raise
+
+        # 4) Abrir el snapshot
+        act = {
+            'type': 'ir.actions.act_window',
+            'res_model': 'att.report.snapshot',
+            'view_mode': 'form',
+            'res_id': snap.id,
+            'target': 'current',
+        }
+        _logger.info("SNAP_BTN: devolviendo action=%s", act)
+        return act
