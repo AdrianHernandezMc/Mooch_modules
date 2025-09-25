@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_att_report_snapshot_tree" model="ir.ui.view">
+    <field name="name">att.report.snapshot.tree</field>
+    <field name="model">att.report.snapshot</field>
+    <field name="arch" type="xml">
+      <tree>
+        <field name="name" string="Nombre"/>
+        <field name="period_type" string="Periodo"/>
+        <field name="report_kind" string="Tipo de Reporte"/>
+        <field name="date_from" string="Desde"/>
+        <field name="date_to" string="Hasta"/>
+        <field name="work_location_id" string="Sucursal"/>
+        <field name="frozen_at" string="Congelado desde"/>
+        <field name="state" string="Estado"/>
+        <field name="document_id" string="Documento"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_att_report_snapshot_form" model="ir.ui.view">
+    <field name="name">att.report.snapshot.form</field>
+    <field name="model">att.report.snapshot</field>
+    <field name="arch" type="xml">
+      <form string="Snapshot de Asistencias">
+        <header>
+          <!-- Odoo 17: usar invisible con expresiones -->
+          <button name="action_print_frozen_pdf"
+                  type="object"
+                  string="Descargar PDF congelado"
+                  class="btn-primary"
+                  invisible="state != 'frozen'"/>
+          <!-- statusbar sigue igual -->
+          <field name="state" widget="statusbar"/>
+        </header>
+
+        <sheet>
+          <group>
+            <group string="Identidad">
+              <field name="name" string="Nombre"/>
+              <field name="period_type" string="Periodo" readonly="1"/>
+              <field name="report_kind" string="Tipo de Reporte" readonly="1"/>
+            </group>
+
+            <group string="Parámetros">
+              <field name="date_from" string="Desde" readonly="1"/>
+              <field name="date_to" string="Hasta" readonly="1"/>
+              <field name="work_location_id" string="Sucursal" readonly="1"/>
+              <field name="employee_ids" string="Empleados" widget="many2many_tags" readonly="1"/>
+              <field name="include_signature" string="Incluye Segmento Firma" readonly="1"/>
+            </group>
+
+            <group string="Documento">
+              <field name="folder_id" readonly="1"/>
+              <field name="tag_ids" widget="many2many_tags" readonly="1"/>
+              <field name="document_id" readonly="1"/>
+              <field name="pdf_filename" readonly="1"/>
+              <field name="pdf_file" filename="pdf_filename" readonly="1"/>
+            </group>
+          </group>
+
+          <group string="Dataset congelado">
+            <field name="frozen_dataset" widget="json" nolabel="1" readonly="1"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_att_report_snapshot" model="ir.actions.act_window">
+    <field name="name">Snapshots de Asistencias</field>
+    <field name="res_model">att.report.snapshot</field>
+    <field name="view_mode">tree,form</field>
+  </record>
+
+  <menuitem id="menu_att_report_snapshot_root"
+            name="Snapshots Asistencias"
+            parent="hr_attendance.menu_hr_attendance_root"
+            action="action_att_report_snapshot"
+            sequence="62"/>
+</odoo>

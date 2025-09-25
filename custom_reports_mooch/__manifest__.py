@@ -18,6 +18,7 @@
         'views/attendance_admin_report_actions.xml',
         'views/attendance_admin_report_templates.xml',
         'views/attendance_admin_report_wizard_views.xml',
+        "views/att_report_snapshot_views.xml",
     ],
     'installable': True,
     'application': False,

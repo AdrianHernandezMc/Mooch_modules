@@ -20,6 +20,7 @@
         <footer>
           <!-- Cambiado a type='object' para que QWeb reciba el doc del wizard -->
           <button string="Imprimir PDF" type="object" name="action_print_admin_pdf" class="btn-primary"/>
+          <button name="action_save_snapshot" type="object" string="Guardar snapshot (Documentos)" class="btn-secondary"/>
           <button string="Cancelar" special="cancel" class="btn-secondary"/>
         </footer>
       </form>

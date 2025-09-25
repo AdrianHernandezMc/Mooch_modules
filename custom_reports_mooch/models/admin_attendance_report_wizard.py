@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import api, fields, models, _
 from datetime import datetime, timedelta, time
 import pytz
 from collections import defaultdict
 import logging
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -440,4 +440,63 @@ class AdminAttendanceReportWizard(models.TransientModel):
             'tz': self.env.user.tz or 'UTC',
             'include_signature': self.include_signature,
             'cards_per_page': 2,
+        }
+
+    def action_save_snapshot(self):
+        self.ensure_one()
+        if not self.date_from or not self.date_to:
+            raise UserError(_("Debes indicar fecha inicial y final."))
+
+        # 1) Construir dataset con TU lógica actual
+        dataset = self.get_dataset()  # <- ya devuelve dict JSON-serializable para QWeb
+
+        Snap = self.env['att.report.snapshot']
+
+        # 2) Nombre amigable + parámetros base
+        dfrom_str = fields.Date.to_date(self.date_from).strftime('%Y-%m-%d')
+        dto_str   = fields.Date.to_date(self.date_to).strftime('%Y-%m-%d')
+        wl_name   = self.work_location_id.name if self.work_location_id else False
+        name = f"Administrativos {dfrom_str}..{dto_str}" + (f" ({wl_name})" if wl_name else "")
+
+        base_vals = {
+            'name': name,
+            'period_type': 'custom',
+            'report_kind': 'admin',
+            'date_from': self.date_from,
+            'date_to': self.date_to,
+            'work_location_id': self.work_location_id.id or False,
+            'employee_ids': [(6, 0, self.employee_ids.ids)] if self.employee_ids else False,
+            'include_signature': bool(getattr(self, 'include_signature', True)),
+        }
+
+        # 3) Reutilizar snapshot si ya existe (evita violar la unique)
+        snap = Snap.search([
+            ('period_type', '=', 'custom'),
+            ('report_kind', '=', 'admin'),
+            ('date_from', '=', self.date_from),
+            ('date_to',   '=', self.date_to),
+            ('work_location_id', '=', self.work_location_id.id or False),
+        ], limit=1)
+
+        if snap:
+            snap.write(base_vals)  # actualiza nombre/empleados por si cambian
+        else:
+            snap = Snap.create(base_vals)
+
+        # 4) Congelar con el dataset del wizard (sin recalcular)
+        snap.action_freeze_from_wizard_dataset(dataset)
+
+        # 5) Abrir el documento en Documentos si existe; si no, abrir el snapshot
+        if snap.document_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'documents.document',
+                'view_mode': 'form',
+                'res_id': snap.document_id.id,
+            }
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'att.report.snapshot',
+            'view_mode': 'form',
+            'res_id': snap.id,
         }

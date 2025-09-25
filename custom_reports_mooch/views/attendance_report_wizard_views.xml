@@ -19,6 +19,7 @@
         </group>
         <footer>
           <button string="Imprimir PDF" type="action" name="%(action_attendance_pdf)d" class="btn-primary"/>
+          <button name="action_save_snapshot" type="object" string="Guardar snapshot (Documentos)" class="btn-secondary"/>
           <button string="Cancelar" special="cancel" class="btn-secondary"/>
         </footer>
       </form>
