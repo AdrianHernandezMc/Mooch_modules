@@ -2,6 +2,8 @@ from odoo import fields, models, api, _
 from odoo.exceptions import ValidationError
 from odoo.tools.misc import formatLang
 import logging
+import base64
+from io import BytesIO
 from datetime import datetime
 _logger = logging.getLogger(__name__)
 
@@ -191,6 +193,11 @@ class ProductMooch(models.Model):
         tracking =True
     )
 
+    barcode_image_pdf = fields.Binary(
+        string='Código Barras PDF',
+        compute='_compute_barcode_image_pdf',
+        help='Imagen del código de barras para PDF'
+    )
 
     _sql_constraints = [
         ('unique_product_name', 'UNIQUE(name)',
@@ -573,7 +580,7 @@ class ProductMooch(models.Model):
                 raise ValidationError(_(
                     "Ya existe otro producto con el nombre:\n  «%s»"
                 ) % rec.name)
-                
+
     @api.model
     def _get_years_list(self):
         """Genera lista dinámica de años"""
@@ -581,8 +588,31 @@ class ProductMooch(models.Model):
         # Puedes ajustar el rango según tus necesidades
         start_year = current_year - 5  # 10 años atrás
         end_year = current_year + 15    # 10 años adelante
-        
+
         years = []
         for year in range(start_year, end_year + 1):
             years.append((str(year), str(year)))
         return years
+
+    @api.depends('barcode')
+    def _compute_barcode_image_pdf(self):
+        """Genera código de barras usando el método nativo de Odoo"""
+        for product in self:
+            if product.barcode:
+                try:
+                    # Usar el método nativo de Odoo para generar código de barras
+                    barcode_url = f'/report/barcode/Code128/{product.barcode}?width=300&height=60&humanreadable=0'
+
+                    # Obtener la imagen del código de barras
+                    barcode_image = self.env['ir.actions.report'].barcode(barcode_url)
+
+                    if barcode_image:
+                        product.barcode_image_pdf = base64.b64encode(barcode_image)
+                    else:
+                        product.barcode_image_pdf = False
+
+                except Exception as e:
+                    _logger.warning("Error generando código barras para %s: %s", product.barcode, str(e))
+                    product.barcode_image_pdf = False
+            else:
+                product.barcode_image_pdf = False
