@@ -1,0 +1,13 @@
+<odoo>
+  <record id="ir_cron_sync_fixed_employee_names" model="ir.cron">
+    <field name="name">RH: Sincronizar nombre desde 'Nombre fijo'</field>
+    <field name="model_id" ref="hr.model_hr_employee"/>
+    <field name="state">code</field>
+    <field name="code">model._cron_sync_fixed_employee_names()</field>
+    <field name="user_id" ref="base.user_admin"/>
+    <field name="interval_number">10</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="active">True</field>
+  </record>
+</odoo>
