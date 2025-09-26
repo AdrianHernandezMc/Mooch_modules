@@ -1,5 +1,17 @@
-<!-- custom_rh_mooch/views/hr_employee_views.xml -->
 <odoo>
+  <record id="view_employee_form_add_fixed_name" model="ir.ui.view">
+    <field name="name">hr.employee.form.add.fixed.name.mooch</field>
+    <field name="model">hr.employee</field>
+    <field name="inherit_id" ref="hr.view_employee_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//form[@js_class='hr_employee_form']//div[hasclass('oe_title')]/h1" position="after">
+        <div class="o_row o_mt-2">
+          <field name="fixed_name" class="o_col-12" placeholder="Nombre fijo…"/>
+        </div>
+      </xpath>
+    </field>
+  </record>
+
   <record id="view_employee_form_schedule_tab" model="ir.ui.view">
     <field name="name">hr.employee.form.schedule.tab.mooch</field>
     <field name="model">hr.employee</field>

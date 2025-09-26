@@ -1,5 +1,3 @@
-# custom_rh_mooch/models/hr_employee_public.py
-# -*- coding: utf-8 -*-
 from odoo import models, fields
 
 
