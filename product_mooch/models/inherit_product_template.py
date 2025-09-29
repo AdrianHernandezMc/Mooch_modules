@@ -593,26 +593,3 @@ class ProductMooch(models.Model):
         for year in range(start_year, end_year + 1):
             years.append((str(year), str(year)))
         return years
-
-    @api.depends('barcode')
-    def _compute_barcode_image_pdf(self):
-        """Genera código de barras usando el método nativo de Odoo"""
-        for product in self:
-            if product.barcode:
-                try:
-                    # Usar el método nativo de Odoo para generar código de barras
-                    barcode_url = f'/report/barcode/Code128/{product.barcode}?width=300&height=60&humanreadable=0'
-
-                    # Obtener la imagen del código de barras
-                    barcode_image = self.env['ir.actions.report'].barcode(barcode_url)
-
-                    if barcode_image:
-                        product.barcode_image_pdf = base64.b64encode(barcode_image)
-                    else:
-                        product.barcode_image_pdf = False
-
-                except Exception as e:
-                    _logger.warning("Error generando código barras para %s: %s", product.barcode, str(e))
-                    product.barcode_image_pdf = False
-            else:
-                product.barcode_image_pdf = False
