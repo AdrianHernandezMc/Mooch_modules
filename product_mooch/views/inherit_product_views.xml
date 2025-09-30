@@ -166,4 +166,21 @@
         </xpath>
     </field>
     </record>
+    <record id="product_template_list_extend_custom" model="ir.ui.view">
+        <field name="name">product.template.list.extend.custom</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <!-- Agregar sale_type y otros campos importantes como columnas -->
+                <field name="sale_type" string="Tipo Compra"/>
+                <field name="department_id" string="Depto"/>
+                <field name="default_code" string="Código"/>
+                <field name="partner_name" string="Proveedor"/>
+                <field name="list_price" string="Precio Contado"/>
+                <field name="credit_price" string="Precio Crédito"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>
