@@ -145,6 +145,7 @@
     <field name="arch" type="xml">
         <xpath expr="//search" position="inside">
         <separator string="Filtros adicionales"/>
+        <field name="sale_type" string="Tipo de Compra"/>
         <field name="department_id" string="Departamento"/>
         <field name="sub_department_id" string="Subdepartamento"/>
         <field name="color_id" string="Color"/>
