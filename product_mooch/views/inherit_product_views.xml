@@ -145,6 +145,7 @@
     <field name="arch" type="xml">
         <xpath expr="//search" position="inside">
         <separator string="Filtros adicionales"/>
+        <field name="sale_type" string="Tipo de Compra" widget="selection"/>
         <field name="department_id" string="Departamento"/>
         <field name="sub_department_id" string="Subdepartamento"/>
         <field name="color_id" string="Color"/>
@@ -156,7 +157,25 @@
 
         <filter name="no_unspsc" string="Sin SAT" domain="[('unspsc_code_id','=',False)]"/>
         <filter name="with_supplier_name" string="Con Nombre proveedor" domain="[('partner_name','!=',False)]"/>
+        <separator string="Por Tipo de Compra"/>
+        <filter name="filter_sale_type_clothes" string="Tipo Ropa" domain="[('sale_type','=','sale_type_clothes')]"/>
+        <filter name="filter_sale_type_home" string="Tipo Hogar" domain="[('sale_type','=','sale_type_home')]"/>
+        <filter name="filter_sale_type_shoe" string="Tipo Calzado" domain="[('sale_type','=','sale_type_shoe')]"/>
+        <filter name="filter_sale_type_season" string="Tipo Invierno" domain="[('sale_type','=','sale_type_season')]"/>
+        <filter name="no_sale_type" string="Sin Tipo de Compra" domain="[('sale_type','=',False)]"/>
         </xpath>
     </field>
+    </record>
+    <record id="product_template_list_extend_custom" model="ir.ui.view">
+        <field name="name">product.template.list.extend.custom</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="sale_type" string="Tipo Compra"/>
+                <field name="department_id" string="Depto"/>
+            </xpath>
+        </field>
     </record>
 </odoo>

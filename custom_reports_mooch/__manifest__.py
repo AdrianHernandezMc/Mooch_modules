@@ -5,7 +5,7 @@
     'category': 'Reporting',
     'summary': 'Añade campos extra a los informes de Ventas y Compras',
     'license': 'Other proprietary',
-    'depends': ['sale', 'purchase','hr','hr_attendance','hr_biometric_attendance','custom_rh_mooch'],
+    'depends': ['sale', 'purchase','hr','hr_attendance','hr_biometric_attendance','custom_rh_mooch','documents'],
     'data': [
         # Security
         'security/ir.model.access.csv',
@@ -15,6 +15,10 @@
         'views/attendance_report_actions.xml',
         'views/attendance_report_templates.xml',
         'views/attendance_report_wizard_views.xml',
+        'views/attendance_admin_report_actions.xml',
+        'views/attendance_admin_report_templates.xml',
+        'views/attendance_admin_report_wizard_views.xml',
+        "views/att_report_snapshot_views.xml",
     ],
     'installable': True,
     'application': False,

@@ -1,4 +1,3 @@
-# custom_rh_mooch/__manifest__.py
 {
     "name": "Custom RH Mooch",
     "version": "17.0.1.0.0",
@@ -8,6 +7,7 @@
     "depends": ["hr"],
     "data": [
         "views/hr_employee_views.xml",
+        "data/ir_cron.xml",
     ],
     "installable": True,
     "application": False,

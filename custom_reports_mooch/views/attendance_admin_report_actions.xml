@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="0">
+
+    <!-- Definir paperformat landscape para administrativos -->
+    <record id="paperformat_admin_attendance_landscape" model="report.paperformat">
+      <field name="name">Admin Attendance A4 Landscape</field>
+      <field name="format">A4</field>
+      <field name="orientation">Landscape</field>
+      <field name="margin_top">33</field>
+      <field name="margin_bottom">5</field>
+      <field name="margin_left">15</field>
+      <field name="margin_right">15</field>
+      <field name="header_line" eval="False"/>
+      <field name="dpi">96</field>
+    </record>
+
+    <record id="action_attendance_admin_pdf" model="ir.actions.report">
+      <field name="name">Reporte Administrativos PDF</field>
+      <field name="model">admin.attendance.report.wizard</field>
+      <field name="report_type">qweb-pdf</field>
+
+      <!-- Debe coincidir con el ID de plantilla QWeb -->
+      <field name="report_name">custom_reports_mooch.attendance_admin_pdf_document</field>
+      <field name="report_file">custom_reports_mooch.attendance_admin_pdf_document</field>
+
+      <field name="print_report_name">'Reporte_Administrativos.pdf'</field>
+      <!-- Usar paperformat landscape -->
+      <field name="paperformat_id" ref="custom_reports_mooch.paperformat_admin_attendance_landscape"/>
+      <!-- Enlazar al wizard para que salga en "Imprimir" cuando aplique -->
+      <field name="binding_model_id" ref="model_admin_attendance_report_wizard"/>
+      <field name="binding_type">report</field>
+    </record>
+
+  </data>
+</odoo>
