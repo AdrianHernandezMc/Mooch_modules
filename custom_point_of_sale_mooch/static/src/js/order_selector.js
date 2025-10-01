@@ -3,6 +3,10 @@ import { Orderline } from "@point_of_sale/app/store/models";
 import { patch } from "@web/core/utils/patch";
 
 patch(Orderline.prototype, {
+    get_price_with_tax() {
+        const originalTotal = this.get_all_prices().priceWithTax;
+        return Math.round(originalTotal); // o parseFloat(originalTotal.toFixed(2)) si prefieres dos decimales
+    },
 
     setup() {
         super.setup(...arguments);

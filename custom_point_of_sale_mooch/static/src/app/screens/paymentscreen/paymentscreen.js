@@ -37,15 +37,19 @@ patch(PaymentScreen.prototype, {
             this.render();
             this.autoValidate?.();
         }
-        else {
-            const { confirmed } = this.popup.add(ConfirmPopup, {
-            title: _t("Facturacion al cliente"),
-            body: _t(
-                "Recordar al cliente que la facturación se realiza el mismo día."
-            ),
-        });
-        }
+
         this.pos.TicketScreen_onDoRefund= false;
+
+        if (this.pos.Reembolso) {
+            this.validateOrder()
+        } 
+
+        if (this.pos.Reembolso== false && this.pos.TicketScreen_onDoRefund== false) {
+            const { confirmed } = this.popup.add(ErrorPopup, {
+                title: _t("Facturacion al cliente"),
+                body: _t("Recordar al cliente que la facturación se realiza el mismo día."),
+            });
+        }
     },
 
     async autoValidate() {
@@ -78,6 +82,8 @@ patch(PaymentScreen.prototype, {
 
     async validateOrder() {
         // Bloquea validación si hace falta y no se capturó t.credito t.de
+        
+        
 
         const line = this.selectedPaymentLine;
         if (this.requiresTxId && (!line?.transaction_id || !line.transaction_id.trim())) {
@@ -87,13 +93,17 @@ patch(PaymentScreen.prototype, {
             });
             return;
         }
+
         // bloque para mover los cambios de los articulos *****
         const order = this.pos.get_order();
+        console.log("Order",order.product_changes_id)
         const order_iines = order.get_orderlines();
         const cfgId = this.pos.config.id;
-        const product_id = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
+        const product_id = order.product_changes_id //await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
+        //console.log("Entro",await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {}))
         const existe = order_iines.some(line => line.product.id === product_id);
-
+        
+        
         if (existe) {
             const ondoInventory = await this.apply_changes();
             if (!ondoInventory) {
@@ -101,19 +111,16 @@ patch(PaymentScreen.prototype, {
             }
         }
         // ************************************************
-
-        /*********************************** */
-              /********* Agrego el vale al programa */
-        //const cfgIdv = this.pos.config.id;
-        //const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgIdv], {});
-        //console.log(order.product_voucher_id)
+        
+        /********* Agrego el vale al programa */
         const exist_vale = order_iines.some(line => line.product.id === order.product_voucher_id);
 
          if (!exist_vale) {
             this.currentOrder.couponPointChanges = []
          } 
-
+        
         super.validateOrder(...arguments);
+        console.log("Entro")
 
         // if (exist_vale) {
         //     alert("Entro")

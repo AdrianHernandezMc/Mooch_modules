@@ -7,8 +7,19 @@
     padding: 8px;
     border-radius: 4px;
 }
-.xx
-.masked {
-  -webkit-text-security: disc; /* Chrome/WebKit */
-  text-security: disc;         /* Prop. no estándar (fallback) */
+
+button.pay-order-button.btn-highlighted {
+  background-color: #fa4f4f !important; /* Amarillo */
+   color: white !important;
+  border: none !important;
 }
+
+
+/* button.pay-order-button.btn-primary {
+  background-color: #28a745 !important; /* Verde personalizado 
+  color: white !important;
+  border: none !important;
+} */
+
+
+

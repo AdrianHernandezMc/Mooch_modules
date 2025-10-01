@@ -14,6 +14,8 @@ patch(ProductsWidget.prototype, {
     function cloneWithUiName(p) {
         const clone = Object.create(Object.getPrototypeOf(p)); // <- mantiene métodos
         Object.assign(clone, p);
+
+        //concateno el nombre y el codigo del product
         const code = (p.default_code || "").trim();
         const base = p.display_name || "";
         clone.display_name = code ? `${base} - [${code}]` : base;

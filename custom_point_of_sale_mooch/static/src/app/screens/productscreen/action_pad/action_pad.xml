@@ -1,0 +1,9 @@
+<templates id="actionpad_widget_inherit" xml:space="preserve">
+    <t t-inherit="point_of_sale.ActionpadWidget" t-inherit-mode="extension" owl="1">
+        <xpath expr="//button[contains(@class, 'refund')]" position="replace">
+            <button class="button refund btn btn-danger" t-on-click="() => this.pos.refundOrder()">
+                Devolver
+            </button>
+        </xpath>
+    </t>
+</templates>

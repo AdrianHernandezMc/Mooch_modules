@@ -30,5 +30,6 @@ import { patch } from "@web/core/utils/patch";
         this.product_voucher_id = product_voucher_id[0].discount_line_product_id[0]
         this.get_order()?.setProductVaucherId?.(product_voucher_id[0].discount_line_product_id[0])
         return res;
-    }
+    },
+
  });
