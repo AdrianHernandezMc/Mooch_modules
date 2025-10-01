@@ -24,7 +24,7 @@
             <div style="font-size: 38px; font-weight: bold; text-align: left; border: none; border-collapse: collapse;">MOOCH</div>
             <table style="font-family: Arial; border: none; border-collapse: collapse;">
               <tr>
-                <td style="text-align: left; font-size: 32px; width: 80%; border: none; border-collapse: collapse;">
+                <td style="text-align: left; font-size: 28px; width: 80%; border: none; border-collapse: collapse;">
                   <t t-esc="doc.name"/> <t t-esc="doc.department_id.nombre"/>
                 </td>
                 <td style="text-align: right; font-size: 32px; width: 110%; border: none; border-collapse: collapse;">
