@@ -20,6 +20,9 @@
                   options="{'no_open': True}"
                   domain="['|', ('company_id', '=', company_id), ('company_id', '=', False)]"/>
           </setting>
+          <setting string="Retiros de efectivo" help="Cantidad/Tope de retiro usado por POS.">
+            <field name="withdrawal"/>
+          </setting>
         </xpath>
       </field>
     </record>

@@ -7,30 +7,26 @@ import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
 import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
 import { useService } from "@web/core/utils/hooks";
 import { HotkeyHelpPopup } from "@custom_point_of_sale_mooch/app/popup/productscreen_help";
-import { markup } from "@odoo/owl";
+import { markup, onMounted, useState } from "@odoo/owl";
 import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
 import { PasswordInputPopup } from "@custom_point_of_sale_mooch/app/popup/hide_passwordpopup";
-
-// function addMonthtoday(date = new Date()) {
-//     const y = date.getFullYear();
-//     const m = date.getMonth();  // 0=Ene
-//     const d = date.getDate();
-//     const targetM = m + 1;
-//     const targetY = y + Math.floor(targetM / 12);
-//     const targetMi = targetM % 12;
-//     const daysInTarget = new Date(targetY, targetMi + 1, 0).getDate(); // último día del mes destino
-//     const day = Math.min(d, daysInTarget);
-// return new Date(targetY, targetMi, day);
-// }
+import { TicketScreen } from "@point_of_sale/app/screens/ticket_screen/ticket_screen";
 
 const _superSetNumpadMode = ProductScreen.prototype.onNumpadClick;
+const _super_getRefundableDetails = TicketScreen.prototype._getRefundableDetails;
+const _super_prepareRefundOrderlineOptions = TicketScreen.prototype._prepareRefundOrderlineOptions 
 
-//Parcheamos el método que invoca el botón "Precio" (cambia el modo del Numpad)
-patch(ProductScreen.prototype, {
-    
+patch(ProductScreen.prototype, {    
     setup() {
         super.setup(...arguments);
         const popup = useService("popup");
+        this.orm = useService("orm");
+        this.posService = useService("pos");
+        this.cashTotal = useState({ value: 0 });
+        //subo la variable al posStore para que se pueda leen en order_receipt y en todos lados
+        this.pos.bloqueodecaja = false;
+        this.pos.Reembolso = false;
+        if (this.pos.couponPointChanges) this.pos.couponPointChanges = [];
 
         // Alt + P limpias las lineas de la orden
         useHotkey("Alt+t", (ev) => {
@@ -73,34 +69,181 @@ patch(ProductScreen.prototype, {
         });
         
         // **************   para hacer pruebad en productscreen  *******************
-        useHotkey("alt+x", (ev) => {
-            //**********        no borrar      ********/
-            // const { confirmed, payload } =  this.popup.add(PasswordInputPopup, {
-            //     title: _t("NIP"),
-            //     body: _t("Ingresa el NIP del Gerente de Ventas:"),
-            //     confirmText: _t("Validar"),
-            //     cancelText: _t("Cancelar"),
-            // });
-            console.log("correcoupn",Object.values(this.currentOrder.couponPointChanges))
-        
+        useHotkey("alt+x", (ev) => {            
+            const order = this.pos.get_order();
+            const orderline = order.get_orderlines()
+            //console.log("orderline",orderline)
+            console.log("order",order)
+            //this.clear_coupon(order)
+
+            // const line = order.get_orderlines()[0]
+            // line.is_reward_line = true; // o false si no aplica
+            // line.reward_rule_id = 3;
+            order.disabledRewards.clear(); 
+            //this.getLocalCashTotal()
         });
         
         // Alt + g para entrar a las ordenes guardadas
         useHotkey("alt+g", (ev) => {
-            // console.log(this.TICKET_SCREEN_STATE)
-            // const TICKET_SCREEN_STATE =  this.TICKET_SCREEN_STATE
-            
-            // TICKET_SCREEN_STATE.forEach(l => {
-            //     l.ui.fiter = "SYNCED"
-            // });
-            // console.log("this.TICKET_SCREEN_STATE)",this.TICKET_SCREEN_STATE)
             this.pos.showScreen("TicketScreen");
         });
     },
 
-    async onMounted() {
-        await this.clear_pay_method()
+    clear_coupon(o) {
+        if (!o) return;
+        o.codeActivatedCoupons = [];
+        o.codeActivatedProgramRules = [];
+        o.couponPointChanges = [];
+        order.disabledRewards.clear();
+        o.get_orderlines()
+        .filter(l => l.is_reward_line || l.reward_rule_id)
+        .forEach(l => (o.remove_orderline || o.removeOrderline)?.(l));
     },
+
+    async onMounted() {
+        this.getLocalCashTotal();
+        await this.clear_pay_method();
+    },
+
+    async clickReembolso(){
+        const { confirmed, payload } = await this.popup.add(TextInputPopup, {
+            title: _t("Reembolso por Ticket"),
+            body: _t("Ingresa el número de ticket (pos_reference)."),
+            placeholder: "S00001-001-0001",
+            confirmText: _t("Buscar"),
+            cancelText: _t("Cancelar"),
+            inputProps: {
+                onInput: (e) => {
+                    let v = e.target.value.replace(/[^0-9]/g, "").slice(0, 12);
+                    let f = v.padStart(12, "0").replace(/(\d{5})(\d{3})(\d{4})/, "S$1-$2-$3");
+                    e.target.value = f;
+                },
+                maxlength: 17,
+            },
+        });
+
+       // const { confirmed, payload } = await this.showPopup(OrderNumberPopup);
+        if (!confirmed || !payload) return;
+
+        // Buscar la orden original
+        const orderNumber = "Orden " + payload;
+        const order = await this.orm.call("pos.order", "search_read", [
+            [["pos_reference", "=", orderNumber]],
+            ["id", "pos_reference", "partner_id", "fiscal_position_id"]
+        ], { limit: 1 });
+
+        if (!order) {
+            this.popup.add(ErrorPopup, {
+            title: "Orden no encontrada",
+            body: `No se encontró la orden ${orderNumber}`,
+            });
+            return;
+        }
+
+        // Buscar líneas de la orden
+        const orderLines = await this.orm.call("pos.order.line", "search_read", [
+            [["order_id", "=", order[0].id]],
+            [
+            "id", "product_id", "qty", "price_unit", "discount",
+            "tax_ids", "combo_parent_id", "combo_line_ids"
+            ]
+        ]);
+
+        for (const line of orderLines) {
+            if (typeof line.pack_lot_lines === 'undefined') {
+                line.pack_lot_lines = 0; // o [] si esperas una lista
+            }
+        }       
+        
+        if (!orderLines.length) {
+            this.popup.add(ErrorPopup, {
+            title: "Sin líneas para reembolsar",
+            body: "La orden no tiene líneas disponibles para reembolso.",
+            });
+            return;
+        }
+
+        // Cargar líneas en toRefundLines
+        this.pos.toRefundLines = {};
+        for (const line of orderLines) {
+            this.pos.toRefundLines[line.id] = {
+            qty: line.qty,
+            orderline: line,
+            destinationOrderUid: null,
+            };
+        }
+
+        // Obtener partner
+        const partner = order.partner_id?.[0]
+            ? this.pos.db.get_partner_by_id(order.partner_id[0])
+            : null;
+
+        // Obtener detalles reembolsables usando la lógica original
+        const refundableDetails = _super_getRefundableDetails.call(this, partner); 
+
+        if (!refundableDetails.length) {
+            this.popup.add(ErrorPopup, {
+            title: "Nada que reembolsar",
+            body: "No se encontraron líneas válidas para reembolso.",
+            });
+            return;
+        }
+
+        // orden de destino
+        const refundOrder = this.pos.get_order()
+        refundOrder.is_return = true;
+
+        if (partner) refundOrder.set_partner(partner);
+        //if (order.fiscal_position) refundOrder.fiscal_position = order.fiscal_position;
+
+        const originalToRefundLineMap = new Map();
+
+        // Agregar productos con opciones completas
+        for (const detail of refundableDetails) {
+            const product = this.pos.db.get_product_by_id(detail.orderline.product_id[0]);
+            const options = _super_prepareRefundOrderlineOptions(detail);
+            const refundLine = await refundOrder.add_product(product, options);
+            originalToRefundLineMap.set(detail.orderline.id, refundLine);
+            detail.destinationOrderUid = refundOrder.uid;
+        }
+
+         // Manejo de combos
+        for (const detail of refundableDetails) {
+            const originalLine = detail.orderline;
+            const refundLine = originalToRefundLineMap.get(originalLine.id);
+
+            if (originalLine.combo_parent_id) {
+            const parentLine = originalToRefundLineMap.get(originalLine.combo_parent_id[0]);
+            if (parentLine) refundLine.comboParent = parentLine;
+            }
+
+            if (originalLine.combo_line_ids?.length) {
+            refundLine.comboLines = originalLine.combo_line_ids.map(id => originalToRefundLineMap.get(id)).filter(Boolean);
+            }
+        }
+
+        // Buscar pagos de la orden
+        const payments = await this.orm.call("pos.payment", "search_read", [
+            [["pos_order_id", "=", order[0].id]],
+            ["amount", "payment_method_id"]
+        ]);
+
+        // Agregar pagos
+        for (const payment of payments) {
+            const method = this.pos.payment_methods.find(pm => pm.id === payment.payment_method_id[0]);
+            if (method) {
+            const paymentLine = refundOrder.add_paymentline(method);
+            paymentLine.set_amount(payment.amount*-1);
+            }
+        }
+
+        console.log("OrdenActual", this.pos.get_order())
+        // Redirigir a pantalla de recibo
+        this.pos.set_order(refundOrder);
+        this.pos.Reembolso = true;
+        this.pos.showScreen("PaymentScreen");
+    },
+    
 
     async clear_pay_method(){
         const order = this.pos.get_order?.();
@@ -109,6 +252,100 @@ patch(ProductScreen.prototype, {
             for (const l of [...lines]) {
                 (order.remove_paymentline || order.removePaymentline || order.removePaymentLine)?.call(order, l);
             }
+        }
+    },
+
+    async Discount(amount, rate) {
+        //Aplica descuento del 10%
+        rate = rate / 100
+        const cents = Math.round(amount * 100);
+        const discounted = Math.round(cents * (1 - rate));
+        return discounted / 100; // regresa en unidades, ej. 89.99
+    },
+
+    async get_cash_out() {
+        const sessionId = this.pos?.pos_session?.id;
+        // 1) Leer líneas de extracto de caja de la sesión
+        const lines = await this.orm.call(
+            "account.bank.statement.line",
+            "search_read",
+            [[["pos_session_id", "=", sessionId]]],
+            { fields: ["amount", "payment_ref", "date", "statement_id", "journal_id"] }
+        );
+
+        let totalIn = 0, totalOut = 0;
+        for (const l of lines) {
+            const amt = Number(l.amount) || 0;
+            if (amt >= 0) totalIn += amt;
+            else totalOut += Math.abs(amt);
+        }
+
+        totalIn  = Math.round(totalIn  * 100) / 100;
+        totalOut = Math.round(totalOut * 100) / 100;
+        const net = Math.max(0, Math.round((totalIn - totalOut) * 100) / 100);
+        //console.log("Cash In:", totalIn, "Cash Out:", totalOut, "Neto:", net);
+        return totalOut
+    },
+
+    async getLocalCashTotal() {
+        const sessionId = this.posService.pos_session.id;
+        // Identifica métodos de pago "efectivo"
+        const cashMethodIds = (this.posService.payment_methods || [])
+            .filter(pm => pm.type === "cash" || pm.is_cash_count) // ambas opciones por compatibilidad
+            .map(pm => pm.id);
+
+        if (!cashMethodIds.length) {
+            this.cashTotal.value = 0;
+            return;
+        }
+
+        const domain = [
+            ["session_id", "=", sessionId],
+            ["payment_method_id", "in", cashMethodIds],
+        ];
+
+        const groups = await this.orm.call(
+            "pos.payment",
+            "read_group",
+            [domain, ["amount:sum"], []],
+            {}
+        );
+
+        let total = 0;
+        if (groups && groups.length) {
+            total = Number(groups[0].amount || 0);
+        } // else {
+        //     // 2) Fallback: sumar con search_read
+        //     const recs = await this.orm.searchRead("pos.payment", domain, ["amount"]);
+        //     total = (recs || []).reduce((acc, r) => acc + Number(r.amount || 0), 0);
+        // }
+
+        this.cashTotal = total
+        
+        const cfgId = this.pos?.config?.id || false;
+        const withdrawal = await this.orm.call("pos.config", "get_withdrawal", [cfgId], {});
+        const cash_out = await this.get_cash_out()
+
+        //Aqui le descento el 10% 
+        let discounted = await this.Discount(withdrawal,10)
+
+        if (this.cashTotal - cash_out >= discounted) {
+            await this.popup.add(ErrorPopup, {
+                title: "Aviso de retiro",
+                body: "Solicitar un retiro de efectivo",
+                confirmText: "OK",
+            });
+            //cambio de color el boton de pago.
+            const button = document.querySelector("button.pay-order-button");
+            if (button) {
+                button.classList.add("btn-highlighted");
+            }
+        }
+        if (this.cashTotal - cash_out > withdrawal){
+            this.pos.bloqueodecaja = true
+        }
+        else{
+            this.pos.bloqueodecaja = false
         }
     },
 
@@ -125,13 +362,12 @@ patch(ProductScreen.prototype, {
         return list.map(decorateName);
     },
 
-
     async onNumpadClick(mode) {
-        if (mode === "price" || mode === "discount" ) {
-            await this.change_price_desc(mode);
-        }
+         if (mode === "price" || mode === "discount" ) {
+             await this.change_price_desc(mode);
+         }
         return _superSetNumpadMode.call(this, mode);
-        },
+    },
 
     getTotalItems() {
         const order = this.pos.get_order();
@@ -175,9 +411,9 @@ patch(ProductScreen.prototype, {
         
         let total = Number(amount_total)
         if (total < 1){
-            amount_total = amount_total * -1
+            amount_total =  amount_total/1.16 * -1
         }
-
+        console.log(amount_total)
         //******* Agrego la linea del producto a la pantalla de productos de venta. */
         const order   = this.currentOrder;
         const cfgId = this.pos.config.id; 
@@ -192,8 +428,6 @@ patch(ProductScreen.prototype, {
         product.display_name = product.name
         product.display_name = product.display_name + " Code: " +  defaults.code
 
-        console.log(Object.values(this.currentOrder.couponPointChanges))
-
         order.add_product(product, {
             quantity: 1,
             price:    amount_total,
@@ -205,116 +439,65 @@ patch(ProductScreen.prototype, {
             this.currentOrder.couponPointChanges = {};
         }
         const changes = this.currentOrder.couponPointChanges;
-        // 2) Intenta encontrar una entrada existente por program_id
+
         let entry =
         Object.values(changes).find(v => Number(v?.program_id) === Number(loyalty_program_id));
 
-        // 3) Si NO existe, créala y guárdala con una clave estable
         if (!entry) {
         entry = {
             points: amount_total,
+            //barcode: defaults.code,
             code: defaults.code,
             program_id: loyalty_program_id,
             coupon_id: -2,
             appliedRules: [loyalty_program_id],
             expiration_date: new Date() + 30,   // ajusta si necesitas
         };
-        // Usa el program_id como clave (string). Si no puedes, usa un uuid/timestamp.
         const key = String(loyalty_program_id);
         changes[key] = entry;
         }
+        
+        //const line = order.get_orderlines()[0]
+        //line.is_reward_line = true; // o false si no aplica
+        //line.reward_rule_id = 3;
+        //line.coupon_id= 2
 
-        // 4) Modifica los campos deseados
-        //entry.points  = NEW_POINTS;
-        //entry.barcode = NEW_BARCODE;
-
-        //console.log("✅ couponPointChanges:", this.currentOrder.couponPointChanges);
-
-
+        //console.log("changes[key]",changes[key])
         const product_voucher_id =  await this.env.services.orm.call(
-        "loyalty.reward",
-        "search_read",
-        [
-            [["program_id", "=", loyalty_program_id]],            // domain
-            ["discount_line_product_id"]                          // fields
-        ],
-        { limit: 1, order: "id asc" }                           // kwargs opcional
+            "loyalty.reward",
+            "search_read",
+            [
+                [["program_id", "=", loyalty_program_id]],            // domain
+                ["discount_line_product_id"]                          // fields
+            ],
+            { limit: 1, order: "id asc" }                           // kwargs opcional
         );
         order.product_voucher_id = product_voucher_id?.[0]?.discount_line_product_id?.[0] ?? null;
         
-        // const line = order.get_selected_orderline();
-        // if (line) {
-        //     const unit = line.get_unit_price();
-        //     const p = line.get_all_prices(); // { priceWithTax, priceWithoutTax, price, tax, ... }
-        //     console.log("unit:", unit, "priceWithTax:", p.priceWithTax, "priceWithoutTax:", p.priceWithoutTax);
-        // }
-
-        // const lines = (order?.get_orderlines?.() || []).filter(
-        //     (l) => l?.product?.id === order.product_voucher_id
-        // );
-        // console.log("lines",lines)
-        // // 2a) suma cantidades
-        // let totalWithTax = (lines || []).reduce((acc, l) => {
-        //     const p = l.get_all_prices?.();
-        //     return acc + (p?.priceWithTax ?? 0);
-        // }, 0);
-        // totalWithTax = totalWithTax.toFixed(2);
-        // console.log("totalQty",totalWithTax);
-
-        // /********* Agrego el vale al programa */
-        // //const cfgId = this.pos.config.id; 
-        // //const loyaty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
-        // const companyId = this.pos.company?.id;   // ← ID de la compañía
-        // const exp = addMonthtoday(new Date());
-        // const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
-        // //const order   = this.currentOrder;
-        // const partner = order.client;
-        // //const partnerId = partner ? partner.id : false;
-       
-        // console.log("loyaty_program_id",loyaty_program_id);
-
-        // // Preparas el diccionario con todos los campos
-        // const couponData = {
-        //   program_id:          loyaty_program_id,
-        //   company_id:          companyId,                // compañía
-        //   partner_id:          partner?.id || false,
-        //   code:                defaults.code,
-        //   expiration_date:     dateAddOneMonth,
-        //   points:              amount_total,
-        //   source_pos_order_id: order.id,         // referenciamos la venta
-        // };
-
-        // console.log("couponData",couponData)
-        // const couponId = await this.orm.create(
-        //   "loyalty.card",    // modelo
-        //   [ couponData ]     // aquí sí va un solo nivel de array
-        // );
     },
 
     async change_price_desc(mode) {
         const { popup, orm } = this.env.services;
-        const nipRes = await popup.add(TextInputPopup, {
-            title: "Captura Autorizacion",
-            body: "Ingresa el NIP del Gerente de Ventas:",
-            placeholder: "NIP",
-            inputType: "password",
-           inputProps: { type: "password", autocomplete: "off" }, // ⬅️ fuerza tipo 
-            //isPassword: true,
-            confirmText: "Validar",
-            cancelText: "Cancelar",
-        });
 
-        if (!nipRes.confirmed || !nipRes.payload) {
+        const { confirmed, payload } = await  this.popup.add(PasswordInputPopup, {
+            title: _t("NIP"),
+            body: _t("Ingresa el NIP del Gerente de Ventas:"),
+            confirmText: _t("Validar"),
+            cancelText: _t("Cancelar"),
+        });
+        
+        if (!confirmed || !payload) {
             return; 
         }
 
-        const nip = String(nipRes.payload).trim();
+        const nip = String(payload).trim();
         if (!nip) return;
 
         let check = { ok: false, name: "" };
         try {
+            console.log("nip",nip)
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
-
+            console.log("check",check)
             if (check.ok && mode === "price")  {
                 this.change_price()
             } 
@@ -333,15 +516,7 @@ patch(ProductScreen.prototype, {
             });
             return; 
         }
-            if (!check?.ok) {
-                await popup.add(TextInputPopup, {
-                    title: "Acceso denegado",
-                    body: "NIP inválido o el empleado no es 'Gerente Ventas'.",
-                    startingValue: "",
-                    confirmText: "OK",
-                });
-            return; 
-        }
+        return;     
     },
   
     async change_price() {

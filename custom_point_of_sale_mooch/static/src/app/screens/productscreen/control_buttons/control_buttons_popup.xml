@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+  <!-- Extiende el template del core -->
+  <t t-extend="point_of_sale.RefundButton">
+    <xpath expr="//button/i" position="attributes">
+      <attribute name="aria-label">Reembolso</attribute>
+      <attribute name="title">Reembolso</attribute>
+    </xpath>
+    <xpath expr="//button" position="inside">
+      <t t-set="__x__">Reembolso</t>
+    </xpath>
+  </t>
+</templates>

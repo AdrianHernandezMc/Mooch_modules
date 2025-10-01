@@ -21,6 +21,14 @@ class ResConfigSettings(models.TransientModel):
         company_dependent=True,
     )
 
+    withdrawal = fields.Float(
+        string="Withdrawal",
+        help="Default limite para retiros en punto de venta.",
+        digits=(16, 2),
+        company_dependent=True,
+        config_parameter="point_of_sale.pos_withdrawal_amount",
+    )
+        
     # Lee y guarda de forma manual en ir.config_parameter
     @api.model
     def get_values(self):
@@ -43,4 +51,5 @@ class ResConfigSettings(models.TransientModel):
             str(self.changes_product_id.id or "")  # guarda vacío si no hay valor
         )
 
+    
     

@@ -40,75 +40,53 @@ patch(TicketScreen.prototype, {
         }
     },
 
-    async onDoRefund() {
-        this.clearOrderlines() //** limpio todas las lineas de la orden acutal*/
-       
-        // const order = this.pos.get_order()
+    // async onDoRefund() {
+    //     this.clearOrderlines() //** limpio todas las lineas de la orden acutal*/
+    //     const selectedOrder = this.getSelectedOrder();
+    //     const orderBackendId = selectedOrder.backendId; // o selectedOrder.id según tu flujo
+    //     this.pos.TicketScreen_onDoRefund = false
         
-        // const selectedOrder2 = this.getSelectedOrder();
+    //     let method = await this.orm.call(
+    //         "pos.payment",          
+    //         "search_read",          
+    //         [[["pos_order_id", "=", orderBackendId]]], 
+    //         { fields: ["payment_method_id", "transaction_id"] }
+    //     );
 
-        // console.log("selectedOrder",selectedOrder2)
-        // console.log(this.pos.toRefundLines)
-
-        // // const Detect_changes_vourcher = Object.values(this.pos.toRefundLines)
-        // // .filter(d => d.productid == order.product_changes_id || d.productid == order.product_voucher_id);
-
-        // const Detect_changes_vourcher = Object.values(this.pos.toRefundLines)
-        // .filter(d => d?.orderline?.productId == order.product_voucher_id || d?.orderline?.productId == order.product_changes_id);
-
-        // if (Detect_changes_vourcher.length > 0){
-        //     alert("No puedes hacer devociones de vales o cambios")
-        //     return 
-        // }
-        // console.log(Detect_changes_vourcher)
-
-        // return
-
-        const selectedOrder = this.getSelectedOrder();
-        const orderBackendId = selectedOrder.backendId; // o selectedOrder.id según tu flujo
-        this.pos.TicketScreen_onDoRefund = false
+    //     const refundDetails = Object.values(this.pos.toRefundLines)
+    //         .filter(d => d.qty > 0 && !d.destinationOrderUid);
         
-        let method = await this.orm.call(
-            "pos.payment",          
-            "search_read",          
-            [[["pos_order_id", "=", orderBackendId]]], 
-            { fields: ["payment_method_id", "transaction_id"] }
-        );
+    //     if (!refundDetails.length) {
+    //       return alert("selecciona un articulo")
+    //     }
 
-        const refundDetails = Object.values(this.pos.toRefundLines)
-            .filter(d => d.qty > 0 && !d.destinationOrderUid);
-        
-        if (!refundDetails.length) {
-          return alert("selecciona un articulo")
-        }
-
-        const totalRefundWithTax = refundDetails.reduce((acc, detail) => {
-            const line = detail.orderline.price;
-            return acc + (Math.round(((line*1.16) *100) /100)*-1);
-        }, 0);
+    //     const totalRefundWithTax = refundDetails.reduce((acc, detail) => {
+    //         const line = detail.orderline.price;
+    //         return acc + (Math.round(((line*1.16) *100) /100)*-1);
+    //     }, 0);
 
         
-        if (method) {
-            if (!method[0].transaction_id || method[0].transaction_id ==="" ) {
-                this.pos.sharedtcode= 0 
-                //alert(this.pos.sharedtcode)
-            }
-            else {
-                    this.pos.sharedtcode = method[0].transaction_id
-            }
+    //     if (method) {
+    //         if (!method[0].transaction_id || method[0].transaction_id ==="" ) {
+    //             this.pos.sharedtcode= 0 
+    //             //alert(this.pos.sharedtcode)
+    //         }
+    //         else {
+    //                 this.pos.sharedtcode = method[0].transaction_id
+    //         }
             
-            method = this.pos.payment_methods_by_id[method[0].payment_method_id[0]];
-            const paymentline= this.pos.get_order().add_paymentline(method);
-            paymentline.set_amount(totalRefundWithTax);
-        }
-        _superOnDoRefund.apply(this, arguments);
-        // Activa bandera para validación automática
-        this.pos.TicketScreen_onDoRefund = true;
-        this.pos.showScreen("PaymentScreen") //, { autoValidate: true });
-    return
-        //await this.validateOrder();
-        //_superOnDoRefund.apply(this, arguments);
-    },
+    //         method = this.pos.payment_methods_by_id[method[0].payment_method_id[0]];
+    //         const paymentline= this.pos.get_order().add_paymentline(method);
+    //         paymentline.set_amount(totalRefundWithTax);
+    //     }
+    //     _superOnDoRefund.apply(this, arguments);
+    //     // Activa bandera para validación automática
+    //     this.pos.TicketScreen_onDoRefund = true;
+    //     this.pos.showScreen("PaymentScreen") //, { autoValidate: true });
+    // return
+    //     //await this.validateOrder();
+    //     //_superOnDoRefund.apply(this, arguments);
+    // },
 
     async onClickOrder(order) {
         _superOnClickOrder.apply(this, arguments);
@@ -142,6 +120,7 @@ patch(TicketScreen.prototype, {
             [[["source_pos_order_id", "=", orderBackendId]]], 
             { fields: ["code"] }
         ); 
+
         order.voucher_code = pos_voucher_code
         console.log("order",order)
         const addcode_to_orderline =  order.get_orderlines()
@@ -162,6 +141,7 @@ patch(TicketScreen.prototype, {
              }
         });
 
+        
 /// **** Echo para los camios de producto ********
         const refundLines = order.get_orderlines().filter(l => l.changes > 0);
         if (!refundLines.length) {
