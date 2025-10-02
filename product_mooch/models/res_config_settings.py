@@ -21,6 +21,9 @@ class ResConfigSettings(models.TransientModel):
     # — Para Ropa de Invierno —
     sale_type_season_cash    = fields.Float(string='Ropa de Invierno (Contado %)', help="Porcentaje contado para productos de temporada")
     sale_type_season_credit  = fields.Float(string='Ropa de Invierno (Crédito %)', help="Porcentaje crédito para productos de temporada")
+    # — Para Ropa y articulos 2024 —
+    sale_type_old_2024_cash    = fields.Float(string='Productos del 2024 (Contado %)', help="Porcentaje contado para productos del 2024")
+    sale_type_old_2024_credit  = fields.Float(string='Productos del 2024 (Crédito %)', help="Porcentaje crédito para productos del 2024")
 
     @api.model
     def set_values(self):
@@ -34,6 +37,8 @@ class ResConfigSettings(models.TransientModel):
         params.set_param('product_mooch.sale_type_shoe_credit',    self.sale_type_shoe_credit)
         params.set_param('product_mooch.sale_type_season_cash',    self.sale_type_season_cash)
         params.set_param('product_mooch.sale_type_season_credit',  self.sale_type_season_credit)
+        params.set_param('product_mooch.sale_type_old_2024_cash',    self.sale_type_old_2024_cash)
+        params.set_param('product_mooch.sale_type_old_2024_credit',  self.sale_type_old_2024_credit)
         # dispara tu cron para que recalcule precios en los productos afectados
         self.env['product.template'].cron_recompute_product_prices()
 
@@ -50,5 +55,7 @@ class ResConfigSettings(models.TransientModel):
             'sale_type_shoe_credit':    float(params.get_param('product_mooch.sale_type_shoe_credit',    default=0.0)),
             'sale_type_season_cash':    float(params.get_param('product_mooch.sale_type_season_cash',    default=0.0)),
             'sale_type_season_credit':  float(params.get_param('product_mooch.sale_type_season_credit',  default=0.0)),
+            'sale_type_old_2024_cash':    float(params.get_param('product_mooch.sale_type_old_2024_cash',    default=0.0)),
+            'sale_type_old_2024_credit':  float(params.get_param('product_mooch.sale_type_old_2024_credit',  default=0.0)),
         })
         return res

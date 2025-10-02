@@ -162,6 +162,7 @@
         <filter name="filter_sale_type_home" string="Tipo Hogar" domain="[('sale_type','=','sale_type_home')]"/>
         <filter name="filter_sale_type_shoe" string="Tipo Calzado" domain="[('sale_type','=','sale_type_shoe')]"/>
         <filter name="filter_sale_type_season" string="Tipo Invierno" domain="[('sale_type','=','sale_type_season')]"/>
+        <filter name="filter_sale_type_old_2024" string="Tipo Articulos 2024" domain="[('sale_type','=','sale_type_old_2024')]"/>
         <filter name="no_sale_type" string="Sin Tipo de Compra" domain="[('sale_type','=',False)]"/>
         </xpath>
     </field>
