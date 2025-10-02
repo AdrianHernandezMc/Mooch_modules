@@ -125,7 +125,8 @@ class ProductMooch(models.Model):
             ('sale_type_clothes', _('Tipo de Compra Ropa')),
             ('sale_type_home', _('Tipo de Compra Hogar')),
             ('sale_type_shoe', _('Tipo de Compra Calzado')),
-            ('sale_type_season', _('Tipo de Compra Ropa de Invierno'))
+            ('sale_type_season', _('Tipo de Compra Ropa de Invierno')),
+            ('sale_type_old_2024', _('Tipo de Compra Articulos del 2024'))
         ],
         string='Tipo de Compra',
         help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado",
@@ -199,10 +200,10 @@ class ProductMooch(models.Model):
         help='Imagen del código de barras para PDF'
     )
 
-    _sql_constraints = [
-        ('unique_product_name', 'UNIQUE(name)',
-         'Ya existe otro producto con este mismo nombre.'),
-    ]
+    # _sql_constraints = [
+    #     ('unique_product_name', 'UNIQUE(name)',
+    #      'Ya existe otro producto con este mismo nombre.'),
+    # ]
 
     @api.depends('default_code')
     def _compute_is_locked(self):
@@ -212,32 +213,34 @@ class ProductMooch(models.Model):
 
     @api.model
     def create(self, vals):
-        """ Genera el nombre del producto automáticamente al crear y asegura coherencia de tipos """
-        # Establecer departamento predeterminado si no está presente
+        """ Genera el nombre/códigos solo si hay clasificación completa;
+            si no hay departamento, deja en blanco y solo loguea. """
+        # 1) No forzar si no viene; solo sugerir si hay match
         if not vals.get('department_id'):
             default_dep = self._get_default_department()
             if default_dep:
+                _logger.info("🟢 Departamento por defecto aplicado: %s", default_dep)
                 vals['department_id'] = default_dep
+            else:
+                _logger.warning("⚠️ Sin departamento por defecto; se deja en blanco.")
 
-        # Verificar que el departamento esté presente
+        # 2) NO bloquear la creación si no hay departamento
+        #    (ANTES: lanzaba ValidationError)
         department_id = vals.get('department_id')
-        if not self.env.context.get('install_mode') and not department_id:
-            raise ValidationError("El departamento no está definido para este producto.")
+        if not department_id:
+            _logger.warning("⚠️ Creación sin departamento: no se generarán códigos hasta que se asigne.")
 
-        # Establecer valores por defecto obligatorios de Odoo
+        # 3) Valores base requeridos por Odoo
         vals['available_in_pos'] = True
-        vals['detailed_type'] = 'product'  # necesario para que Odoo no falle en validaciones internas
+        vals['detailed_type'] = 'product'
         vals['type'] = 'product'
 
-        # Verificar si se tiene lo necesario para generar código
+        # 4) Generación de códigos SOLO si está completa la clasificación mínima (departamento)
         if self._is_classification_complete(vals):
-            # Generar consecutivo puro por departamento
             consecutive = self._generate_consecutive(department_id)
             vals['consecutive'] = consecutive
-
-            # Generar código interno basado en prefijo + consecutivo
             vals['default_code'] = self._generate_product_code(vals)
-            vals['barcode'] = vals['default_code']  # copiar código interno como código de barras
+            vals['barcode'] = vals['default_code']
 
         return super(ProductMooch, self).create(vals)
 
@@ -518,7 +521,7 @@ class ProductMooch(models.Model):
         """Recalcula precios tomando el costo real de cada variante."""
         params = self.env['ir.config_parameter'].sudo()
         _logger.info("=== INICIO cron_recompute_product_prices ===")
-        for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_shoe', 'sale_type_season'):
+        for sale_type in ('sale_type_clothes', 'sale_type_home', 'sale_type_shoe', 'sale_type_season', 'sale_type_old_2024'):
             pct_cash   = float(params.get_param(f'product_mooch.{sale_type}_cash',   default=0.0))
             pct_credit = float(params.get_param(f'product_mooch.{sale_type}_credit', default=0.0))
             variants = self.env['product.product'].search([
@@ -570,16 +573,24 @@ class ProductMooch(models.Model):
     @api.constrains('name')
     def _check_duplicate_name(self):
         for rec in self:
-            if not rec.name:
+            name = (rec.name or '').strip()
+            if not name:
                 continue
-            dup = self.search([
+
+            # ⛳️ Permitir duplicados SOLO si el nombre es "Tarjeta de regalo"
+            if name.lower() == 'tarjeta de regalo':
+                continue
+
+            # Validación normal (mira solo activos de la misma compañía)
+            dup = rec.search([
                 ('id', '!=', rec.id),
-                ('name', '=', rec.name),
+                ('name', '=', name),
+                ('company_id', '=', rec.company_id.id),
+                ('active', '=', True),
             ], limit=1)
+
             if dup:
-                raise ValidationError(_(
-                    "Ya existe otro producto con el nombre:\n  «%s»"
-                ) % rec.name)
+                raise ValidationError(_("Ya existe otro producto con el nombre:\n  «%s»") % name)
 
     @api.model
     def _get_years_list(self):

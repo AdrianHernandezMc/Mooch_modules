@@ -3,41 +3,61 @@
     <record id="product_mooch_res_config_settings_view_form_inherit" model="ir.ui.view">
         <field name="name">product.mooch.res.config.settings.form.inherit</field>
         <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="stock.res_config_settings_view_form"/> <!-- ID correcto de la vista base -->
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+
         <field name="arch" type="xml">
-            <!-- Insertar los campos después del bloque product_general_settings -->
-            <xpath expr="//block[@name='product_setting_container']" position="inside">
-                <!--inserto un campo vacío para forzar salto de línea -->
-                <setting id="dummy_break_setting" name="dummy_break"  string=""  colspan="2"/>
-                <!-- Moda -->
-                <setting id="sale_type_clothes_cash_setting" string="Porcentaje contado para productos de moda (Contado %)">
-                    <field name="sale_type_clothes_cash" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <setting id="sale_type_clothes_credit_setting" string="Porcentaje crédito para productos de moda (Crédito %)">
+        <xpath expr="//block[@name='product_setting_container']" position="inside">
+
+        <!-- separador opcional -->
+        <setting id="dummy_break_setting" name="dummy_break" string="" colspan="2"/>
+
+        <div class="o_setting_box" name="sale_types_scroll_box">
+            <!-- DERECHA: descripción + contenedor con scroll -->
+            <div class="o_setting_right_pane">
+
+            <!-- Descripción fuera del scroll -->
+            <div class="o_setting_label">
+                <span class="o_form_label">Tipos de venta</span>
+            </div>
+            <div class="text-muted mb-2">
+                Define los porcentajes de Contado y Crédito por categoría.
+            </div>
+            <div style="max-height:380px; overflow:auto; border:1px solid #e0e0e0; border-radius:6px; padding:10px;">
+
+                <!-- MODA -->
+                <group string="MODA" col="2">
+                    <field name="sale_type_clothes_cash"   widget="float" options="{'suffix': ' %'}"/>
                     <field name="sale_type_clothes_credit" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <!-- Hogar -->
-                <setting id="sale_type_home_cash_setting" string="Porcentaje contado para productos de hogar (Contado %)">
-                    <field name="sale_type_home_cash" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <setting id="sale_type_home_credit_setting" string="Porcentaje crédito para productos de hogar (Crédito %)">
+                </group>
+
+                <!-- HOGAR -->
+                <group string="HOGAR" col="2">
+                    <field name="sale_type_home_cash"   widget="float" options="{'suffix': ' %'}"/>
                     <field name="sale_type_home_credit" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <!-- Calzado -->
-                <setting id="sale_type_shoe_cash_setting" string="Porcentaje contado para productos de calzado (Contado %)">
-                    <field name="sale_type_shoe_cash" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <setting id="sale_type_shoe_credit_setting" string="Porcentaje crédito para productos de calzado (Crédito %)">
+                </group>
+
+                <!-- CALZADO -->
+                <group string="CALZADO" col="2">
+                    <field name="sale_type_shoe_cash"   widget="float" options="{'suffix': ' %'}"/>
                     <field name="sale_type_shoe_credit" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <!-- Temporada Navideña -->
-                <setting id="sale_type_season_cash_setting" string="Porcentaje contado para productos de Ropa de Invierno (Contado %)">
-                    <field name="sale_type_season_cash" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-                <setting id="sale_type_season_credit_setting" string="Porcentaje crédito para productos de Ropa de Invierno (Crédito %)">
+                </group>
+
+                <!-- TEMPORADA -->
+                <group string="ROPA DE INVIERNO" col="2">
+                    <field name="sale_type_season_cash"   widget="float" options="{'suffix': ' %'}"/>
                     <field name="sale_type_season_credit" widget="float" options="{'suffix': ' %'}"/>
-                </setting>
-            </xpath>
+                </group>
+                <!-- OLD ITEMS -->
+                <group string="Productos del 2024" col="2">
+                    <field name="sale_type_old_2024_cash" widget="float" options="{'suffix': ' %'}"/>
+                    <field name="sale_type_old_2024_credit" widget="float" options="{'suffix': ' %'}"/>
+                </group>
+
+                </div>
+            </div>
+            </div>
+
+        </xpath>
         </field>
     </record>
 </odoo>
