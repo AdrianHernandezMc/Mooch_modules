@@ -33,8 +33,10 @@ class AttendanceReportWizard(models.TransientModel):
 
     employee_ids = fields.Many2many(
         "hr.employee",
-        domain="[('active','=',True)] if not work_location_id else [('active','=',True), ('work_location_id','=', work_location_id)]",
-        help="Si dejas vacío, se incluirán todos los empleados (o los de la sucursal seleccionada)."
+        # Si prefieres mantener el dominio dinámico aquí también:
+        domain="[('active','=',True), ('is_administrative','=',False)] if not work_location_id "
+            "else [('active','=',True), ('is_administrative','=',False), ('work_location_id','=', work_location_id)]",
+        help="Si dejas vacío, se incluirán solo empleados operativos (o los de la sucursal seleccionada)."
     )
 
     include_signature = fields.Boolean(default=True)
@@ -131,7 +133,7 @@ class AttendanceReportWizard(models.TransientModel):
         dto_utc   = dto.astimezone(pytz.UTC).replace(tzinfo=None)   if dto.tzinfo   else dto
 
         # Empleados
-        emp_domain = [('active', '=', True)]
+        emp_domain = [('active', '=', True), ('is_administrative', '=', False)]
         if self.work_location_id:
             emp_domain.append(('work_location_id', '=', self.work_location_id.id))
 
