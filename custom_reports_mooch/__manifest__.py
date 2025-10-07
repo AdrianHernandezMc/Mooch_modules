@@ -5,13 +5,15 @@
     'category': 'Reporting',
     'summary': 'Añade campos extra a los informes de Ventas y Compras',
     'license': 'Other proprietary',
-    'depends': ['sale', 'purchase','hr','hr_attendance','hr_biometric_attendance','custom_rh_mooch','documents'],
+    'depends': ['sale', 'purchase','hr','hr_attendance','hr_biometric_attendance','custom_rh_mooch','documents','base'],
     'data': [
         # Security
         'security/ir.model.access.csv',
         # Compras
         'views/report_purchaseorder_custom.xml',
         # Asistencias
+        "views/giftcard_card_report.xml",
+        "views/loyalty_card_tree_print_inherit.xml",
         'views/attendance_report_actions.xml',
         'views/attendance_report_templates.xml',
         'views/attendance_report_wizard_views.xml',

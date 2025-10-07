@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+
+    <!-- Formato de papel -->
+    <record id="paperformat_gift_card_inline" model="report.paperformat">
+      <field name="name">Gift Card 85x54 mm (ZC300 • Portrait)</field>
+      <field name="default" eval="False"/>
+      <field name="format">custom</field>
+      <field name="page_width">20</field>
+      <field name="page_height">13</field>
+      <field name="orientation">Portrait</field>
+      <field name="margin_top">0</field>
+      <field name="margin_bottom">0</field>
+      <field name="margin_left">0</field>
+      <field name="margin_right">0</field>
+      <field name="dpi">300</field>
+      <field name="header_line" eval="False"/>
+      <field name="header_spacing">0</field>
+    </record>
+
+    <!-- Template QWeb CORREGIDO -->
+    <template id="giftcard_card_template_loyalty">
+      <t t-call="web.basic_layout">
+      <style type="text/css">
+        @page {
+          size: 85mm 55mm;
+          margin: 0;
+        }
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 85mm !important;
+          height: 55mm !important;
+        }
+        .page {
+          width: 85mm;
+          height: 55mm;
+          margin: 0;
+          padding: 0;
+          page-break-after: always;
+          border: none;
+          box-sizing: border-box;
+        }
+        .card {
+          box-sizing: border-box;
+          width: 85mm;
+          height: 55mm;
+          padding: 3mm;
+          border: 0.5mm solid #000;
+          position: relative;
+          overflow: hidden;
+          font-family: Arial, sans-serif;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        /* =============================================== */
+        /* SECCIÓN PARA MANIPULAR TAMAÑOS - EDITA AQUÍ */
+        /* =============================================== */
+        .brand { font-size: 14pt; }      /* MOOCH */
+        .title { font-size: 11pt; }      /* TARJETA DE REGALO */
+        .info { font-size: 10pt; }       /* Texto información general */
+        .code { font-size: 11pt; }       /* Código de la tarjeta */
+        .foot { font-size: 8pt; }        /* Pie de página frente */
+        .signature-label { font-size: 9pt; } /* Texto FIRMA */
+        .back-title { font-size: 11pt; } /* Términos y Condiciones */
+        .tc { font-size: 8pt; }          /* Lista de términos */
+        .support { font-size: 8pt; }     /* Soporte email */
+        /* =============================================== */
+        
+        .grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          align-items: center;
+          margin-bottom: 2mm;
+          flex-shrink: 0;
+        }
+        .brand {
+          font-weight: 700;
+          letter-spacing: 0.3mm;
+        }
+        .title {
+          text-align: right;
+          font-weight: bold;
+        }
+        .info {
+          line-height: 1.4;
+          margin-bottom: 2mm;
+          flex-shrink: 0;
+        }
+        .code {
+          font-weight: 700;
+          margin: 1mm 0;
+        }
+        .media {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          margin: 0 0;
+          flex-grow: 1;
+        }
+        .barcode-container {
+          text-align: center;
+          width: 100%;
+          margin: 0 auto;
+        }
+        .barcode-container img {
+          width: 100%;
+          height: auto;
+          display: block;
+          margin: 0 auto;
+        }
+        .foot {
+          text-align: center;
+          margin-top: auto; /* Esto empuja el pie hacia abajo */
+          padding-top: 2mm;
+          flex-shrink: 0;
+        }
+        .signature-box {
+          border: 0.5mm solid #000;
+          height: 8mm;
+          margin: 3mm 0 4mm;
+          display: flex;
+          justify-content: center;
+          align-items: flex-end;
+        }
+        .signature-box .label {
+          position: relative;
+          top: 1mm;
+          background: #fff;
+          padding: 0 2mm;
+        }
+        .back-title {
+          font-weight: 700;
+          margin-bottom: 3mm;
+        }
+        .tc {
+          margin: 0 0 3mm 3mm;
+          padding: 0;
+          line-height: 1.3;
+        }
+        .tc li {
+          margin: 1.5mm 0;
+        }
+        .support {
+          position: absolute;
+          left: 3mm;
+          right: 3mm;
+          bottom: 3mm;
+          text-align: center;
+        }
+      </style>
+
+        <t t-foreach="docs" t-as="lc">
+          <!-- PÁGINA 1: FRENTE -->
+          <div class="page">
+            <div class="card">
+              <div class="grid">
+                <div class="brand">MOOCH</div>
+                <div class="title">TARJETA DE REGALO</div>
+              </div>
+
+              <div class="info">
+                <div class="code">Código: <span t-esc="lc.code"/></div>
+                <div>Programa: <span t-esc="lc.program_id.display_name"/></div>
+                <div>Saldo: <span t-esc="lc.points_display"/></div>
+                <div t-if="lc.expiration_date">Válida hasta: <span t-field="lc.expiration_date"/></div>
+              </div>
+
+              <div class="media">
+                <div class="barcode-container">
+                  <!-- BARCODE CORREGIDO - mejor tamaño y relación de aspecto -->
+                  <img t-att-src="'/report/barcode/Code128/'+(lc.code or '')+'?width=900&amp;height=170&amp;humanreadable=1'"/>
+                </div>
+              </div>
+
+              <div class="foot">Presenta esta tarjeta en caja. No canjeable por efectivo.</div>
+            </div>
+          </div>
+
+          <!-- PÁGINA 2: REVERSO -->
+          <div class="page">
+            <div class="card">
+              <div class="signature-box">
+                <div class="label signature-label">FIRMA</div>
+              </div>
+              <div class="back-title">Términos y Condiciones</div>
+              <ul class="tc">
+                <li>Válida solo en sucursales participantes.</li>
+                <li>No recargable salvo indicación del programa.</li>
+                <li>Trátese como efectivo; no reemplazable por pérdida.</li>
+                <li>Aplican restricciones del programa de tarjetas de regalo.</li>
+              </ul>
+              <div class="support">Soporte: soporte@mooch.mx</div>
+            </div>
+          </div>
+        </t>
+      </t>
+    </template>
+
+    <!-- Acción de reporte -->
+    <record id="action_loyalty_card_report" model="ir.actions.report">
+      <field name="name">Tarjeta de Regalo (loyalty.card) 85x54 ZC300</field>
+      <field name="model">loyalty.card</field>
+      <field name="report_type">qweb-pdf</field>
+      <field name="report_name">custom_reports_mooch.giftcard_card_template_loyalty</field>
+      <field name="paperformat_id" ref="custom_reports_mooch.paperformat_gift_card_inline"/>
+      <field name="print_report_name">'GiftCard_' + (object.code or 'sin_codigo')</field>
+    </record>
+
+  </data>
+</odoo>
