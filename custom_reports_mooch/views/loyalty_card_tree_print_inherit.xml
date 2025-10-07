@@ -1,0 +1,16 @@
+<odoo>
+  <record id="loyalty_card_tree_print_inherit" model="ir.ui.view">
+    <field name="name">loyalty.card.tree.print.giftcard</field>
+    <field name="model">loyalty.card</field>
+    <field name="inherit_id" ref="loyalty.loyalty_card_view_tree"/>
+    <field name="arch" type="xml">
+      <xpath expr="//tree/button[@name='action_coupon_send']" position="after">
+        <button string="Imprimir"
+                type="action"
+                name="%(custom_reports_mooch.action_loyalty_card_report)d"
+                class="btn-secondary"
+                context="{'active_model':'loyalty.card','active_ids':[active_id]}"/>
+      </xpath>
+    </field>
+  </record>
+</odoo>
