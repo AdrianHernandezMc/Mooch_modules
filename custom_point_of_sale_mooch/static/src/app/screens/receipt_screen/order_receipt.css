@@ -37,7 +37,7 @@
 @media print { 
   @page { size: 150mm auto; margin: 0;}  /* algunos navegadores lo respetan */
 
-/* .pos-receipt, .pos-receipt * {
+ .pos-receipt, .pos-receipt * {
     font-family:
       "Hiragino Kaku Gothic ProN",
       "Hiragino Kaku Gothic Pro",
@@ -47,11 +47,8 @@
       "Noto Sans JP",
       Arial, sans-serif !important;
     color: #000 !important; 
-    font-weight: 800 !important;*/     /* negrita fuerte */
+    font-weight: 800 !important;     /* negrita fuerte */
     /* -webkit-print-color-adjust: exact;
     print-color-adjust: exact; */
-/* } */
+  }
 }
-
-
-
