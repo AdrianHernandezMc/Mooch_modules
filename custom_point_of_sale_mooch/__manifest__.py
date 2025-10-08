@@ -41,6 +41,8 @@
         'custom_point_of_sale_mooch/static/src/app/screens/ticketscreen/ticketscreen.js',
         'custom_point_of_sale_mooch/static/src/app/store/models.js',
         'custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/control_buttons_popup.xml',
+        'custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.xml',
+        'custom_point_of_sale_mooch/static/src/app/navbar/navbar.js',
         #'custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml',
         #'custom_point_of_sale_mooch/static/src/app/screens/PaymentScreen/paymentline_model.js',
         #'custom_point_of_sale_mooch/static/src/js/fixes/safe_global_discount.js',

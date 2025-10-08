@@ -82,7 +82,6 @@ patch(Order.prototype, {
 
     //--- modifica linea de articulos ------
         const olines = this.get_orderlines?.() || [];
-        console.log("r.orderlines",r.orderlines);
         r.orderlines = (r.orderlines || []).map((line, idx) => {
             const oline_   = olines[idx];  //--emparejamos ids de  r.orderlines con olines
             const prod = oline_?.product;
@@ -108,7 +107,6 @@ patch(Order.prototype, {
                 productName: shortName,
                 unit: "" }; 
         });
-        console.log("r.pos_orderlines",r.orderlines);
     //--- agreto las lineas de pago el transanction Id
 
         const Paymentsline = this.get_paymentlines?.() || [];
@@ -139,6 +137,7 @@ patch(Order.prototype, {
           }];
           r.new_coupon_info = base
         }
+        console.log(r.new_coupon_info)
         console.log("Sin error")
     return r;
   },

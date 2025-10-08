@@ -27,6 +27,7 @@ patch(PaymentScreen.prototype, {
         this.pos.txState = useState({ value: "" });
         this.orm = useService("orm");
         this.rpc = useService("rpc");
+        
     },
     async onMounted() {
         //this._super();
@@ -83,8 +84,6 @@ patch(PaymentScreen.prototype, {
     async validateOrder() {
         // Bloquea validación si hace falta y no se capturó t.credito t.de
         
-        
-
         const line = this.selectedPaymentLine;
         if (this.requiresTxId && (!line?.transaction_id || !line.transaction_id.trim())) {
             await this.popup.add(ErrorPopup, {
@@ -96,13 +95,12 @@ patch(PaymentScreen.prototype, {
 
         // bloque para mover los cambios de los articulos *****
         const order = this.pos.get_order();
-        console.log("Order",order.product_changes_id)
+        console.log("Order",order)
         const order_iines = order.get_orderlines();
-        const cfgId = this.pos.config.id;
+        //const cfgId = this.pos.config.id;
         const product_id = order.product_changes_id //await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
         //console.log("Entro",await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {}))
         const existe = order_iines.some(line => line.product.id === product_id);
-        
         
         if (existe) {
             const ondoInventory = await this.apply_changes();
@@ -119,17 +117,18 @@ patch(PaymentScreen.prototype, {
             this.currentOrder.couponPointChanges = []
          } 
         
-        super.validateOrder(...arguments);
-        console.log("Entro")
+         if (exist_vale) {
+            console.log("Entro")
+            const cfgId = this.pos.config.id; 
+            const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
+            const crate_vale = this.create_vale(order,loyalty_program_id)
+            if (!crate_vale) {
+                console.log("error_vale")
+            return
+            }
+         }
 
-        // if (exist_vale) {
-        //     alert("Entro")
-        //     const crate_vale = this.create_vale(orderbeforebackend,loyalty_program_id)
-        //     if (!crate_vale) {
-        //         alert("error_vale")
-        //        return
-        //     }
-        // }
+         super.validateOrder(...arguments);
     },
 
     async create_vale(order,loyaty_program_id){
@@ -158,7 +157,8 @@ patch(PaymentScreen.prototype, {
           code:                order.voucher_code,
           expiration_date:     dateAddOneMonth,
           points:              totalWithTax,
-          source_pos_order_id: order.server_id,         // referenciamos la venta
+          //source_pos_order_id: order.server_id,
+          pos_reference: order.name,         // referenciamos la venta
         };
 
         console.log("couponData",couponData)

@@ -13,8 +13,11 @@ class PosConfig(models.Model):
     #     compute_sudo=True,
     #     store=False,  # si quieres verlo siempre en el POS, no es necesario store=True
     # )
-
-
+    advanced_employee_ids = fields.Many2many(
+        'hr.employee',
+        string='Advanced Employees'
+    )
+    
     @api.model
     def get_changes_product_id(self, config_id):
         cfg = self.browse(config_id).sudo()
@@ -23,6 +26,7 @@ class PosConfig(models.Model):
         pid = int(raw) if raw.isdigit() and int(raw) > 0 else 0
         return pid or False
 
+
     @api.model
     def get_loyalty_program_id(self, config_id):
         cfg = self.browse(config_id).sudo()
@@ -30,6 +34,7 @@ class PosConfig(models.Model):
         raw = (ICP.get_param("voucher.loyalty_program_id") or "").strip()
         pid = int(raw) if raw.isdigit() and int(raw) > 0 else 0
         return pid or False
+
 
     @api.model
     def get_withdrawal(self, config_id=None):
@@ -43,8 +48,6 @@ class PosConfig(models.Model):
             return float(val or 0.0)
         except Exception:
             return 0.0
-        
-
         
     # @api.depends("company_id")
     # def _compute_changes_product_id(self):
@@ -61,3 +64,7 @@ class PosConfig(models.Model):
     #         except Exception:
     #             _logger.exception("compute changes_product_id cfg=%s", cfg.id)
     #         cfg.changes_product_id = val
+
+
+
+
