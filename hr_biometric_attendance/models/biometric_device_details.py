@@ -163,9 +163,9 @@ class BiometricDeviceDetails(models.Model):
         hr_attendance = self.env['hr.attendance']
 
         # Parámetros de control
-        TOL = timedelta(minutes=2)           # Para considerar dos IN iguales (rebote del reloj)
-        ADJUST_MAX = timedelta(minutes=10)   # Máx. ventana para "ajustar" un IN abierto hacia atrás
-        MAX_OPEN = timedelta(hours=16)       # Límite razonable de jornada para cerrar abiertos obsoletos
+        TOL = timedelta(minutes=2)           
+        ADJUST_MAX = timedelta(minutes=10)   
+        MAX_OPEN = timedelta(hours=16)       
 
         def _exists_same_in(emp_id, dt_str):
             """¿Ya existe un IN exactamente en dt_str para el empleado (abierto o cerrado)?"""
