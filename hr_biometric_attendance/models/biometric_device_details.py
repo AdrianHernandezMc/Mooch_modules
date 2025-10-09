@@ -265,6 +265,7 @@ class BiometricDeviceDetails(models.Model):
                     utc_dt = local_dt.astimezone(pytz.utc)
                     atten_time = fields.Datetime.to_string(utc_dt)
                     atten_time_dt = fields.Datetime.from_string(atten_time)
+                    atten_date = utc_dt.date()  # 🔥 NUEVO: Obtener fecha del registro
 
                     # Espejo (evitar duplicado)
                     if not zk_attendance.search([
@@ -315,16 +316,22 @@ class BiometricDeviceDetails(models.Model):
                                     merged_or_skipped = True
                                     break
                                 else:
-                                    # Diferencia grande: cerrar abierto y seguir evaluando
-                                    close_at = max(open_att.check_in, atten_time_dt - timedelta(seconds=1))
-                                    close_at = min(close_at, open_att.check_in + MAX_OPEN)
-                                    _logger.info("[BIO] Cerrando IN obsoleto %s: IN %s, OUT %s",
-                                                emp.name, open_att.check_in, close_at)
-                                    try:
-                                        open_att.write({'check_out': fields.Datetime.to_string(close_at)})
-                                    except ValidationError as ve:
-                                        _logger.warning("[BIO] Bloqueo cerrando obsoleto de %s. Omitido. %s",
-                                                        emp.name, ve)
+                                    # 🔥 MODIFICADO: Solo cerrar si NO es del día actual
+                                    open_att_date = open_att.check_in.date() if open_att.check_in else None
+                                    if open_att_date and open_att_date < current_date:
+                                        # Diferencia grande y es día anterior: cerrar abierto
+                                        close_at = max(open_att.check_in, atten_time_dt - timedelta(seconds=1))
+                                        close_at = min(close_at, open_att.check_in + MAX_OPEN)
+                                        _logger.info("[BIO] Cerrando IN OBSOLETO (día anterior) %s: IN %s, OUT %s",
+                                                    emp.name, open_att.check_in, close_at)
+                                        try:
+                                            open_att.write({'check_out': fields.Datetime.to_string(close_at)})
+                                        except ValidationError as ve:
+                                            _logger.warning("[BIO] Bloqueo cerrando obsoleto de %s. Omitido. %s",
+                                                            emp.name, ve)
+                                    else:
+                                        _logger.info("[BIO] IN anterior del MISMO DÍA mantenido abierto: %s @ %s", 
+                                                    emp.name, open_att.check_in)
                                     continue
 
                             # IN posterior al abierto
@@ -335,23 +342,35 @@ class BiometricDeviceDetails(models.Model):
                                     merged_or_skipped = True
                                     break
                                 else:
-                                    # Abierto muy viejo: ciérralo y continúa
-                                    close_at = min(open_att.check_in + MAX_OPEN, atten_time_dt - timedelta(seconds=1))
-                                    _logger.info("[BIO] Cerrando IN muy antiguo %s: IN %s, OUT %s",
-                                                emp.name, open_att.check_in, close_at)
-                                    try:
-                                        open_att.write({'check_out': fields.Datetime.to_string(close_at)})
-                                    except ValidationError as ve:
-                                        _logger.warning("[BIO] Bloqueo cerrando antiguo de %s. Omitido. %s",
-                                                        emp.name, ve)
+                                    # 🔥 MODIFICADO: Solo cerrar si NO es del día actual
+                                    open_att_date = open_att.check_in.date() if open_att.check_in else None
+                                    if open_att_date and open_att_date < current_date:
+                                        # Abierto muy viejo de día anterior: ciérralo
+                                        close_at = min(open_att.check_in + MAX_OPEN, atten_time_dt - timedelta(seconds=1))
+                                        _logger.info("[BIO] Cerrando IN MUY ANTIGUO (día anterior) %s: IN %s, OUT %s",
+                                                    emp.name, open_att.check_in, close_at)
+                                        try:
+                                            open_att.write({'check_out': fields.Datetime.to_string(close_at)})
+                                        except ValidationError as ve:
+                                            _logger.warning("[BIO] Bloqueo cerrando antiguo de %s. Omitido. %s",
+                                                            emp.name, ve)
+                                    else:
+                                        _logger.info("[BIO] IN del MISMO DÍA mantenido abierto: %s @ %s", 
+                                                    emp.name, open_att.check_in)
                                     continue
 
                         if merged_or_skipped:
                             continue
 
-                        # Seguridad fuerte antes de crear: ¿quedó algún abierto?
-                        if hr_attendance.search_count([('employee_id', '=', emp.id), ('check_out', '=', False)]):
-                            _logger.warning("[BIO] Aún existe un IN abierto para %s; IN @ %s omitido para evitar ValidationError.",
+                        # 🔥 MODIFICADO: Verificar abiertos pero permitir del día actual
+                        open_today = hr_attendance.search_count([
+                            ('employee_id', '=', emp.id), 
+                            ('check_out', '=', False),
+                            ('check_in', '>=', fields.Datetime.to_string(current_date))  # Solo del día actual
+                        ])
+                        
+                        if open_today:
+                            _logger.warning("[BIO] Ya existe IN ABIERTO HOY para %s; nuevo IN @ %s omitido.",
                                             emp.name, atten_time)
                             continue
 
@@ -411,7 +430,6 @@ class BiometricDeviceDetails(models.Model):
                 except Exception:
                     pass
                 raise ValidationError(str(e))
-
 
     def action_restart_device(self):
         """For restarting the device"""
