@@ -398,45 +398,45 @@ class ReportAttendancePDF(models.AbstractModel):
                     lunch_out, lunch_in = lo, li
                     logger.debug("Ambos tipos válidos: lunch_out=%s, lunch_in=%s", fmt(lunch_out), fmt(lunch_in))
 
-            elif lunch_out_events and not lunch_in_events:
-                # Sólo hay códigos 4 → usar primero/último como ventana de comida
-                lo_first = min(lunch_out_events)
-                lo_last  = max(lunch_out_events)
-                if lo_last > lo_first:
-                    dur = lo_last - lo_first
-                    if timedelta(minutes=20) <= dur <= timedelta(hours=2):
-                        lunch_out, lunch_in = lo_first, lo_last
-                        logger.debug("Solo lunch_out: usando primero y último: %s a %s", fmt(lunch_out), fmt(lunch_in))
-                # Si aún falta cerrar, asumir +60m (cap a salida si existe)
-                if lunch_out is None or lunch_in is None:
-                    lunch_out = lunch_out or lo_first
-                    li = lunch_out + timedelta(hours=1)
-                    if last_out and li > last_out:
-                        li = last_out
-                    lunch_in = lunch_in or li
-                    logger.debug("Solo lunch_out: sin par → asumiendo +60m: %s", fmt(lunch_in))
+        #     elif lunch_out_events and not lunch_in_events:
+        #         # Sólo hay códigos 4 → usar primero/último como ventana de comida
+        #         lo_first = min(lunch_out_events)
+        #         lo_last  = max(lunch_out_events)
+        #         if lo_last > lo_first:
+        #             dur = lo_last - lo_first
+        #             if timedelta(minutes=20) <= dur <= timedelta(hours=2):
+        #                 lunch_out, lunch_in = lo_first, lo_last
+        #                 logger.debug("Solo lunch_out: usando primero y último: %s a %s", fmt(lunch_out), fmt(lunch_in))
+        #         # Si aún falta cerrar, asumir +60m (cap a salida si existe)
+        #         if lunch_out is None or lunch_in is None:
+        #             lunch_out = lunch_out or lo_first
+        #             li = lunch_out + timedelta(hours=1)
+        #             if last_out and li > last_out:
+        #                 li = last_out
+        #             lunch_in = lunch_in or li
+        #             logger.debug("Solo lunch_out: sin par → asumiendo +60m: %s", fmt(lunch_in))
 
-            elif lunch_in_events and not lunch_out_events:
-                # Caso raro: sólo códigos 5 → asumir -60m
-                li = max(lunch_in_events)
-                lo = li - timedelta(hours=1)
-                lunch_out, lunch_in = lo, li
-                logger.debug("Solo lunch_in: asumiendo -60m: %s a %s", fmt(lunch_out), fmt(lunch_in))
+        #     elif lunch_in_events and not lunch_out_events:
+        #         # Caso raro: sólo códigos 5 → asumir -60m
+        #         li = max(lunch_in_events)
+        #         lo = li - timedelta(hours=1)
+        #         lunch_out, lunch_in = lo, li
+        #         logger.debug("Solo lunch_in: asumiendo -60m: %s a %s", fmt(lunch_out), fmt(lunch_in))
 
-        # 3.2 Inferir por calendario (usar SOLO checadas de comida)
-        if not is_sunday and (lunch_out is None or lunch_in is None) and ls_plan and le_plan:
-            TOL = timedelta(minutes=90)
-            window_start = ls_plan - TOL
-            window_end   = le_plan + TOL
-            lunch_times = [dt for dt in (lunch_out_events + lunch_in_events)
-                        if window_start <= dt <= window_end]
-            if lunch_times:
-                lunch_out = lunch_out or min(lunch_times)
-                lunch_in  = lunch_in  or max(lunch_times)
-                logger.debug("Comida inferida por checadas de comida en ventana: %s a %s", fmt(lunch_out), fmt(lunch_in))
-            else:
-                lunch_out, lunch_in = ls_plan, le_plan
-                logger.debug("Comida por calendario: %s a %s", fmt(lunch_out), fmt(lunch_in))
+        # # 3.2 Inferir por calendario (usar SOLO checadas de comida)
+        # if not is_sunday and (lunch_out is None or lunch_in is None) and ls_plan and le_plan:
+        #     TOL = timedelta(minutes=90)
+        #     window_start = ls_plan - TOL
+        #     window_end   = le_plan + TOL
+        #     lunch_times = [dt for dt in (lunch_out_events + lunch_in_events)
+        #                 if window_start <= dt <= window_end]
+        #     if lunch_times:
+        #         lunch_out = lunch_out or min(lunch_times)
+        #         lunch_in  = lunch_in  or max(lunch_times)
+        #         logger.debug("Comida inferida por checadas de comida en ventana: %s a %s", fmt(lunch_out), fmt(lunch_in))
+        #     else:
+        #         lunch_out, lunch_in = ls_plan, le_plan
+        #         logger.debug("Comida por calendario: %s a %s", fmt(lunch_out), fmt(lunch_in))
 
         # 3.3 Validar duración
         if lunch_out and lunch_in:
