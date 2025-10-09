@@ -166,9 +166,6 @@ class BiometricDeviceDetails(models.Model):
         TOL = timedelta(minutes=2)           
         ADJUST_MAX = timedelta(minutes=10)   
         MAX_OPEN = timedelta(hours=16)       
-        
-        # 🔥 NUEVO: Obtener fecha actual
-        current_date = fields.Datetime.now().date()
 
         def _exists_same_in(emp_id, dt_str):
             """¿Ya existe un IN exactamente en dt_str para el empleado (abierto o cerrado)?"""
