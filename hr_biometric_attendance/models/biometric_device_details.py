@@ -157,35 +157,179 @@ class BiometricDeviceDetails(models.Model):
                 raise ValidationError(f'{error}')
 
     def action_download_attendance(self):
-        """Descarga registros del dispositivo evitando duplicados y el ValidationError de 'ya registró su entrada'."""
+        """Descarga registros del dispositivo y los mapea a pares IN/OUT consecutivos en Odoo"""
         _logger.info("++++++++++++ Descargando asistencia desde el dispositivo ++++++++++++++")
         zk_attendance = self.env['zk.machine.attendance']
         hr_attendance = self.env['hr.attendance']
 
         # Parámetros de control
-        TOL = timedelta(minutes=2)           # Para considerar dos IN iguales (rebote del reloj)
-        ADJUST_MAX = timedelta(minutes=10)   # Máx. ventana para "ajustar" un IN abierto hacia atrás
-        MAX_OPEN = timedelta(hours=16)       # Límite razonable de jornada para cerrar abiertos obsoletos
+        TOL = timedelta(minutes=2)
 
-        def _exists_same_in(emp_id, dt_str):
-            """¿Ya existe un IN exactamente en dt_str para el empleado (abierto o cerrado)?"""
-            return bool(hr_attendance.search_count([
-                ('employee_id', '=', emp_id),
-                ('check_in', '=', dt_str),
-            ]))
+        def _safe_create_attendance_pair(emp, in_time, out_time):
+            """Crea un par IN/OUT en hr.attendance"""
+            # Verificar si ya existe este par exacto
+            existing = hr_attendance.search([
+                ('employee_id', '=', emp.id),
+                ('check_in', '=', in_time),
+                ('check_out', '=', out_time),
+            ], limit=1)
+            
+            if not existing:
+                try:
+                    hr_attendance.create({
+                        'employee_id': emp.id,
+                        'check_in': in_time,
+                        'check_out': out_time,
+                    })
+                    _logger.info("[BIO] Par creado: %s [%s -> %s]", emp.name, in_time, out_time)
+                except ValidationError as ve:
+                    _logger.warning("[BIO] Error creando par para %s [%s -> %s]: %s", 
+                                emp.name, in_time, out_time, ve)
 
-        def _safe_create_in(emp, dt_str):
-            """Crea IN con deduplicación y tolerancia a ValidationError."""
-            if _exists_same_in(emp.id, dt_str):
-                _logger.info("[BIO] IN ya existente (misma marca), omitido: %s @ %s", emp.name, dt_str)
-                return
+        for info in self:
+            machine_ip = info.device_ip
+            zk_port = info.port_number
+
             try:
-                hr_attendance.create({'employee_id': emp.id, 'check_in': dt_str})
-                _logger.info("[BIO] IN creado: %s @ %s", emp.name, dt_str)
-            except ValidationError as ve:
-                # Evita romper todo el batch: loguea y continúa
-                _logger.warning("[BIO] Odoo bloqueó IN para %s @ %s (prob. IN abierto). Omitido. Detalle: %s",
-                                emp.name, dt_str, ve)
+                zk = ZK(machine_ip, port=zk_port, timeout=15, password=0, force_udp=False, ommit_ping=False)
+            except NameError:
+                raise UserError(_("Pyzk module not Found. Please install it with 'pip3 install pyzk'."))
+
+            conn = self.device_connect(zk)
+            if not conn:
+                raise UserError(_('Unable to connect to Attendance Device.'))
+
+            try:
+                conn.disable_device()
+                attendance_logs = conn.get_attendance() or []
+
+                # Orden cronológico
+                try:
+                    attendance_logs = sorted(attendance_logs, key=lambda a: a.timestamp)
+                except Exception:
+                    pass
+
+                # TZ del usuario
+                tzname = (self.env.user.tz or getattr(self.env.user.partner_id, 'tz', None) or 'UTC')
+                local_tz = pytz.timezone(tzname)
+
+                # Agrupar por empleado y día
+                employee_attendance = {}
+                
+                for each in attendance_logs:
+                    device_user_id = str(each.user_id) if each.user_id is not None else False
+                    if not device_user_id:
+                        continue
+
+                    # Buscar empleado
+                    emp = self.env['hr.employee'].with_context(active_test=False).search([
+                        ('device_id_num', '=', device_user_id),
+                        ('company_id', '=', info.company_id.id),
+                        ('device_id', '=', info.id),
+                    ], limit=1)
+                    
+                    if not emp:
+                        _logger.warning("[BIO] Empleado no encontrado para device_id_num=%s", device_user_id)
+                        continue
+
+                    # Normalizar hora
+                    local_dt = local_tz.localize(each.timestamp, is_dst=None)
+                    utc_dt = local_dt.astimezone(pytz.utc)
+                    atten_time = fields.Datetime.to_string(utc_dt)
+                    atten_date = utc_dt.date()
+
+                    # Agrupar por empleado y fecha
+                    key = (emp.id, atten_date)
+                    if key not in employee_attendance:
+                        employee_attendance[key] = []
+                    
+                    employee_attendance[key].append({
+                        'time': atten_time,
+                        'datetime': utc_dt,
+                        'punch': int(each.punch) if each.punch is not None else -1,
+                        'original_data': each
+                    })
+
+                    # Guardar en zk.machine.attendance (espejo)
+                    if not zk_attendance.search([
+                        ('employee_id', '=', emp.id),
+                        ('device_id_num', '=', device_user_id),
+                        ('punching_time', '=', atten_time),
+                        ('punch_type', '=', str(each.punch)),
+                    ], limit=1):
+                        zk_attendance.create({
+                            'employee_id': emp.id,
+                            'device_id_num': device_user_id,
+                            'attendance_type': str(each.status),
+                            'punch_type': str(each.punch),
+                            'punching_time': atten_time,
+                            'address_id': info.address_id.id if info.address_id else False,
+                        })
+
+                # PROCESAR CADA EMPLEADO/DÍA - CREAR PARES CONSECUTIVOS
+                for (emp_id, atten_date), records in employee_attendance.items():
+                    # Ordenar por tiempo
+                    records.sort(key=lambda x: x['datetime'])
+                    emp = self.env['hr.employee'].browse(emp_id)
+                    
+                    _logger.info("[BIO] Procesando %s registros para %s el %s", 
+                                len(records), emp.name, atten_date)
+                    
+                    # Filtrar solo checadas válidas (IN=0, OUT=1, BREAK_OUT=2, BREAK_IN=3)
+                    valid_records = [r for r in records if r['punch'] in [0, 1, 2, 3]]
+                    
+                    # Crear pares consecutivos
+                    i = 0
+                    while i < len(valid_records) - 1:
+                        current = valid_records[i]
+                        next_rec = valid_records[i + 1]
+                        
+                        # Mapeo: cualquier "entrada" seguida de cualquier "salida" crea un par
+                        # 0=IN → 1=OUT: primer par (mañana)
+                        # 0=IN → 2=BREAK_OUT: primer par (mañana)  
+                        # 2=BREAK_OUT → 3=BREAK_IN: segundo par (tarde)
+                        # 3=BREAK_IN → 1=OUT: segundo par (tarde)
+                        if current['punch'] in [0, 2, 3] and next_rec['punch'] in [1, 2, 3]:
+                            # Verificar que no sea el mismo timestamp (rebote)
+                            time_diff = next_rec['datetime'] - current['datetime']
+                            if time_diff > TOL:
+                                _logger.info("[BIO] Creando par: %s (%s) → %s (%s)", 
+                                            current['time'], current['punch'], 
+                                            next_rec['time'], next_rec['punch'])
+                                _safe_create_attendance_pair(emp, current['time'], next_rec['time'])
+                                i += 2  # Saltar al siguiente par
+                            else:
+                                _logger.info("[BIO] Rebote detectado, omitiendo: %s", current['time'])
+                                i += 1  # Rebote, saltar solo uno
+                        else:
+                            _logger.info("[BIO] No se puede formar par: %s (%s) → %s (%s)", 
+                                        current['time'], current['punch'], 
+                                        next_rec['time'], next_rec['punch'])
+                            i += 1
+
+                    # Log de registros no procesados
+                    if i < len(valid_records):
+                        _logger.warning("[BIO] %s registros sin procesar para %s", 
+                                    len(valid_records) - i, emp.name)
+
+                if not self.is_live_capture:
+                    current_time = fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    message = _('Datos descargados del dispositivo el %s por %s') % (current_time, self.env.user.name)
+                    self.message_post(body=message)
+
+                conn.enable_device()
+                conn.disconnect()
+                _logger.info("++++++++++++ Descarga finalizada correctamente ++++++++++++++")
+                return True
+
+            except Exception as e:
+                _logger.exception("Error durante la descarga de asistencia")
+                try:
+                    conn.enable_device()
+                    conn.disconnect()
+                except Exception:
+                    pass
+                raise ValidationError(str(e))
 
         def _safe_create_span(emp, in_dt_str, out_dt_str):
             """Crea tramo IN/OUT corto con tolerancia a ValidationError."""
