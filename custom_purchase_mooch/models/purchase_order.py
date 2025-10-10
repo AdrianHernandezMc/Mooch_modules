@@ -1,4 +1,7 @@
-import json, logging
+# -*- coding: utf-8 -*-
+import json
+import logging
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.addons.decimal_precision import dp
@@ -6,9 +9,13 @@ from odoo.tools.misc import format_amount
 
 _logger = logging.getLogger(__name__)
 
+
 class PurchaseOrder(models.Model):
     _inherit = 'purchase.order'
 
+    # =========================
+    #      CAMPOS EXTRAS
+    # =========================
     invoice_tag_ids = fields.Many2many(
         'purchase.invoice.tag',
         'purchase_order_invoice_tag_rel',
@@ -48,7 +55,12 @@ class PurchaseOrder(models.Model):
         default=False,
         copy=False,
     )
-    show_confirm_button = fields.Boolean(string="Mostrar Confirmar", compute='_compute_show_confirm_button', store=False)
+
+    show_confirm_button = fields.Boolean(
+        string="Mostrar Confirmar",
+        compute='_compute_show_confirm_button',
+        store=False
+    )
 
     qty_total_order = fields.Float(
         string='Conteo total de cantidades',
@@ -57,6 +69,7 @@ class PurchaseOrder(models.Model):
         help='Suma de las cantidades de las líneas de la orden, excluyendo secciones y notas.',
         store=True,
     )
+
     employee_id = fields.Many2one(
         'hr.employee',
         string='Solicitante',
@@ -65,6 +78,9 @@ class PurchaseOrder(models.Model):
         required=True
     )
 
+    # =========================
+    #        COMPUTES
+    # =========================
     @api.depends('order_line.price_unit', 'order_line.product_qty', 'order_line.discount')
     def _compute_total_discount(self):
         for order in self:
@@ -74,11 +90,42 @@ class PurchaseOrder(models.Model):
             )
             order.total_discount = total
 
+    # =========================
+    #        ONCHANGES
+    # =========================
     @api.onchange('discount_global')
     def _onchange_discount_global(self):
         for line in self.order_line:
             line.discount = self.discount_global or 0.0
 
+    @api.onchange('order_line')
+    def _onchange_order_lines_analytic(self):
+        for po in self:
+            accounts = po.order_line.mapped('analytic_account_id')
+            po.analytic_account_id = accounts[0] if len(accounts) == 1 else False
+
+    @api.onchange('order_line', 'order_line.product_qty', 'order_line.display_type')
+    def _onchange_qty_total_order(self):
+        for order in self:
+            order.qty_total_order = sum(
+                l.product_qty for l in order.order_line if not l.display_type
+            )
+
+    @api.depends('budget_validated')
+    def _compute_show_confirm_button(self):
+        for order in self:
+            order.show_confirm_button = order.budget_validated
+
+    @api.depends('order_line.product_qty', 'order_line.display_type')
+    def _compute_qty_total_order(self):
+        for order in self:
+            order.qty_total_order = sum(
+                l.product_qty for l in order.order_line if not l.display_type
+            )
+
+    # =========================
+    #       ACCIONES UI
+    # =========================
     def action_open_product_selector(self):
         return {
             'type': 'ir.actions.act_window',
@@ -91,24 +138,74 @@ class PurchaseOrder(models.Model):
             },
         }
 
-    @api.onchange('order_line')
-    def _onchange_order_lines_analytic(self):
-        for po in self:
-            accounts = po.order_line.mapped('analytic_account_id')
-            po.analytic_account_id = accounts[0] if len(accounts)==1 else False
+    def action_open_discount_wizard(self):
+        self.ensure_one()
+        return {
+            'name': 'Agregar Descuento Global',
+            'type': 'ir.actions.act_window',
+            'res_model': 'purchase.discount.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_order_id': self.id,
+            }
+        }
 
-    @api.depends('budget_validated')
-    def _compute_show_confirm_button(self):
-        for order in self:
-            order.show_confirm_button = order.budget_validated
+    # =========================
+    #        HELPERS NUEVOS
+    # =========================
+    def _get_ref_date_for_budget(self):
+        """
+        Fecha de referencia para elegir la línea de presupuesto: usa la fecha de la PO.
+        Si no existe, usa ahora.
+        """
+        ref_dt = self.date_order or fields.Datetime.now()
+        return fields.Date.to_date(ref_dt)
 
+    def _get_budget_line_for_date(self, analytic_account, ref_date):
+        """
+        Devuelve la línea de presupuesto vigente para la cuenta en ref_date.
+        """
+        BudgetLine = self.env['crossovered.budget.lines']
+        return BudgetLine.search([
+            ('analytic_account_id', '=', analytic_account.id),
+            ('date_from', '<=', ref_date),
+            ('date_to', '>=', ref_date),
+        ], limit=1)
+
+    def _get_committed_from_invoices_period(self, analytic_account, date_from, date_to):
+        """
+        Comprometido solo por facturas de proveedor POSTEADAS en el periodo del presupuesto,
+        usando account.analytic.line enlazada a apuntes contables.
+
+        Notas:
+          - Filtramos por move_line_id.parent_state = 'posted' (estado del asiento).
+          - Filtramos por move_type in ('in_invoice','in_refund').
+          - Costos (amount negativo) → sumamos -amount; refunds restan.
+        """
+        AnalyticLine = self.env['account.analytic.line']
+        domain = [
+            ('account_id', '=', analytic_account.id),
+            ('date', '>=', date_from),
+            ('date', '<=', date_to),
+            ('move_line_id', '!=', False),
+            ('move_line_id.parent_state', '=', 'posted'),
+            ('move_line_id.move_id.move_type', 'in', ('in_invoice', 'in_refund')),
+        ]
+        lines = AnalyticLine.search(domain)
+        committed = sum((-l.amount) for l in lines)
+        return max(committed, 0.0)
+
+    # =========================
+    #     VALIDACIÓN PRESUP.
+    # =========================
     def action_check_budget(self):
         self.ensure_one()
         _logger.info("Iniciando validación de presupuesto para PO %s", self.name)
 
         try:
             BudgetLine = self.env['crossovered.budget.lines']
-            AnalyticLine = self.env['account.analytic.line']
+            AnalyticLine = self.env['account.analytic.line']  # noqa: F841
         except KeyError as e:
             _logger.error("Error al cargar modelos de presupuesto: %s", str(e))
             self.budget_validated = True
@@ -123,19 +220,21 @@ class PurchaseOrder(models.Model):
                 }
             }
 
-        today = fields.Date.context_today(self)
+        # === Usar el periodo de presupuesto según la fecha de la PO (no 'hoy')
+        ref_date = self._get_ref_date_for_budget()
+
         message_lines = []
         has_errors = False
 
-        # 1. Identificar descuentos (líneas negativas)
+        # 1) Identificar descuentos (líneas negativas) de ESTA PO
         discount_lines = self.order_line.filtered(lambda l: l.price_total < 0)
         total_discount = abs(sum(discount_lines.mapped('price_total'))) if discount_lines else 0.0
 
-        # 2. Mostrar resumen financiero (estilo compacto)
+        # 2) Resumen financiero (tal como lo tenías)
         subtotal_sin_descuento = sum(line.price_subtotal for line in self.order_line if line.price_total >= 0)
-        subtotal_con_descuento = subtotal_sin_descuento - total_discount  # Aquí aplicamos el descuento al subtotal
+        subtotal_con_descuento = subtotal_sin_descuento - total_discount
         iva_amount = sum(line.price_tax for line in self.order_line if line.price_total >= 0)
-        total = subtotal_con_descuento + iva_amount  # El total ahora usa el subtotal con descuento
+        total = subtotal_con_descuento + iva_amount
 
         message_lines.append(f"""
         <div style="margin-bottom: 15px; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
@@ -150,12 +249,11 @@ class PurchaseOrder(models.Model):
         </div>
         """)
 
-        # 3. Procesar líneas para presupuesto (excluyendo descuentos)
+        # 3) Procesar líneas para presupuesto (excluyendo descuentos) con prorrateo analítico
         totals = {}
         for line in self.order_line:
             if line.price_total < 0:
                 continue
-                
             if not line.analytic_distribution:
                 continue
 
@@ -165,7 +263,6 @@ class PurchaseOrder(models.Model):
                     analytic_dist = json.loads(analytic_dist)
                 except json.JSONDecodeError:
                     continue
-
             if not isinstance(analytic_dist, dict):
                 continue
 
@@ -180,63 +277,54 @@ class PurchaseOrder(models.Model):
                 if not acct.exists():
                     continue
 
-                amt = line.price_total * (percentage / 100.0)
+                amt = line.price_total * (percentage / 100.0)  # mantiene tu lógica (con IVA)
                 totals[acct] = totals.get(acct, 0.0) + amt
 
         if not totals:
             raise UserError(_("No se encontraron distribuciones analíticas válidas en las líneas del pedido."))
 
-        # 4. Validación contra presupuestos (estilo original con iconos)
+        # 4) Validación contra presupuestos (con periodo por fecha de la PO y comprometido por facturas posteadas)
         for acct, po_amt in totals.items():
-            # Buscar línea de presupuesto vigente
-            bline = BudgetLine.search([
-                ('analytic_account_id', '=', acct.id),
-                ('date_from', '<=', today),
-                ('date_to', '>=', today),
-            ], limit=1)
-
+            # Línea del presupuesto que cubre la fecha de esta PO
+            bline = self._get_budget_line_for_date(acct, ref_date)
             if not bline:
                 message_lines.append(f"""
                 <div style="margin-bottom: 15px; color: #f44336;">
                     <h3>❌ {acct.name}</h3>
-                    <p>No hay línea de presupuesto para el período actual</p>
+                    <p>No hay línea de presupuesto para el período que cubre la fecha del pedido ({ref_date}).</p>
                 </div>
                 """)
                 has_errors = True
                 continue
 
-            # Calcular total comprometido (valor absoluto)
-            domain = [
-                ('account_id', '=', acct.id),
-                ('date', '>=', bline.date_from),
-                ('date', '<=', bline.date_to),
-            ]
-            analytic_lines = AnalyticLine.search(domain)
-            total_comprometido = sum(abs(line.amount) for line in analytic_lines)
+            # Comprometido actual SOLO por facturas posteadas del periodo (trimestre presupuestal)
+            total_comprometido = self._get_committed_from_invoices_period(
+                analytic_account=acct,
+                date_from=bline.date_from,
+                date_to=bline.date_to,
+            )
 
-            # Buscar descuentos para esta cuenta
+            # Descuentos de ESTA ORDEN prorrateados a esta cuenta
             account_discount = 0.0
             for d_line in discount_lines:
                 if not d_line.analytic_distribution:
                     continue
-                    
                 d_dist = d_line.analytic_distribution
                 if isinstance(d_dist, str):
                     try:
                         d_dist = json.loads(d_dist)
                     except json.JSONDecodeError:
                         continue
-
                 if str(acct.id) in d_dist:
                     account_discount += abs(d_line.price_total) * (float(d_dist[str(acct.id)]) / 100.0)
 
-            # Calcular montos ajustados
+            # Montos ajustados de ESTA ORDEN
             monto_bruto = abs(po_amt)
             monto_neto = max(0, monto_bruto - account_discount)
             nuevo_compromiso = total_comprometido + monto_neto
             diferencia = bline.planned_amount - nuevo_compromiso
 
-            # Validación (estilo original con iconos)
+            # Render de resultados por cuenta
             if nuevo_compromiso > bline.planned_amount:
                 exceso = nuevo_compromiso - bline.planned_amount
                 message_lines.append(f"""
@@ -270,7 +358,7 @@ class PurchaseOrder(models.Model):
                 </div>
                 """)
 
-        # 5. Mostrar resultados en wizard
+        # 5) Wizard con resultados
         if not has_errors:
             self.budget_validated = True
 
@@ -307,13 +395,18 @@ class PurchaseOrder(models.Model):
             'context': self.env.context,
         }
 
-    # Sobrescribes button_confirm para forzar check si no se ha validado
+    # =========================
+    #       CONFIRMACIÓN
+    # =========================
     def button_confirm(self):
         for po in self:
             if not po.budget_validated:
                 raise UserError(_("Debes primero “Validar Presupuesto”"))
         return super().button_confirm()
 
+    # =========================
+    #   DASHBOARD / RESUMEN
+    # =========================
     def get_department_budget_data(self):
         BudgetLine = self.env['crossovered.budget.lines']
         AnalyticLine = self.env['account.analytic.line']
@@ -323,29 +416,24 @@ class PurchaseOrder(models.Model):
 
         result = []
         for dept in departments:
-            # Buscar cuentas analíticas asociadas al departamento
             accounts = self.env['account.analytic.account'].search([
                 ('department_id', '=', dept.id),
                 ('active', '=', True)
             ])
-
             if not accounts:
                 continue
 
-            total_budget = 0
-            total_committed = 0
+            total_budget = 0.0
+            total_committed = 0.0
             for account in accounts:
-                # Buscar línea de presupuesto vigente
                 bline = BudgetLine.search([
                     ('analytic_account_id', '=', account.id),
                     ('date_from', '<=', today),
                     ('date_to', '>=', today),
                 ], limit=1)
-
                 if not bline:
                     continue
 
-                # Calcular total comprometido
                 domain = [
                     ('account_id', '=', account.id),
                     ('date', '>=', bline.date_from),
@@ -370,32 +458,3 @@ class PurchaseOrder(models.Model):
             })
 
         return result
-
-    def action_open_discount_wizard(self):
-        self.ensure_one()
-        return {
-            'name': 'Agregar Descuento Global',
-            'type': 'ir.actions.act_window',
-            'res_model': 'purchase.discount.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_order_id': self.id,
-            }
-        }
-        
-
-    @api.depends('order_line.product_qty', 'order_line.display_type')
-    def _compute_qty_total_order(self):
-        for order in self:
-            order.qty_total_order = sum(
-                l.product_qty for l in order.order_line if not l.display_type
-            )
-
-    # Para que se actualice visualmente mientras editas, sin esperar a guardar
-    @api.onchange('order_line', 'order_line.product_qty', 'order_line.display_type')
-    def _onchange_qty_total_order(self):
-        for order in self:
-            order.qty_total_order = sum(
-                l.product_qty for l in order.order_line if not l.display_type
-            )
