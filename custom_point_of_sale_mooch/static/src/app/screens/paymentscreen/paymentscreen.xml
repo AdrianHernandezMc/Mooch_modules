@@ -15,11 +15,12 @@
           </t>
         </xpath>
     </t>
+    <!-- Template para el Popup de Entrega a Domicilio -->
     <t t-name="custom_point_of_sale_mooch.HomeDeliveryPopup">
         <div class="o_home_delivery_popup o_pos_popup large-popup">
             <div class="o_popup_header">
-                <h3><t t-esc="props.title"/></h3>
-                <p class="popup-subtitle"><t t-esc="props.body"/></p>
+                <h3>🚚 Entrega a Domicilio</h3>
+                <p class="popup-subtitle">Configura los detalles de entrega para el pedido</p>
             </div>
 
             <div class="o_popup_body">
@@ -27,47 +28,64 @@
                     <!-- Columna izquierda: Formulario -->
                     <div class="form-column">
                         <div class="form-section">
-                            <h4>Información de Contacto</h4>
+                            <h4>👤 Información de Contacto</h4>
                             <div class="form-grid">
                                 <label>Nombre del Contacto:</label>
-                                <input type="text" t-model="state.contact_name" placeholder="Persona que recibirá el pedido" class="form-input"/>
+                                <input type="text" 
+                                       t-model="state.contact_name" 
+                                       placeholder="Persona que recibirá el pedido" 
+                                       class="form-input"/>
 
-                                <label>Teléfono:</label>
-                                <input type="text" t-model="state.phone" placeholder="Número de contacto" class="form-input"/>
+                                <label>📞 Teléfono:</label>
+                                <input type="text" 
+                                       t-model="state.phone" 
+                                       placeholder="Número de contacto" 
+                                       class="form-input"/>
 
-                                <label>Notas de Entrega:</label>
-                                <textarea t-model="state.notes" placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." class="form-textarea"></textarea>
+                                <label>📝 Notas de Entrega:</label>
+                                <textarea t-model="state.notes" 
+                                          placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." 
+                                          class="form-textarea"></textarea>
                             </div>
                         </div>
 
                         <div class="form-section">
-                            <h4>Ubicación de Entrega</h4>
+                            <h4>📍 Ubicación de Entrega</h4>
 
                             <div class="address-search">
-                                <label>Buscar Dirección:</label>
+                                <label>Buscar Dirección en Google Maps:</label>
                                 <div class="search-container">
-                                    <input type="text" id="address-input" placeholder="Escribe la dirección completa..." class="form-input search-input"/>
-                                    <button class="btn btn-search" t-on-click="searchAddress">🔍</button>
+                                    <input type="text" 
+                                           id="address-input" 
+                                           t-model="state.address"
+                                           placeholder="Escribe la dirección completa..." 
+                                           class="form-input search-input"/>
+                                    <button class="btn btn-search" 
+                                            t-on-click="searchAddress"
+                                            title="Buscar en Google Maps">🔍</button>
                                 </div>
-                            </div>
-
-                            <!-- Dirección obtenida automáticamente -->
-                            <div class="form-grid">
-                                <label>Dirección Completa:</label>
-                                <input type="text" t-model="state.address" placeholder="La dirección se llenará automáticamente..." readonly="readonly" class="form-input address-display"/>
+                                <small class="text-muted">
+                                    💡 Escribe la dirección y haz clic en la lupa para buscarla en Google Maps
+                                </small>
                             </div>
 
                             <div class="coordinates-display">
                                 <div class="coordinate-group">
                                     <label>Latitud:</label>
-                                    <input type="text" t-model="state.lat" readonly="readonly" class="form-input coordinate-input"/>
+                                    <input type="text" 
+                                           t-model="state.lat" 
+                                           readonly="readonly" 
+                                           class="form-input coordinate-input"/>
                                 </div>
                                 <div class="coordinate-group">
                                     <label>Longitud:</label>
-                                    <input type="text" t-model="state.lng" readonly="readonly" class="form-input coordinate-input"/>
+                                    <input type="text" 
+                                           t-model="state.lng" 
+                                           readonly="readonly" 
+                                           class="form-input coordinate-input"/>
                                 </div>
 
-                                <!-- ✅ INDICADOR DE REVERSE GEOCODING -->
+                                <!-- Indicador de Reverse Geocoding -->
                                 <t t-if="state.reverse_geocoding">
                                     <div class="geocoding-status">
                                         <div class="geocoding-loading">
@@ -84,9 +102,16 @@
                             </div>
 
                             <div class="location-actions">
-                                <button class="btn btn-location" t-on-click="useMyLocation" t-att-disabled="state.searching_address">
-                                    <t t-if="state.searching_address">Buscando...</t>
-                                    <t t-else="true">📍 Usar Mi Ubicación Actual</t>
+                                <button class="btn btn-location" 
+                                        t-on-click="useMyLocation" 
+                                        t-att-disabled="state.searching_address">
+                                    <t t-if="state.searching_address">
+                                        <div class="small-spinner"></div>
+                                        Buscando ubicación...
+                                    </t>
+                                    <t t-else="">
+                                        📍 Usar Mi Ubicación Actual
+                                    </t>
                                 </button>
                             </div>
                         </div>
@@ -95,8 +120,8 @@
                     <!-- Columna derecha: Mapa -->
                     <div class="map-column">
                         <div class="map-section">
-                            <h4>Selecciona la Ubicación en el Mapa</h4>
-                            <p class="map-instructions">Haz clic en el mapa para marcar la ubicación exacta de entrega</p>
+                            <h4>🗺️ Mapa de Entrega</h4>
+                            <p class="map-instructions">Haz clic en el mapa o arrastra el marcador para seleccionar la ubicación exacta</p>
 
                             <div class="map-container">
                                 <div id="delivery-map" class="delivery-map">
@@ -117,7 +142,10 @@
                             </div>
 
                             <div class="map-tips">
-                                <p>💡 <strong>Tips:</strong> Arrastra el marcador o haz clic en el mapa para ajustar la ubicación</p>
+                                <p>💡 <strong>Tips:</strong><br/>
+                                • Haz clic en el mapa para colocar el marcador<br/>
+                                • Arrastra el marcador para ajustar la ubicación<br/>
+                                • Usa "Mi Ubicación" para ubicarte automáticamente</p>
                             </div>
                         </div>
                     </div>
@@ -126,8 +154,8 @@
 
             <div class="o_popup_footer">
                 <div class="footer-actions">
-                    <button class="btn btn-cancel" t-on-click="cancel">Cancelar Pedido</button>
-                    <button class="btn btn-confirm" t-on-click="confirm">✅ Confirmar Entrega y Continuar</button>
+                    <button class="btn btn-cancel" t-on-click="cancel">❌ Cancelar</button>
+                    <button class="btn btn-confirm" t-on-click="confirm">✅ Confirmar Entrega</button>
                 </div>
             </div>
         </div>

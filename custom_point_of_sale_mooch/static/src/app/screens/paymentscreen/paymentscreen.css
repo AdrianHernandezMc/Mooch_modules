@@ -19,6 +19,14 @@ label.small.text-muted {
     padding: 2px 6px !important; /* 🔹 menos espacio interno */
 }
 
+.o_pos_txid_box {
+    background-color: #a0baf0 !important;
+    padding: 2px 2px !important;
+}
+
+
+/* Estilos para el Popup de Entrega a Domicilio */
+
 /* Popup Grande para Entrega */
 .o_home_delivery_popup.large-popup {
     width: 95vw !important;
@@ -110,6 +118,7 @@ label.small.text-muted {
     font-size: 14px !important;
     background: white !important;
     transition: all 0.3s ease !important;
+    box-sizing: border-box !important;
 }
 
 .form-input:focus, .form-textarea:focus {
@@ -121,6 +130,7 @@ label.small.text-muted {
 .form-textarea {
     height: 100px !important;
     resize: vertical !important;
+    font-family: inherit !important;
 }
 
 /* Buscador de direcciones */
@@ -142,11 +152,18 @@ label.small.text-muted {
     right: 5px !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
-    background: none !important;
+    background: #3498db !important;
     border: none !important;
+    border-radius: 4px !important;
+    color: white !important;
     font-size: 16px !important;
     cursor: pointer !important;
-    padding: 8px !important;
+    padding: 8px 12px !important;
+    transition: background 0.3s ease !important;
+}
+
+.btn-search:hover {
+    background: #2980b9 !important;
 }
 
 /* Coordenadas */
@@ -162,12 +179,43 @@ label.small.text-muted {
     margin-bottom: 5px !important;
     font-weight: 600 !important;
     color: #495057 !important;
+    font-size: 13px !important;
 }
 
 .coordinate-input {
     background: #f8f9fa !important;
     font-family: monospace !important;
     font-size: 13px !important;
+    color: #2c3e50 !important;
+}
+
+/* Estados de geocoding */
+.geocoding-status {
+    grid-column: 1 / -1 !important;
+    margin-top: 10px !important;
+}
+
+.geocoding-loading {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    color: #3498db !important;
+    font-size: 13px !important;
+}
+
+.geocoding-status.success {
+    color: #27ae60 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+
+.small-spinner {
+    width: 16px !important;
+    height: 16px !important;
+    border: 2px solid #f3f3f3 !important;
+    border-top: 2px solid #3498db !important;
+    border-radius: 50% !important;
+    animation: spin 1s linear infinite !important;
 }
 
 /* Mapa */
@@ -180,6 +228,7 @@ label.small.text-muted {
     color: #6c757d !important;
     margin: 0 0 15px 0 !important;
     font-size: 13px !important;
+    line-height: 1.4 !important;
 }
 
 .map-container {
@@ -188,6 +237,7 @@ label.small.text-muted {
     border-radius: 8px !important;
     overflow: hidden !important;
     border: 2px solid #dee2e6 !important;
+    min-height: 400px !important;
 }
 
 .delivery-map {
@@ -196,129 +246,7 @@ label.small.text-muted {
     min-height: 400px !important;
 }
 
-.map-loading {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 100% !important;
-    color: #6c757d !important;
-}
-
-.loading-spinner {
-    width: 40px !important;
-    height: 40px !important;
-    border: 4px solid #f3f3f3 !important;
-    border-top: 4px solid #3498db !important;
-    border-radius: 50% !important;
-    animation: spin 1s linear infinite !important;
-    margin-bottom: 10px !important;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.map-tips {
-    margin-top: 15px !important;
-    padding: 10px !important;
-    background: #e3f2fd !important;
-    border-radius: 6px !important;
-    border-left: 4px solid #2196f3 !important;
-}
-
-.map-tips p {
-    margin: 0 !important;
-    font-size: 12px !important;
-    color: #1565c0 !important;
-}
-
-/* Botones de ubicación */
-.location-actions {
-    display: flex !important;
-    gap: 10px !important;
-    flex-wrap: wrap !important;
-}
-
-.btn-location {
-    background: #27ae60 !important;
-    color: white !important;
-    border: none !important;
-    padding: 12px 20px !important;
-    border-radius: 8px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    transition: background 0.3s ease !important;
-    flex: 1 !important;
-}
-
-.btn-location:hover:not(:disabled) {
-    background: #219653 !important;
-}
-
-.btn-location:disabled {
-    background: #95a5a6 !important;
-    cursor: not-allowed !important;
-}
-
-/* Footer y botones de acción */
-.o_popup_footer {
-    background: #f8f9fa !important;
-    padding: 20px 30px !important;
-    border-top: 1px solid #dee2e6 !important;
-    border-radius: 0 0 12px 12px !important;
-}
-
-.footer-actions {
-    display: flex !important;
-    justify-content: space-between !important;
-    gap: 15px !important;
-}
-
-.btn-cancel {
-    background: #e74c3c !important;
-    color: white !important;
-    border: none !important;
-    padding: 12px 25px !important;
-    border-radius: 8px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-}
-
-.btn-confirm {
-    background: #27ae60 !important;
-    color: white !important;
-    border: none !important;
-    padding: 12px 25px !important;
-    border-radius: 8px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    font-size: 16px !important;
-}
-
-.btn-cancel:hover {
-    background: #c0392b !important;
-}
-
-.btn-confirm:hover {
-    background: #219653 !important;
-}
-
-/* Responsive */
-@media (max-height: 800px) {
-    .o_home_delivery_popup.large-popup {
-        height: 95vh !important;
-    }
-}
 /* Estados del mapa */
-.delivery-map {
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 400px !important;
-    background: #e9ecef !important;
-}
-
 .map-loading {
     display: flex !important;
     flex-direction: column !important;
@@ -374,4 +302,173 @@ label.small.text-muted {
 .no-api-key-message h5 {
     margin: 0 0 10px 0 !important;
     color: #856404 !important;
+}
+
+.no-api-key-message p {
+    margin: 5px 0 !important;
+    font-size: 13px !important;
+}
+
+/* Botones de ubicación */
+.location-actions {
+    display: flex !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+.btn-location {
+    background: #27ae60 !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: background 0.3s ease !important;
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    font-size: 14px !important;
+}
+
+.btn-location:hover:not(:disabled) {
+    background: #219653 !important;
+}
+
+.btn-location:disabled {
+    background: #95a5a6 !important;
+    cursor: not-allowed !important;
+}
+
+/* Footer y botones de acción */
+.o_popup_footer {
+    background: #f8f9fa !important;
+    padding: 20px 30px !important;
+    border-top: 1px solid #dee2e6 !important;
+    border-radius: 0 0 12px 12px !important;
+}
+
+.footer-actions {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 15px !important;
+}
+
+.btn-cancel {
+    background: #e74c3c !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 25px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: background 0.3s ease !important;
+}
+
+.btn-confirm {
+    background: #27ae60 !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 25px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: background 0.3s ease !important;
+}
+
+.btn-cancel:hover {
+    background: #c0392b !important;
+}
+
+.btn-confirm:hover {
+    background: #219653 !important;
+}
+
+/* Textos de ayuda */
+.text-muted {
+    color: #6c757d !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+}
+
+.map-tips {
+    margin-top: 15px !important;
+    padding: 12px !important;
+    background: #e3f2fd !important;
+    border-radius: 6px !important;
+    border-left: 4px solid #2196f3 !important;
+}
+
+.map-tips p {
+    margin: 0 !important;
+    font-size: 12px !important;
+    color: #1565c0 !important;
+    line-height: 1.4 !important;
+}
+
+/* Responsive */
+@media (max-height: 800px) {
+    .o_home_delivery_popup.large-popup {
+        height: 95vh !important;
+    }
+    
+    .form-column,
+    .map-column {
+        padding: 15px !important;
+    }
+}
+
+@media (max-width: 1200px) {
+    .popup-layout {
+        flex-direction: column !important;
+    }
+    
+    .form-column,
+    .map-column {
+        width: 100% !important;
+    }
+    
+    .form-column {
+        border-right: none !important;
+        border-bottom: 1px solid #e9ecef !important;
+        max-height: 45vh !important;
+    }
+}
+
+/* Labels generales */
+label {
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    font-size: 13px !important;
+    margin-bottom: 5px !important;
+    display: block !important;
+}
+
+/* Placeholder styling */
+::placeholder {
+    color: #6c757d !important;
+    opacity: 0.7 !important;
+}
+
+/* Scrollbar personalizado */
+.form-column::-webkit-scrollbar {
+    width: 6px;
+}
+
+.form-column::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.form-column::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.form-column::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
