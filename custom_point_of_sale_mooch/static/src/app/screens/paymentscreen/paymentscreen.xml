@@ -15,6 +15,44 @@
           </t>
         </xpath>
     </t>
+  <!-- Cambio la palabra validar por Finalizar compra -->
+    <t t-inherit="point_of_sale.PaymentScreenValidate" t-inherit-mode="extension">
+        <!-- Versión móvil/small -->
+        <xpath expr="//button[contains(@class,'validation-button')]//span[normalize-space()='Validate']" position="replace">
+          <span>Finalizar compra</span>
+        </xpath>
+        <!-- Versión desktop -->
+        <xpath expr="//div[contains(@class,'button') and contains(@class,'validation')]//span[contains(@class,'next_text') and normalize-space()='Validate']" position="replace">
+          <span class="next_text">Finalizar compra</span>
+        </xpath>
+    </t>
+    <!--Validacion si entra al llenar entrega a domicilio.  -->
+    <t t-name="custom_point_of_sale_mooch.DeliveryConfirmationPopup">
+        <div class="o_delivery_confirmation_popup o_pos_popup">
+            <div class="o_popup_header">
+                <h3>🚚 Entrega a Domicilio</h3>
+            </div>
+            <div class="o_popup_body">
+                <div class="confirmation-content">
+                    <div class="icon-section">
+                        <div class="delivery-icon">📦</div>
+                    </div>
+                    <div class="message-section">
+                        <h4>¿Deseas agregar dirección de entrega?</h4>
+                        <p>Si el pedido es para entrega a domicilio, podrás capturar los datos de ubicación y contacto.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="o_popup_footer">
+                <div class="footer-actions">
+                  <button class="btn btn-confirm" t-on-click="confirmDelivery">✅ <br/>Sí, Agregar Dirección</button>
+                  <button class="btn btn-skip" t-on-click="skipDelivery">➡️ <br/>Saltar Entrega</button>
+                  <button class="btn btn-cancel" t-on-click="cancel">❌ <br/>Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </t>
     <!-- Template para el Popup de Entrega a Domicilio -->
     <t t-name="custom_point_of_sale_mooch.HomeDeliveryPopup">
         <div class="o_home_delivery_popup o_pos_popup large-popup">
@@ -31,19 +69,19 @@
                             <h4>👤 Información de Contacto</h4>
                             <div class="form-grid">
                                 <label>Nombre del Contacto:</label>
-                                <input type="text" 
-                                       t-model="state.contact_name" 
-                                       placeholder="Persona que recibirá el pedido" 
+                                <input type="text"
+                                       t-model="state.contact_name"
+                                       placeholder="Persona que recibirá el pedido"
                                        class="form-input"/>
 
                                 <label>📞 Teléfono:</label>
-                                <input type="text" 
-                                       t-model="state.phone" 
-                                       placeholder="Número de contacto" 
+                                <input type="text"
+                                       t-model="state.phone"
+                                       placeholder="Número de contacto"
                                        class="form-input"/>
 
                                 <label>📝 Notas de Entrega:</label>
-                                <textarea t-model="state.notes" 
+                                <textarea t-model="state.notes"
                                           placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." 
                                           class="form-textarea"></textarea>
                             </div>
@@ -55,12 +93,12 @@
                             <div class="address-search">
                                 <label>Buscar Dirección en Google Maps:</label>
                                 <div class="search-container">
-                                    <input type="text" 
-                                           id="address-input" 
+                                    <input type="text"
+                                           id="address-input"
                                            t-model="state.address"
-                                           placeholder="Escribe la dirección completa..." 
+                                           placeholder="Escribe la dirección completa..."
                                            class="form-input search-input"/>
-                                    <button class="btn btn-search" 
+                                    <button class="btn btn-search"
                                             t-on-click="searchAddress"
                                             title="Buscar en Google Maps">🔍</button>
                                 </div>
@@ -72,16 +110,16 @@
                             <div class="coordinates-display">
                                 <div class="coordinate-group">
                                     <label>Latitud:</label>
-                                    <input type="text" 
-                                           t-model="state.lat" 
-                                           readonly="readonly" 
+                                    <input type="text"
+                                           t-model="state.lat"
+                                           readonly="readonly"
                                            class="form-input coordinate-input"/>
                                 </div>
                                 <div class="coordinate-group">
                                     <label>Longitud:</label>
-                                    <input type="text" 
-                                           t-model="state.lng" 
-                                           readonly="readonly" 
+                                    <input type="text"
+                                           t-model="state.lng"
+                                           readonly="readonly"
                                            class="form-input coordinate-input"/>
                                 </div>
 
@@ -102,8 +140,8 @@
                             </div>
 
                             <div class="location-actions">
-                                <button class="btn btn-location" 
-                                        t-on-click="useMyLocation" 
+                                <button class="btn btn-location"
+                                        t-on-click="useMyLocation"
                                         t-att-disabled="state.searching_address">
                                     <t t-if="state.searching_address">
                                         <div class="small-spinner"></div>

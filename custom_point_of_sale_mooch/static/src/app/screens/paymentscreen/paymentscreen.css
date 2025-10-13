@@ -25,6 +25,70 @@ label.small.text-muted {
 }
 
 
+
+/* Estilos para el popup de vonfirmacion si desea ingresar datos de pedido */
+.o_delivery_confirmation_popup {
+    width: 500px !important;
+    max-width: 90vw !important;
+    background: white !important;
+    border-radius: 12px !important;
+}
+
+.confirmation-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+}
+
+.icon-section {
+    flex-shrink: 0;
+}
+
+.delivery-icon {
+    font-size: 60px;
+    text-align: center;
+}
+
+.message-section h4 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.message-section p {
+    margin: 0;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+.footer-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 20px;
+}
+
+.btn-skip {
+    background: #6c757d !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    flex: 1;
+}
+
+.btn-skip:hover {
+    background: #5a6268 !important;
+}
+
+.btn-cancel, .btn-confirm {
+    flex: 1;
+}
+
 /* Estilos para el Popup de Entrega a Domicilio */
 
 /* Popup Grande para Entrega */

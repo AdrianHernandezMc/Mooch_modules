@@ -8,8 +8,9 @@ import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
 import { useService } from "@web/core/utils/hooks";
 import { Order } from "@point_of_sale/app/store/models";
 
-// Import del popup
+// Import del popup's
 import { HomeDeliveryPopup } from "../../popup/home_delivery_popup";
+import { DeliveryConfirmationPopup } from "../../popup/delivery_confirmation_popup";
 
 function addMonthtoday(date = new Date()) {
     const y = date.getFullYear();
@@ -158,7 +159,7 @@ patch(PaymentScreen.prototype, {
             }
         }
 
-        // ✅ [CORREGIDO] Mostrar popup de entrega ANTES de procesar el pago
+        // ✅ [NUEVO FLUJO] Mostrar confirmación de entrega ANTES del formulario
         try {
             const config = this.pos?.config;
             const currentOrder = this.pos?.get_order?.();
@@ -171,25 +172,52 @@ patch(PaymentScreen.prototype, {
             });
 
             if (config && config.is_home_box && currentOrder && !currentOrder._homeBoxPopupShown) {
-                console.log("[DEBUG] Showing Home Delivery Popup BEFORE payment");
-                const { confirmed } = await this.popup.add(HomeDeliveryPopup, {
-                    title: _t("Datos para entrega"),
-                    body: _t("Captura los datos del pedido de entrega:"),
-                    order: currentOrder,
-                    config: config,
+                console.log("[DEBUG] Showing Delivery Confirmation Popup");
+
+                // 1. Primero mostrar popup de confirmación
+                const confirmationResult = await this.popup.add(DeliveryConfirmationPopup, {
+                    title: _t("Entrega a Domicilio"),
                 });
 
-                if (confirmed) {
-                    currentOrder._homeBoxPopupShown = true;  // ✅ MOVER AQUÍ
-                    console.log("[DEBUG] Delivery confirmed - marking as shown");
+                if (!confirmationResult) {
+                    console.log("[DEBUG] User cancelled delivery confirmation");
+                    return false; // Usuario canceló todo
+                }
+
+                if (!confirmationResult.confirmed) {
+                    console.log("[DEBUG] User cancelled delivery flow");
+                    return false; // Usuario canceló
+                }
+
+                if (confirmationResult.wantsDelivery) {
+                    console.log("[DEBUG] User wants delivery - showing address form");
+
+                    // 2. Mostrar popup de datos de entrega
+                    const deliveryResult = await this.popup.add(HomeDeliveryPopup, {
+                        title: _t("Datos para entrega"),
+                        body: _t("Captura los datos del pedido de entrega:"),
+                        order: currentOrder,
+                        config: config,
+                    });
+
+                    if (!deliveryResult || !deliveryResult.confirmed) {
+                        console.log("[DEBUG] User cancelled address form");
+                        return false; // Usuario canceló el formulario de dirección
+                    }
+
+                    // Marcar como mostrado solo si completó la entrega
+                    currentOrder._homeBoxPopupShown = true;
+                    console.log("[DEBUG] Delivery address completed");
+
                 } else {
-                    console.log("[DEBUG] User cancelled delivery popup - NOT marking as shown");
-                    return false;  // Detener el pago
+                    console.log("[DEBUG] User skipped delivery - proceeding to payment");
+                    // Usuario eligió "Saltar Entrega" - continuar al pago sin datos de entrega
+                    currentOrder._homeBoxPopupShown = true; // Marcar para que no vuelva a preguntar
                 }
             }
         } catch (err) {
-            console.error("Error en popup de entrega:", err);
-            // Si hay error en el popup, continuar con el pago normal
+            console.error("Error en flujo de entrega:", err);
+            // Si hay error, continuar con el pago normal
         }
 
         // ✅ SOLO si el popup se confirmó o no era necesario, procesar el pago

@@ -20,6 +20,7 @@
             "custom_point_of_sale_mooch/static/src/js/selection_popup.js",
 
             # Popups
+            "custom_point_of_sale_mooch/static/src/app/popup/delivery_confirmation_popup.js",
             "custom_point_of_sale_mooch/static/src/app/popup/home_delivery_popup.js",
             "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.js",
             "custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.js",
