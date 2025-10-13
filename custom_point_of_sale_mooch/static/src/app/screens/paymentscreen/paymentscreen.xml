@@ -12,18 +12,124 @@
                       t-on-input="onTxInput"
                       t-att-value="(selectedPaymentLine and selectedPaymentLine.transaction_id) or ''"/>
             </div>
-          </t> 
+          </t>
         </xpath>
     </t>
-  <!-- Cambio la palabra validar por Finalizar compra -->
-    <t t-inherit="point_of_sale.PaymentScreenValidate" t-inherit-mode="extension">
-        <!-- Versión móvil/small -->
-        <xpath expr="//button[contains(@class,'validation-button')]//span[normalize-space()='Validate']" position="replace">
-          <span>Finalizar compra</span>
-        </xpath>
-        <!-- Versión desktop -->
-        <xpath expr="//div[contains(@class,'button') and contains(@class,'validation')]//span[contains(@class,'next_text') and normalize-space()='Validate']" position="replace">
-          <span class="next_text">Finalizar compra</span>
-        </xpath>
+    <t t-name="custom_point_of_sale_mooch.HomeDeliveryPopup">
+        <div class="o_home_delivery_popup o_pos_popup large-popup">
+            <div class="o_popup_header">
+                <h3><t t-esc="props.title"/></h3>
+                <p class="popup-subtitle"><t t-esc="props.body"/></p>
+            </div>
+
+            <div class="o_popup_body">
+                <div class="popup-layout">
+                    <!-- Columna izquierda: Formulario -->
+                    <div class="form-column">
+                        <div class="form-section">
+                            <h4>Información de Contacto</h4>
+                            <div class="form-grid">
+                                <label>Nombre del Contacto:</label>
+                                <input type="text" t-model="state.contact_name" placeholder="Persona que recibirá el pedido" class="form-input"/>
+
+                                <label>Teléfono:</label>
+                                <input type="text" t-model="state.phone" placeholder="Número de contacto" class="form-input"/>
+
+                                <label>Notas de Entrega:</label>
+                                <textarea t-model="state.notes" placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." class="form-textarea"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h4>Ubicación de Entrega</h4>
+
+                            <div class="address-search">
+                                <label>Buscar Dirección:</label>
+                                <div class="search-container">
+                                    <input type="text" id="address-input" placeholder="Escribe la dirección completa..." class="form-input search-input"/>
+                                    <button class="btn btn-search" t-on-click="searchAddress">🔍</button>
+                                </div>
+                            </div>
+
+                            <!-- Dirección obtenida automáticamente -->
+                            <div class="form-grid">
+                                <label>Dirección Completa:</label>
+                                <input type="text" t-model="state.address" placeholder="La dirección se llenará automáticamente..." readonly="readonly" class="form-input address-display"/>
+                            </div>
+
+                            <div class="coordinates-display">
+                                <div class="coordinate-group">
+                                    <label>Latitud:</label>
+                                    <input type="text" t-model="state.lat" readonly="readonly" class="form-input coordinate-input"/>
+                                </div>
+                                <div class="coordinate-group">
+                                    <label>Longitud:</label>
+                                    <input type="text" t-model="state.lng" readonly="readonly" class="form-input coordinate-input"/>
+                                </div>
+
+                                <!-- ✅ INDICADOR DE REVERSE GEOCODING -->
+                                <t t-if="state.reverse_geocoding">
+                                    <div class="geocoding-status">
+                                        <div class="geocoding-loading">
+                                            <div class="small-spinner"></div>
+                                            <span>Obteniendo dirección...</span>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-elif="state.lat and state.lng and state.address">
+                                    <div class="geocoding-status success">
+                                        <span>✅ Dirección obtenida</span>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <div class="location-actions">
+                                <button class="btn btn-location" t-on-click="useMyLocation" t-att-disabled="state.searching_address">
+                                    <t t-if="state.searching_address">Buscando...</t>
+                                    <t t-else="true">📍 Usar Mi Ubicación Actual</t>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna derecha: Mapa -->
+                    <div class="map-column">
+                        <div class="map-section">
+                            <h4>Selecciona la Ubicación en el Mapa</h4>
+                            <p class="map-instructions">Haz clic en el mapa para marcar la ubicación exacta de entrega</p>
+
+                            <div class="map-container">
+                                <div id="delivery-map" class="delivery-map">
+                                    <t t-if="!state.map_loaded">
+                                        <div class="map-loading">
+                                            <div class="loading-spinner"></div>
+                                            <p>Cargando mapa...</p>
+                                        </div>
+                                    </t>
+                                    <t t-elif="!props.config?.google_maps_api_key">
+                                        <div class="no-api-key-message">
+                                            <h5>⚠️ Google Maps no configurado</h5>
+                                            <p>Configura la API Key de Google Maps en la configuración del POS para usar el mapa interactivo.</p>
+                                            <p>Puedes continuar ingresando la dirección manualmente.</p>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <div class="map-tips">
+                                <p>💡 <strong>Tips:</strong> Arrastra el marcador o haz clic en el mapa para ajustar la ubicación</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="o_popup_footer">
+                <div class="footer-actions">
+                    <button class="btn btn-cancel" t-on-click="cancel">Cancelar Pedido</button>
+                    <button class="btn btn-confirm" t-on-click="confirm">✅ Confirmar Entrega y Continuar</button>
+                </div>
+            </div>
+        </div>
     </t>
 </templates>

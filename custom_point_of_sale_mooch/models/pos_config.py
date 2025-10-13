@@ -17,7 +17,25 @@ class PosConfig(models.Model):
         'hr.employee',
         string='Advanced Employees'
     )
-    
+
+#################Campos Adrian Muebles##############################
+    is_home_box = fields.Boolean(
+        string="¿Es caja de Hogar?",
+        help="Activa comportamientos especiales para cajas de Muebles/Hogar. "
+             "Cuando esté habilitado podrás capturar datos de pedido del cliente "
+             "para impresión de documentos de entrega."
+    )
+    enable_maps = fields.Boolean(
+        string="Habilitar Google Maps en POS",
+        help="Muestra preview de Google Maps en el popup si hay API Key."
+    )
+    google_maps_api_key = fields.Char(
+        string="Google Maps API Key",
+        help="API Key para Google Maps Embed/Places. (Opcional)"
+    )
+#################Fin de camgps######################################
+
+
     @api.model
     def get_changes_product_id(self, config_id):
         cfg = self.browse(config_id).sudo()

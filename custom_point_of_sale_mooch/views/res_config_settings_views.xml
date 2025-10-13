@@ -26,5 +26,21 @@
         </xpath>
       </field>
     </record>
+    <!-- Vista para los campos de Muebles (Adrian) -->
+    <record id="view_pos_config_form_home_box_mooch" model="ir.ui.view">
+      <field name="name">pos.config.form.home.box.mooch</field>
+      <field name="model">pos.config</field>
+      <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+      <field name="arch" type="xml">
+        <xpath expr="//form/sheet" position="inside">
+          <group string="Hogar (Mooch)">
+            <field name="is_home_box"/>
+            <field name="enable_maps" modifiers="{'invisible': [('is_home_box','=',False)]}"/>
+            <field name="google_maps_api_key" modifiers="{'invisible': ['|', ('is_home_box','=',False), ('enable_maps','=',False)]}"/>
+          </group>
+        </xpath>
+      </field>
+    </record>
+    <!-- Fin de vistas de Campos Muebles (Adrian) -->
   </data>
 </odoo>

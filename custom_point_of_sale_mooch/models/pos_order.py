@@ -1,4 +1,4 @@
-from odoo import api, models
+from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
 # class PosOrder(models.Model):
@@ -19,6 +19,17 @@ from odoo.exceptions import UserError
 
 class PosOrder(models.Model):
     _inherit = 'pos.order'
+
+#################Campos Adrian Muebles##############################
+    delivery_contact_name = fields.Char("Nombre de contacto (entrega)")
+    delivery_phone = fields.Char("Teléfono (entrega)")
+    delivery_address = fields.Char("Dirección (entrega)")
+    delivery_notes = fields.Text("Notas de entrega")
+    delivery_geo_lat = fields.Float("Latitud (entrega)")
+    delivery_geo_lng = fields.Float("Longitud (entrega)")
+    delivery_maps_url = fields.Char("URL de Maps")
+
+#################Fin de camgps######################################
 
     @api.model
     def get_order_locations(self, order_ids):

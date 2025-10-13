@@ -5,33 +5,71 @@ import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { useState } from "@odoo/owl";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; 
-import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
 import { useService } from "@web/core/utils/hooks";
+import { Order } from "@point_of_sale/app/store/models";
+
+// Import del popup
+import { HomeDeliveryPopup } from "../../popup/home_delivery_popup";
 
 function addMonthtoday(date = new Date()) {
     const y = date.getFullYear();
-    const m = date.getMonth();  // 0=Ene
+    const m = date.getMonth();
     const d = date.getDate();
     const targetM = m + 1;
     const targetY = y + Math.floor(targetM / 12);
     const targetMi = targetM % 12;
-    const daysInTarget = new Date(targetY, targetMi + 1, 0).getDate(); // último día del mes destino
+    const daysInTarget = new Date(targetY, targetMi + 1, 0).getDate();
     const day = Math.min(d, daysInTarget);
-return new Date(targetY, targetMi, day);
+    return new Date(targetY, targetMi, day);
 }
 
+// ✅ CORREGIDO: Patch para Order - SIN el nombre del patch
+patch(Order.prototype, {
+    setup() {
+        super.setup(...arguments);  // ✅ Cambiado: super en lugar de this._super
+        this._homeDeliveryData = null;
+        this._homeBoxPopupShown = false;
+    },
+    
+    set_home_delivery_data(data) {
+        this._homeDeliveryData = {
+            contact_name: data.contact_name || "",
+            phone: data.phone || "",
+            address: data.address || "",
+            notes: data.notes || "",
+            lat: data.lat || 0.0,
+            lng: data.lng || 0.0,
+            maps_url: data.maps_url || "",
+        };
+    },
+    
+    get_home_delivery_data() {
+        return this._homeDeliveryData;
+    },
+    
+    export_as_JSON() {
+        const json = super.export_as_JSON(...arguments);  // ✅ Cambiado: super en lugar de this._super
+        json.home_delivery_data = this._homeDeliveryData || null;
+        return json;
+    },
+    
+    init_from_JSON(json) {
+        super.init_from_JSON(...arguments);  // ✅ Cambiado: super en lugar de this._super
+        this._homeDeliveryData = json.home_delivery_data || null;
+    },
+});
+
+// ✅ CORREGIDO: Patch para PaymentScreen - SIN el nombre del patch
 patch(PaymentScreen.prototype, {
     setup() {
-        super.setup();
+        super.setup();  // ✅ Cambiado: super en lugar de this._super
         this.pos = usePos();
         this.pos.txState = useState({ value: "" });
         this.orm = useService("orm");
         this.rpc = useService("rpc");
-        
     },
+
     async onMounted() {
-        //this._super();
-        // TicketScreen_onDoRefund bandera que proviene de point_of_sale_mooch.TicketScreen_onDoRefund
         if (this.pos.TicketScreen_onDoRefund){
             const line = this.selectedPaymentLine;
             line.transaction_id = String(this.pos.sharedtcode);
@@ -39,14 +77,14 @@ patch(PaymentScreen.prototype, {
             this.autoValidate?.();
         }
 
-        this.pos.TicketScreen_onDoRefund= false;
+        this.pos.TicketScreen_onDoRefund = false;
 
         if (this.pos.Reembolso) {
-            this.validateOrder()
+            this.validateOrder();
         } 
 
-        if (this.pos.Reembolso== false && this.pos.TicketScreen_onDoRefund== false) {
-            const { confirmed } = this.popup.add(ErrorPopup, {
+        if (this.pos.Reembolso == false && this.pos.TicketScreen_onDoRefund == false) {
+            await this.popup.add(ErrorPopup, {
                 title: _t("Facturacion al cliente"),
                 body: _t("Recordar al cliente que la facturación se realiza el mismo día."),
             });
@@ -61,13 +99,10 @@ patch(PaymentScreen.prototype, {
         return this.pos.get_order()?.selected_paymentline || null;
     },
 
-    //  Requisito: si el nombre del método contiene 'Tarjeta de crédito' o 'Tarjeta de débito'
     get requiresTxId() {
         const line = this.selectedPaymentLine;
         const method = line?.payment_method;
-
         if (!method) return false;
-
         return !!method.require_transaction_id;
     },
 
@@ -80,245 +115,210 @@ patch(PaymentScreen.prototype, {
         }
     },
 
-
     async validateOrder() {
         // Bloquea validación si hace falta y no se capturó t.credito t.de
-        
         const line = this.selectedPaymentLine;
         if (this.requiresTxId && (!line?.transaction_id || !line.transaction_id.trim())) {
             await this.popup.add(ErrorPopup, {
-                title: _t("Falto caputrar id de la tajeta"),
+                title: _t("Falto capturar id de la tarjeta"),
                 body: _t("Captura el Transaction ID para pagos con tarjeta."),
             });
             return;
         }
 
-        // bloque para mover los cambios de los articulos *****
+        // bloque para mover los cambios de los articulos
         const order = this.pos.get_order();
-        console.log("Order",order)
+        console.log("Order", order);
         const order_iines = order.get_orderlines();
-        //const cfgId = this.pos.config.id;
-        const product_id = order.product_changes_id //await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
-        //console.log("Entro",await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {}))
+        const product_id = order.product_changes_id;
         const existe = order_iines.some(line => line.product.id === product_id);
         
         if (existe) {
             const ondoInventory = await this.apply_changes();
             if (!ondoInventory) {
-               return
+            return;
             }
         }
-        // ************************************************
         
         /********* Agrego el vale al programa */
         const exist_vale = order_iines.some(line => line.product.id === order.product_voucher_id);
 
-         if (!exist_vale) {
-            this.currentOrder.couponPointChanges = []
-         } 
+        if (!exist_vale) {
+            this.currentOrder.couponPointChanges = [];
+        } 
         
-         if (exist_vale) {
-            console.log("Entro")
+        if (exist_vale) {
+            console.log("Entro");
             const cfgId = this.pos.config.id; 
             const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
-            const crate_vale = this.create_vale(order,loyalty_program_id)
+            const crate_vale = await this.create_vale(order, loyalty_program_id);
             if (!crate_vale) {
-                console.log("error_vale")
-            return
+                console.log("error_vale");
+                return;
             }
-         }
+        }
 
-         super.validateOrder(...arguments);
-    },
-
-    async create_vale(order,loyaty_program_id){
-    try {
-        const companyId = this.pos.company?.id;   // ← ID de la compañía
-        const exp = addMonthtoday(new Date());
-        const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
-        const partner = order.client;
-        const lines = (order?.get_orderlines?.() || []).filter(
-            (l) => l?.product?.id === order.product_voucher_id
-        );
-
-        let totalWithTax = (lines || []).reduce((acc, l) => {
-            const p = l.get_all_prices?.();
-            return acc + (p?.priceWithTax ?? 0);
-        }, 0);
-        totalWithTax = totalWithTax.toFixed(2);
-
-        console.log("order",order.server_id)
-
-        // Preparas el diccionario con todos los campos
-        const couponData = {
-          program_id:          loyaty_program_id,
-          company_id:          companyId,                // compañía
-          partner_id:          partner?.id || false,
-          code:                order.voucher_code,
-          expiration_date:     dateAddOneMonth,
-          points:              totalWithTax,
-          //source_pos_order_id: order.server_id,
-          pos_reference: order.name,         // referenciamos la venta
-        };
-
-        console.log("couponData",couponData)
-        const couponId = await this.orm.create(
-          "loyalty.card",    // modelo
-          [ couponData ]     // aquí sí va un solo nivel de array
-        );
-
-        return false;
-
-    } catch (err) {
-         await this.popup.add(ErrorPopup, {
-                title: "Error",
-                body: err,
-                confirmText: "OK",
+        // ✅ [NUEVO] Mostrar popup de entrega ANTES de procesar el pago
+        try {
+            const config = this.pos?.config;
+            const currentOrder = this.pos?.get_order?.();
+            
+            console.log("[DEBUG] Home Delivery Check:", {
+                configExists: !!config,
+                isHomeBox: config?.is_home_box,
+                currentOrder: !!currentOrder,
+                alreadyShown: currentOrder?._homeBoxPopupShown
             });
-        return false;
-    }
+            
+            if (config && config.is_home_box && currentOrder && !currentOrder._homeBoxPopupShown) {
+                console.log("[DEBUG] Showing Home Delivery Popup BEFORE payment");
+                currentOrder._homeBoxPopupShown = true;
+                
+                // Mostrar popup y esperar a que se complete
+                const { confirmed } = await this.popup.add(HomeDeliveryPopup, {
+                    title: _t("Datos para entrega"),
+                    body: _t("Captura los datos del pedido de entrega:"),
+                    order: currentOrder,
+                    config: config,
+                });
+                
+                // Si el usuario cancela, no procesar el pago
+                if (!confirmed) {
+                    console.log("[DEBUG] User cancelled delivery popup");
+                    return;
+                }
+            }
+        } catch (err) {
+            console.error("Error en popup de entrega:", err);
+            // Si hay error en el popup, continuar con el pago normal
+        }
 
+        // ✅ SOLO si el popup se completó o no era necesario, procesar el pago
+        const result = await super.validateOrder(...arguments);
+        return result;
     },
 
+    async create_vale(order, loyaty_program_id) {
+        try {
+            const companyId = this.pos.company?.id;
+            const exp = addMonthtoday(new Date());
+            const dateAddOneMonth = exp.toISOString().slice(0, 10);
+            const partner = order.client;
+            const lines = (order?.get_orderlines?.() || []).filter(
+                (l) => l?.product?.id === order.product_voucher_id
+            );
+
+            let totalWithTax = (lines || []).reduce((acc, l) => {
+                const p = l.get_all_prices?.();
+                return acc + (p?.priceWithTax ?? 0);
+            }, 0);
+            totalWithTax = Number(totalWithTax).toFixed(2);
+
+            const couponData = {
+                program_id: loyaty_program_id,
+                company_id: companyId,
+                partner_id: partner?.id || false,
+                code: order.voucher_code,
+                expiration_date: dateAddOneMonth,
+                points: totalWithTax,
+                pos_reference: order.name,
+            };
+
+            console.log("couponData", couponData);
+            await this.orm.create("loyalty.card", [couponData]);
+            return true;
+
+        } catch (err) {
+            await this.popup.add(ErrorPopup, {
+                title: "Error",
+                body: String(err),
+            });
+            return false;
+        }
+    },
 
     async apply_changes() {
         const details = Object.values(this.pos.toRefundLines);
-        const refundDetails =  details.filter(d => d.qty > 0).map(d => d.orderline);
+        const refundDetails = details.filter(d => d.qty > 0).map(d => d.orderline);
         const detallesArray = Object.values(refundDetails);
 
         if (!detallesArray.length) {
             alert("selecciona un articulo");
-            return false
+            return false;
         }
 
-        // reviso si hay un movimiento de salida o venta
-        const backendId = detallesArray[0].orderBackendId; //ID de la venta que se va a aplicar el cambio.
-        const res = await this.orm.call(
-            "pos.order",
-            "get_order_locations",
-            [[backendId]]
-        );
-
+        const backendId = detallesArray[0].orderBackendId;
+        const res = await this.orm.call("pos.order", "get_order_locations", [[backendId]]);
         const locations = res[backendId] || [];
         const firstLoc = locations[0];
-        const order_name = await this.orm.call(
-            "pos.order",
-            "read",
-            [[backendId]],
-            { fields: ["name"] }
-        );
+        const order_name = await this.orm.call("pos.order", "read", [[backendId]], { fields: ["name"] });
 
         if (!firstLoc) {
-            alert(`No hay movimiento de salida/venta en ${order_name[0].name}, ve a inventrio recepciones y valida el movimiento  ${order_name[0].name}`)
-            return false
+            alert(`No hay movimiento de salida/venta en ${order_name[0].name}, ve a inventrio recepciones y valida el movimiento  ${order_name[0].name}`);
+            return false;
         }
 
         await this.save_tbl_changes(refundDetails);
-        let ondoInventory = false
-        ondoInventory =  await this.move_to_inventory(detallesArray, backendId,firstLoc)
-        return ondoInventory
+        return await this.move_to_inventory(detallesArray, backendId, firstLoc);
     },
 
-     async save_tbl_changes(refundDetails) {
-    //crea una lines de cambio en la tabla de cambios.
+    async save_tbl_changes(refundDetails) {
         const destinationOrder = this.pos.get_order();
         const origin_id = refundDetails.map(d => d.orderBackendId);
-        const productId_origin =  refundDetails.map(d => d.productId);
+        const productId_origin = refundDetails.map(d => d.productId);
 
-        await this.orm.call(
-            'pos.changes',
-            'poschanges_links_pre',
-            [
-                origin_id[0],
-                destinationOrder.uid,
-                productId_origin,
-            ]
-        );
-    // *****
-     },
+        await this.orm.call('pos.changes', 'poschanges_links_pre', [
+            origin_id[0],
+            destinationOrder.uid,
+            productId_origin,
+        ]);
+    },
 
-    async move_to_inventory(detallesArray, backendId,firstLoc) {
-        // 5) Por cada línea, creo el picking de entrada
+    async move_to_inventory(detallesArray, backendId, firstLoc) {
         for (const detail of detallesArray) {
             const productId = detail.productId;
             const qty = detail.qty;
-            const newQty = qty; //*-1;
 
-            // //5.0 Actualizo cada orderline en negativo
-            const lineIds = await this.orm.call(
-            'pos.order.line',     // modelo (string)
-            'search',             // método (string)
-            [[                    // args: array con tu dominio
-                ['order_id',   '=', backendId],
+            const lineIds = await this.orm.call('pos.order.line', 'search', [[
+                ['order_id', '=', backendId],
                 ['product_id', '=', productId],
-            ]],
-            {}                    // kwargs (objeto)
-            );
+            ]], {});
 
-            await this.orm.call(
-                'pos.order.line',
-                'write',
-                [ lineIds, { changes: newQty } ],
-                {}
-            );
+            await this.orm.call('pos.order.line', 'write', [lineIds, { changes: qty }], {});
 
-            // 5.1) UoM del producto
-            const [prod] = await this.orm.call(
-                "product.product",    // modelo
-                "read",               // método
-                [[productId], ["uom_id"]],
-                {}
-            );
+            const [prod] = await this.orm.call("product.product", "read", [[productId], ["uom_id"]], {});
             const uomId = prod.uom_id[0];
 
-            // 5.2) Tipo de operación “incoming” para tu compañía
-            const [pt] = await this.orm.call(
-                "stock.picking.type",                    // modelo
-                "search_read",                           // método
-                [
-                    [
-                    ["code", "=", "incoming"],
-                    ["warehouse_id.company_id", "=", this.pos.company.id],
-                    ],
-                ],                                        // args: [ [ domain tuples ] ]
-                { fields: ["id"] }                       // kwargs
-            );
+            const [pt] = await this.orm.call("stock.picking.type", "search_read", [[
+                ["code", "=", "incoming"],
+                ["warehouse_id.company_id", "=", this.pos.company.id],
+            ]], { fields: ["id"] });
+            
             if (!pt) {
-                alert("No existe un tipo de operación de entrada configurado.......");
-                return false
+                alert("No existe un tipo de operación de entrada configurado");
+                return false;
             }
 
-            // 5.3) Crear el picking
             const pickingVals = {
                 origin: `POS Return ${backendId}`,
                 picking_type_id: pt.id,
                 location_id: firstLoc.origin_id,
                 location_dest_id: firstLoc.location_id,
-                move_ids_without_package: [
-            [0, 0, {
-                product_id: productId,
-                product_uom_qty: qty,
-                product_uom: uomId,
-                name: "Devolución POS",
-                location_id: firstLoc.origin_id ,
-                location_dest_id: firstLoc.location_id,
-                }],
-            ],
+                move_ids_without_package: [[0, 0, {
+                    product_id: productId,
+                    product_uom_qty: qty,
+                    product_uom: uomId,
+                    name: "Devolución POS",
+                    location_id: firstLoc.origin_id,
+                    location_dest_id: firstLoc.location_id,
+                }]],
             };
 
-            const pickingId = await this.orm.call(
-                "stock.picking",       // modelo
-                "create",              // método
-                [pickingVals],         // args
-                {}                     // kwargs
-            );
-
-            // 5.4) Confirmar, reservar y validar
-            await this.orm.call("stock.picking", "action_confirm",    [[pickingId]]);
-            await this.orm.call("stock.picking", "action_assign",     [[pickingId]]);
-            await this.orm.call("stock.picking", "button_validate",   [[pickingId]]);
-      }
-      return true
+            const pickingId = await this.orm.call("stock.picking", "create", [pickingVals], {});
+            await this.orm.call("stock.picking", "action_confirm", [[pickingId]]);
+            await this.orm.call("stock.picking", "action_assign", [[pickingId]]);
+            await this.orm.call("stock.picking", "button_validate", [[pickingId]]);
+        }
+        return true;
     }
 });
-
