@@ -158,7 +158,7 @@ patch(PaymentScreen.prototype, {
             }
         }
 
-        // ✅ [NUEVO] Mostrar popup de entrega ANTES de procesar el pago
+        // ✅ [CORREGIDO] Mostrar popup de entrega ANTES de procesar el pago
         try {
             const config = this.pos?.config;
             const currentOrder = this.pos?.get_order?.();
@@ -172,7 +172,9 @@ patch(PaymentScreen.prototype, {
             
             if (config && config.is_home_box && currentOrder && !currentOrder._homeBoxPopupShown) {
                 console.log("[DEBUG] Showing Home Delivery Popup BEFORE payment");
-                currentOrder._homeBoxPopupShown = true;
+                
+                // ⚠️ CORREGIDO: NO marcar como mostrado todavía
+                // currentOrder._homeBoxPopupShown = true;  // ❌ QUITAR ESTA LÍNEA
                 
                 // Mostrar popup y esperar a que se complete
                 const { confirmed } = await this.popup.add(HomeDeliveryPopup, {
@@ -182,10 +184,13 @@ patch(PaymentScreen.prototype, {
                     config: config,
                 });
                 
-                // Si el usuario cancela, no procesar el pago
-                if (!confirmed) {
-                    console.log("[DEBUG] User cancelled delivery popup");
-                    return;
+                // ⚠️ CORREGIDO: Marcar como mostrado SOLO después de la confirmación
+                if (confirmed) {
+                    currentOrder._homeBoxPopupShown = true;  // ✅ MOVER AQUÍ
+                    console.log("[DEBUG] Delivery confirmed - marking as shown");
+                } else {
+                    console.log("[DEBUG] User cancelled delivery popup - NOT marking as shown");
+                    return false;  // Detener el pago
                 }
             }
         } catch (err) {
@@ -193,7 +198,7 @@ patch(PaymentScreen.prototype, {
             // Si hay error en el popup, continuar con el pago normal
         }
 
-        // ✅ SOLO si el popup se completó o no era necesario, procesar el pago
+        // ✅ SOLO si el popup se confirmó o no era necesario, procesar el pago
         const result = await super.validateOrder(...arguments);
         return result;
     },
