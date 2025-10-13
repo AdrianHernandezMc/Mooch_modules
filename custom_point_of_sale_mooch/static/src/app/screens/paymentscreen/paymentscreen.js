@@ -30,7 +30,7 @@ patch(Order.prototype, {
         this._homeDeliveryData = null;
         this._homeBoxPopupShown = false;
     },
-    
+
     set_home_delivery_data(data) {
         this._homeDeliveryData = {
             contact_name: data.contact_name || "",
@@ -42,17 +42,17 @@ patch(Order.prototype, {
             maps_url: data.maps_url || "",
         };
     },
-    
+
     get_home_delivery_data() {
         return this._homeDeliveryData;
     },
-    
+
     export_as_JSON() {
         const json = super.export_as_JSON(...arguments);  // ✅ Cambiado: super en lugar de this._super
         json.home_delivery_data = this._homeDeliveryData || null;
         return json;
     },
-    
+
     init_from_JSON(json) {
         super.init_from_JSON(...arguments);  // ✅ Cambiado: super en lugar de this._super
         this._homeDeliveryData = json.home_delivery_data || null;
@@ -81,7 +81,7 @@ patch(PaymentScreen.prototype, {
 
         if (this.pos.Reembolso) {
             this.validateOrder();
-        } 
+        }
 
         if (this.pos.Reembolso == false && this.pos.TicketScreen_onDoRefund == false) {
             await this.popup.add(ErrorPopup, {
@@ -132,24 +132,24 @@ patch(PaymentScreen.prototype, {
         const order_iines = order.get_orderlines();
         const product_id = order.product_changes_id;
         const existe = order_iines.some(line => line.product.id === product_id);
-        
+
         if (existe) {
             const ondoInventory = await this.apply_changes();
             if (!ondoInventory) {
             return;
             }
         }
-        
+
         /********* Agrego el vale al programa */
         const exist_vale = order_iines.some(line => line.product.id === order.product_voucher_id);
 
         if (!exist_vale) {
             this.currentOrder.couponPointChanges = [];
-        } 
-        
+        }
+
         if (exist_vale) {
             console.log("Entro");
-            const cfgId = this.pos.config.id; 
+            const cfgId = this.pos.config.id;
             const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
             const crate_vale = await this.create_vale(order, loyalty_program_id);
             if (!crate_vale) {
@@ -162,29 +162,23 @@ patch(PaymentScreen.prototype, {
         try {
             const config = this.pos?.config;
             const currentOrder = this.pos?.get_order?.();
-            
+
             console.log("[DEBUG] Home Delivery Check:", {
                 configExists: !!config,
                 isHomeBox: config?.is_home_box,
                 currentOrder: !!currentOrder,
                 alreadyShown: currentOrder?._homeBoxPopupShown
             });
-            
+
             if (config && config.is_home_box && currentOrder && !currentOrder._homeBoxPopupShown) {
                 console.log("[DEBUG] Showing Home Delivery Popup BEFORE payment");
-                
-                // ⚠️ CORREGIDO: NO marcar como mostrado todavía
-                // currentOrder._homeBoxPopupShown = true;  // ❌ QUITAR ESTA LÍNEA
-                
-                // Mostrar popup y esperar a que se complete
                 const { confirmed } = await this.popup.add(HomeDeliveryPopup, {
                     title: _t("Datos para entrega"),
                     body: _t("Captura los datos del pedido de entrega:"),
                     order: currentOrder,
                     config: config,
                 });
-                
-                // ⚠️ CORREGIDO: Marcar como mostrado SOLO después de la confirmación
+
                 if (confirmed) {
                     currentOrder._homeBoxPopupShown = true;  // ✅ MOVER AQUÍ
                     console.log("[DEBUG] Delivery confirmed - marking as shown");
@@ -298,7 +292,7 @@ patch(PaymentScreen.prototype, {
                 ["code", "=", "incoming"],
                 ["warehouse_id.company_id", "=", this.pos.company.id],
             ]], { fields: ["id"] });
-            
+
             if (!pt) {
                 alert("No existe un tipo de operación de entrada configurado");
                 return false;
