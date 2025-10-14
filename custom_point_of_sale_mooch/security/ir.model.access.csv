@@ -1,3 +1,6 @@
 "id","name","model_id:id","group_id:id","perm_read","perm_write","perm_create","perm_unlink"
-"access_pos_changes_user","pos.changes: usuario POS","model_pos_changes","base.group_user",1,0,0,0
+"access_pos_changes_user","pos.changes: usuario POS","model_pos_changes","base.group_user",1,1,1,1
 "access_pos_changes_manager","pos.changes: manager POS","model_pos_changes","point_of_sale.group_pos_manager",1,1,1,1
+"access_loyalty_card_pos_user","loyalty.card: usuario POS","model_loyalty_card","point_of_sale.group_pos_user",1,1,1,0
+"access_loyalty_card_pos_user","loyalty.card: usuario POS","model_loyalty_card","point_of_sale.group_pos_user",1,1,1,0
+"access_hr_employee_pos_user",hr.employee: usuario POS,model_hr_employee,point_of_sale.group_pos_user,1,1,1,0

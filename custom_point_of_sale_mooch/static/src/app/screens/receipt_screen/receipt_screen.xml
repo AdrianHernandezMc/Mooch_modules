@@ -8,7 +8,7 @@
     <!-- Insertar DESPUÉS del bloque que itera paymentlines -->
     <xpath expr="//div[contains(@class,'paymentlines') and @t-foreach='props.data.paymentlines']" position="after">
       <div class="paymentlines items-count">
-        <span>Arciulos vendidos</span>
+        <span>Artiulos vendidos</span>
         <span t-esc="props.data.qty_articles" class="pos-receipt-right-align"/>
       </div>
     </xpath>
@@ -30,5 +30,13 @@
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')]/p[1]" position="replace">
     <t/>
     </xpath>
+    <!-- Campo para agregar el tipo de venta -->
+    <xpath expr="//div[@class='pos-receipt-taxes']" position="after">
+      <div class="pos-sale-type">
+         <!-- <span style="display:block; text-align:center; font-weight:bold; font-size:18px;">Sale Type:</span> -->
+        <span t-esc="props.data.sale_type"  style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
+      </div>
+    </xpath>
+
   </t>
 </templates>

@@ -48,7 +48,21 @@ class PosConfig(models.Model):
             return float(val or 0.0)
         except Exception:
             return 0.0
-        
+
+    @api.model
+    def get_employee_discount(self, config_id=None):
+        ICP = self.env["ir.config_parameter"].sudo()
+        if config_id:
+            cfg = self.browse(config_id)
+            if cfg and cfg.company_id:
+                ICP = ICP.with_company(cfg.company_id.id)
+        val = ICP.get_param("point_of_sale.pos_employee_discount")
+        try:
+            return int(float(val or 0.0))
+        except Exception:
+            return 0
+
+
     # @api.depends("company_id")
     # def _compute_changes_product_id(self):
     #     ICP = self.env["ir.config_parameter"].sudo()

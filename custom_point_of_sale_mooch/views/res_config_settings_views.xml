@@ -23,6 +23,9 @@
           <setting string="Retiros de efectivo" help="Cantidad/Tope de retiro usado por POS.">
             <field name="withdrawal"/>
           </setting>
+          <setting string="Descuento para empleados" help="Porcentaje de descuento automático aplicado a empleados en el punto de venta.">
+            <field name="employee_discount"/>
+          </setting>
         </xpath>
       </field>
     </record>
