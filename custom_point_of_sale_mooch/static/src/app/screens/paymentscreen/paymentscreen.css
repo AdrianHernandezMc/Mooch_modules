@@ -536,3 +536,28 @@ label {
 .form-column::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
 }
+
+/* Indicador de carga de datos del partner */
+.loading-partner-data {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    color: #1565c0;
+    font-size: 14px;
+    font-weight: 500;
+    border-left: 4px solid #2196f3;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+}
+
+.loading-partner-data .small-spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid #e3f2fd;
+    border-top: 3px solid #2196f3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}

@@ -26,6 +26,7 @@
           <span class="next_text">Finalizar compra</span>
         </xpath>
     </t>
+    <!-- Vistas para cajas de muebles/hogar-->
     <!--Validacion si entra al llenar entrega a domicilio.  -->
     <t t-name="custom_point_of_sale_mooch.DeliveryConfirmationPopup">
         <div class="o_delivery_confirmation_popup o_pos_popup">
@@ -65,27 +66,33 @@
                 <div class="popup-layout">
                     <!-- Columna izquierda: Formulario -->
                     <div class="form-column">
-                        <div class="form-section">
-                            <h4>👤 Información de Contacto</h4>
-                            <div class="form-grid">
-                                <label>Nombre del Contacto:</label>
-                                <input type="text"
-                                       t-model="state.contact_name"
-                                       placeholder="Persona que recibirá el pedido"
-                                       class="form-input"/>
-
-                                <label>📞 Teléfono:</label>
-                                <input type="text"
-                                       t-model="state.phone"
-                                       placeholder="Número de contacto"
-                                       class="form-input"/>
-
-                                <label>📝 Notas de Entrega:</label>
-                                <textarea t-model="state.notes"
-                                          placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." 
-                                          class="form-textarea"></textarea>
+                        <t t-if="state.loading_partner_data">
+                            <div class="loading-partner-data">
+                                <div class="small-spinner"></div>
+                                <span>📡 Cargando datos de entrega del cliente...</span>
                             </div>
-                        </div>
+                        </t>
+                            <div class="form-section">
+                                <h4>👤 Información de Contacto</h4>
+                                <div class="form-grid">
+                                    <label>Nombre del Contacto:</label>
+                                    <input type="text"
+                                          t-model="state.contact_name"
+                                          placeholder="Persona que recibirá el pedido"
+                                          class="form-input"/>
+
+                                    <label>📞 Teléfono:</label>
+                                    <input type="text"
+                                          t-model="state.phone"
+                                          placeholder="Número de contacto"
+                                          class="form-input"/>
+
+                                    <label>📝 Notas de Entrega:</label>
+                                    <textarea t-model="state.notes"
+                                              placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." 
+                                              class="form-textarea"></textarea>
+                                </div>
+                            </div>
 
                         <div class="form-section">
                             <h4>📍 Ubicación de Entrega</h4>

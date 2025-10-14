@@ -29,7 +29,7 @@ class PosOrder(models.Model):
     delivery_geo_lng = fields.Float("Longitud (entrega)")
     delivery_maps_url = fields.Char("URL de Maps")
 
-#################Fin de camgps######################################
+#################Fin de campos######################################
 
     @api.model
     def get_order_locations(self, order_ids):

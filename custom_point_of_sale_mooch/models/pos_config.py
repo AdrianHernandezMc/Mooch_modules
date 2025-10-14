@@ -33,7 +33,7 @@ class PosConfig(models.Model):
         string="Google Maps API Key",
         help="API Key para Google Maps Embed/Places. (Opcional)"
     )
-#################Fin de camgps######################################
+#################Fin de campos######################################
 
 
     @api.model
@@ -84,5 +84,21 @@ class PosConfig(models.Model):
     #         cfg.changes_product_id = val
 
 
+###############Metodos y funciones para muebles (Adrian)#####################
 
+    def _pos_ui_models(self):
+        result = super()._pos_ui_models()
+        for model in result:
+            if model['model'] == 'res.partner':
+                model['fields'].extend([
+                    'delivery_contact_name',
+                    'delivery_phone',
+                    'delivery_address',
+                    'delivery_notes',
+                    'delivery_lat',
+                    'delivery_lng',
+                    'delivery_maps_url'
+                ])
+        return result
 
+#############################################################################

@@ -57,6 +57,10 @@
             "custom_point_of_sale_mooch/static/src/app/screens/paymentscreen/paymentscreen.css",
             "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.css",
             "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.css",
+            #Comentados
+            #'custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml',
+            #'custom_point_of_sale_mooch/static/src/app/screens/PaymentScreen/paymentline_model.js',
+            #'custom_point_of_sale_mooch/static/src/js/fixes/safe_global_discount.js',
         ],
         "point_of_sale.assets_prod": [
             "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/receipt_screen.xml",
