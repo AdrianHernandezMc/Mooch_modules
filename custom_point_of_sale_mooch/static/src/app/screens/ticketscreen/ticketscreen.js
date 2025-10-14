@@ -92,6 +92,8 @@ patch(TicketScreen.prototype, {
         _superOnClickOrder.apply(this, arguments);
         this.clearRefundlines()
 
+        
+
         const orderBackendId = order.backendId
         //console.log("order",order)
 
@@ -141,6 +143,16 @@ patch(TicketScreen.prototype, {
              }
         });
 
+        const isRefund = order.orderlines.some(line => line.quantity < 0);
+        console.log("isRefund",isRefund)
+
+        if (isRefund) {
+            this.pos.Sale_type = "Reembolso";
+        }
+        else {
+            this.pos.Sale_type = null;   
+        }
+
         
 /// **** Echo para los camios de producto ********
         const refundLines = order.get_orderlines().filter(l => l.changes > 0);
@@ -161,6 +173,8 @@ patch(TicketScreen.prototype, {
             l.changes = 0;
             delete this.pos.toRefundLines?.[l.id];
         });
+
+
         this.render();
     },
 })

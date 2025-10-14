@@ -28,7 +28,14 @@ class ResConfigSettings(models.TransientModel):
         company_dependent=True,
         config_parameter="point_of_sale.pos_withdrawal_amount",
     )
-        
+
+    employee_discount = fields.Integer(
+        string="(%) Employee Discount (%)",
+        help="% Porcentaje entero de descuento automático aplicado a empleados en el punto de venta.",
+        company_dependent=True,
+        config_parameter="point_of_sale.pos_employee_discount",
+    )
+
     # Lee y guarda de forma manual en ir.config_parameter
     @api.model
     def get_values(self):

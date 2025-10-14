@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="refund_button_inherit" xml:space="preserve">
+     <t t-inherit="point_of_sale.RefundButton" t-inherit-mode="extension" owl="1">
+         <xpath expr="//button" position="replace">
+             <button class="control-button btn btn-light rounded-0 fw-bolder" t-on-click="() => this.click()">
+                <i class="fa fa-undo me-1" role="img" aria-label="Aplicar cambios" title="Aplicar cambios" />
+                Cambios
+            </button> 
+        </xpath> 
+    </t> 
+</templates>

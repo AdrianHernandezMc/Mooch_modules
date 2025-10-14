@@ -132,7 +132,7 @@ patch(PaymentScreen.prototype, {
     },
 
     async create_vale(order,loyaty_program_id){
-    try {
+    // try {
         const companyId = this.pos.company?.id;   // ← ID de la compañía
         const exp = addMonthtoday(new Date());
         const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
@@ -147,7 +147,6 @@ patch(PaymentScreen.prototype, {
         }, 0);
         totalWithTax = totalWithTax.toFixed(2);
 
-        console.log("order",order.server_id)
 
         // Preparas el diccionario con todos los campos
         const couponData = {
@@ -166,17 +165,17 @@ patch(PaymentScreen.prototype, {
           "loyalty.card",    // modelo
           [ couponData ]     // aquí sí va un solo nivel de array
         );
-
+        console.log("paso")
         return false;
 
-    } catch (err) {
-         await this.popup.add(ErrorPopup, {
-                title: "Error",
-                body: err,
-                confirmText: "OK",
-            });
-        return false;
-    }
+    // } catch (err) {
+    //      await this.popup.add(ErrorPopup, {
+    //             title: "Error",
+    //             body: err,
+    //             confirmText: "OK",
+    //         });
+    //     return false;
+    // }
 
     },
 
