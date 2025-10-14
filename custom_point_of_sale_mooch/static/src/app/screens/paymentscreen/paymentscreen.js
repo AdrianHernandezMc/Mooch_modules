@@ -225,43 +225,52 @@ patch(PaymentScreen.prototype, {
         return result;
     },
 
-    async create_vale(order, loyaty_program_id) {
-        try {
-            const companyId = this.pos.company?.id;
-            const exp = addMonthtoday(new Date());
-            const dateAddOneMonth = exp.toISOString().slice(0, 10);
-            const partner = order.client;
-            const lines = (order?.get_orderlines?.() || []).filter(
-                (l) => l?.product?.id === order.product_voucher_id
-            );
+    async create_vale(order,loyaty_program_id){
+    // try {
+        const companyId = this.pos.company?.id;   // ← ID de la compañía
+        const exp = addMonthtoday(new Date());
+        const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
+        const partner = order.client;
+        const lines = (order?.get_orderlines?.() || []).filter(
+            (l) => l?.product?.id === order.product_voucher_id
+        );
 
-            let totalWithTax = (lines || []).reduce((acc, l) => {
-                const p = l.get_all_prices?.();
-                return acc + (p?.priceWithTax ?? 0);
-            }, 0);
-            totalWithTax = Number(totalWithTax).toFixed(2);
+        let totalWithTax = (lines || []).reduce((acc, l) => {
+            const p = l.get_all_prices?.();
+            return acc + (p?.priceWithTax ?? 0);
+        }, 0);
+        totalWithTax = totalWithTax.toFixed(2);
 
-            const couponData = {
-                program_id: loyaty_program_id,
-                company_id: companyId,
-                partner_id: partner?.id || false,
-                code: order.voucher_code,
-                expiration_date: dateAddOneMonth,
-                points: totalWithTax,
-                pos_reference: order.name,
-            };
 
-            console.log("couponData", couponData);
-            await this.orm.create("loyalty.card", [couponData]);
-            return true;
+        // Preparas el diccionario con todos los campos
+        const couponData = {
+          program_id:          loyaty_program_id,
+          company_id:          companyId,                // compañía
+          partner_id:          partner?.id || false,
+          code:                order.voucher_code,
+          expiration_date:     dateAddOneMonth,
+          points:              totalWithTax,
+          //source_pos_order_id: order.server_id,
+          pos_reference: order.name,         // referenciamos la venta
+        };
 
-        } catch (err) {
-            await this.popup.add(ErrorPopup, {
-                title: "Error",
-                body: String(err),
-            });
-            return false;
-        }
+        console.log("couponData",couponData)
+        const couponId = await this.orm.create(
+          "loyalty.card",    // modelo
+          [ couponData ]     // aquí sí va un solo nivel de array
+        );
+        console.log("paso")
+        return false;
+
+    // } catch (err) {
+    //      await this.popup.add(ErrorPopup, {
+    //             title: "Error",
+    //             body: err,
+    //             confirmText: "OK",
+    //         });
+    //     return false;
+    // }
+
     },
 
     async apply_changes() {

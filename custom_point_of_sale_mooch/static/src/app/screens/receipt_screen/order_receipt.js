@@ -75,10 +75,13 @@ patch(Order.prototype, {
         r.amount_total = r.amount_total + r.rounding_applied;
         r.rounding_applied = null;
 
+
+
     //---Articulos vendido -------
         const lines = this.get_orderlines?.() || [];
         const qty_articles_Pos = lines.reduce((a, l) => a + Math.max(l.quantity ?? 0, 0), 0);
         r.qty_articles = qty_articles_Pos;
+
 
     //--- modifica linea de articulos ------
         const olines = this.get_orderlines?.() || [];
@@ -137,8 +140,10 @@ patch(Order.prototype, {
           }];
           r.new_coupon_info = base
         }
-        console.log(r.new_coupon_info)
-        console.log("Sin error")
+        console.log("r",r)
+        // Indico cual es el tipo de venta
+        r.sale_type = this.pos.Sale_type
+        
     return r;
   },
 

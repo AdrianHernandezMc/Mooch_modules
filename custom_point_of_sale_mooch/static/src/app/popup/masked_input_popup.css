@@ -1,0 +1,66 @@
+/* ===== Odoo 17 look for POS popup (standalone CSS) ===== */
+:root{
+  --o-brand:#875A7B;
+  --o-gray-100:#f8f9fa; --o-gray-200:#e9ecef; --o-gray-300:#dee2e6;
+  --o-gray-600:#6c757d; --o-gray-800:#343a40; --o-gray-900:#212529;
+  --o-radius:.5rem; --o-btn-radius:.375rem; --o-input-h:38px;
+}
+
+/* Caja base */
+.maskedpopup{
+  display:flex; flex-direction:column;
+  width:520px; max-width:calc(100vw - 32px);
+  font-family:"Lato","Open Sans",sans-serif; color:var(--o-gray-800);
+  background:#fff; border:1px solid var(--o-gray-300); border-radius:var(--o-radius);
+  box-shadow:0 .5rem 1rem rgba(0,0,0,.15); overflow:hidden; padding:0;
+}
+
+/* Título (<h3>) */
+.maskedpopup > h3{
+  margin:0; padding:.75rem 1rem;
+  font-size:1rem; font-weight:700; line-height:1.25; color:var(--o-gray-900);
+  background:var(--o-gray-100); border-bottom:1px solid var(--o-gray-200);
+}
+
+/* Texto (<p>) */
+.maskedpopup > p{
+  margin:0; padding:1rem 1rem .5rem; font-size:.9375rem; color:var(--o-gray-600);
+}
+
+/* Input */
+.maskedpopup > input{
+  margin:.25rem 1rem .75rem; width:calc(100% - 2rem);
+  height:var(--o-input-h); padding:.375rem .75rem; font-size:.9375rem;
+  background:#25cc70; color:var(--o-gray-800);
+  border:1px solid #ced4da; border-radius:var(--o-btn-radius); outline:0;
+  transition:border-color .15s, box-shadow .15s;
+}
+.maskedpopup > input:focus{
+  border-color:var(--o-brand); box-shadow:0 0 0 .25rem rgba(135,90,123,.25);
+}
+
+/* Botonera (.buttons) */
+.maskedpopup > .buttons{
+  display:flex; justify-content:flex-end; gap:.5rem; padding:0 1rem 1rem;
+}
+
+/* Botones (Buscar = primero, Cancelar = último) */
+.maskedpopup > .buttons > button{
+  height:var(--o-input-h); padding:.375rem .9rem; font-weight:600; cursor:pointer;
+  border-radius:var(--o-btn-radius); border:1px solid var(--o-gray-300);
+  background:#f1f3f5; color:var(--o-gray-800); transition:filter .15s, background .15s;
+}
+.maskedpopup > .buttons > button:first-child{
+  background:var(--o-brand); border-color:var(--o-brand); color:#fff;
+}
+.maskedpopup > .buttons > button:hover{ filter:brightness(.98); }
+.maskedpopup > .buttons > button:last-child:hover{ background:#e9ecef; }
+
+/* Responsive */
+@media (max-width:480px){
+.maskedpopup{ width:auto; }
+.maskedpopup > h3{ font-size:.95rem; padding:.6rem .85rem; }
+.maskedpopup > p{ padding:.85rem .85rem .4rem; }
+.maskedpopup > input{ margin:.2rem .85rem .7rem; width:calc(100% - 1.7rem); }
+.maskedpopup > .buttons{ padding:0 .85rem .85rem; }
+}

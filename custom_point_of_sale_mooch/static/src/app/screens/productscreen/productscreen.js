@@ -10,6 +10,7 @@ import { HotkeyHelpPopup } from "@custom_point_of_sale_mooch/app/popup/productsc
 import { markup, onMounted, useState } from "@odoo/owl";
 import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
 import { PasswordInputPopup } from "@custom_point_of_sale_mooch/app/popup/hide_passwordpopup";
+import { MaskedInputPopup } from "@custom_point_of_sale_mooch/app/popup/masked_input_popup"
 import { TicketScreen } from "@point_of_sale/app/screens/ticket_screen/ticket_screen";
 
 const _superSetNumpadMode = ProductScreen.prototype.onNumpadClick;
@@ -26,12 +27,13 @@ patch(ProductScreen.prototype, {
         //subo la variable al posStore para que se pueda leen en order_receipt y en todos lados
         this.pos.bloqueodecaja = false;
         this.pos.Reembolso = false;
+        this.pos.Sale_type = null;
         if (this.pos.couponPointChanges) this.pos.couponPointChanges = [];
-        //this.pos.sum_cash =  async () => {return await this.sum_cash();};
         if (typeof this.sum_cash === 'function') {
             this.pos.sum_cash = async () => await this.sum_cash();
         }
         this.pos.get_cash_out = async () => await this.get_cash_out();
+
 
         // Alt + P limpias las lineas de la orden
         useHotkey("Alt+t", (ev) => {
@@ -74,11 +76,26 @@ patch(ProductScreen.prototype, {
         });
         
         // **************   para hacer pruebad en productscreen  *******************
-        useHotkey("alt+x", (ev) => {                        
+        useHotkey("alt+x", (ev) => {
             //this.createvale()
-            
-             const order = this.pos.get_order();
-             console.log("order",order);
+            const order = this.posService.get_order();
+            const partner = order?.get_partner?.() || order?.get_client?.() || null;
+            console.log("partner",partner);
+            //const p = this.pos.get_order?.()?.get_partner?.() || null;
+            if (!partner) return false;
+            const Is_employee =  this.orm.call(
+                "hr.employee","search_read",
+                [[["work_contact_id","=",partner.id]],
+                ["id","name"]
+                ],
+                {limit:1}
+            );
+            console.log("Is_employee",Is_employee)
+            return !!(Is_employee?.length);
+            this.env.bus.trigger("trigger-discount", { pc: 10 });
+            // console.log("this.pos.Sale_type",this.pos.Sale_type);
+            // this.pos.Sale_type = "Reembolso";
+            // console.log("this.pos.Sale_type",this.pos.Sale_type);
             // const { updated } =  this.orm.call(
             //     "loyalty.card",
             //     "sync_source_order_by_posref",
@@ -87,8 +104,8 @@ patch(ProductScreen.prototype, {
             // );
 
             // console.log("loyalty.cards actualizados:", updated);
-            console.log(this.pos.pos_session.user_id)
-            console.log(this.pos.get_cashier()?.id )
+            //console.log(this.pos.pos_session.user_id)
+            //console.log(this.pos.get_cashier()?.id )
         });
         
         // Alt + g para entrar a las ordenes guardadas
@@ -110,9 +127,10 @@ patch(ProductScreen.prototype, {
 
         // 🧩 Tu lógica adicional después de obtener el producto
         if (product && product.default_code) {
-            product.display_name = `[${product.default_code}] ${product.display_name}`;
+            if (!product.display_name.includes(product.default_code)){
+                product.display_name = `${product.display_name} - [${product.default_code}]`;
+            }
         }
-        console.log("product",product);
         return product;
     },
 
@@ -169,36 +187,6 @@ patch(ProductScreen.prototype, {
             merge:    false,
             uom_id:   [1, 'Unidad'],
         });
-
-        // if (!this.currentOrder.couponPointChanges || Array.isArray(this.currentOrder.couponPointChanges)) {
-        //     this.currentOrder.couponPointChanges = {};
-        // }
-
-        //const r = await this.fetch_reward(2);
-        //console.log("r",r)
-        //const l = order.add_product(this.pos.db.get_product_by_id(r.discount_line_product_id), { price: 0 });
-        //console.log("l",l)
-        
-
-        // const changes = this.currentOrder.couponPointChanges;
-        // let entry =
-        // Object.values(changes).find(v => Number(v?.program_id) === Number(loyalty_program_id));
-
-        // if (!entry) {
-        // entry = {
-        //     points: 1.0,// amount_total,
-        //     barcode: defaults.code,
-        //     //code: defaults.code,
-        //     program_id: loyalty_program_id,
-        //     coupon_id: -2,
-        //     reward_id: 2,
-        //     appliedRules: [2], //[loyalty_program_id],
-        //    // expiration_date: new Date() + 30,   // ajusta si necesitas
-        // };
-
-        // const key = String(loyalty_program_id);
-        // changes[key] = entry;
-        // }
         
         const product_voucher_id =  await this.env.services.orm.call(
             "loyalty.reward",
@@ -219,7 +207,6 @@ patch(ProductScreen.prototype, {
             "reward_product_id","required_points","active","company_id"
         ]]);
         const r = res?.[0] || null;
-        console.log("r",r)
         return r;
     },
 
@@ -247,33 +234,44 @@ patch(ProductScreen.prototype, {
     },
 
     async clickReembolso(){
-        const { confirmed, payload } = await this.popup.add(TextInputPopup, {
-            title: _t("Reembolso por Ticket"),
-            body: _t("Ingresa el número de ticket (pos_reference)."),
-            placeholder: "S0001-001-0001",
-            confirmText: _t("Buscar"),
-            cancelText: _t("Cancelar"),
-           inputProps: {
-        onInput: (e) => {
-                let input = e.target;
-                let raw = input.value.replace(/[^0-9]/g, "").slice(0, 12); // Solo números
-                let formatted = "S";
-
-                if (raw.length > 0) formatted += raw.slice(0, 4);
-                if (raw.length >= 5) formatted += "-" + raw.slice(4, 7);
-                if (raw.length >= 8) formatted += "-" + raw.slice(7, 11);
-
-                // Evita sobrescribir si el usuario borra
-                input.value = formatted;
-
-                // Reposiciona el cursor al final
-                input.setSelectionRange(formatted.length, formatted.length);
-            },
-            maxlength: 17,
-        },
-
+        const { confirmed, payload } = await this.popup.add(MaskedInputPopup,{
+            resolve: (result) => {
+                console.log("Popup cerrado:", result);
+            }
         });
-        console.log("confirmed",confirmed, "payload",payload);
+
+
+        // if (confirmed) {
+        //     alert("C")
+        // }
+
+        // const { confirmed, payload } = await this.popup.add(TextInputPopup, {
+        //     title: _t("Reembolso por Ticket"),
+        //     body: _t("Ingresa el número de ticket (pos_reference)."),
+        //     placeholder: "S0001-001-0001",
+        //     confirmText: _t("Buscar"),
+        //     cancelText: _t("Cancelar"),
+        //     inputProps: {
+        //     onInput: (e) => {
+        //         let input = e.target;
+        //         let raw = input.value.replace(/[^0-9]/g, "").slice(0, 12); // Solo números
+        //         let formatted = "S";
+
+        //         if (raw.length > 0) formatted += raw.slice(0, 4);
+        //         if (raw.length >= 5) formatted += "-" + raw.slice(4, 7);
+        //         if (raw.length >= 8) formatted += "-" + raw.slice(7, 11);
+
+        //         // Evita sobrescribir si el usuario borra
+        //         input.value = formatted;
+
+        //         // Reposiciona el cursor al final
+        //         input.setSelectionRange(formatted.length, formatted.length);
+        //     },
+        //     maxlength: 17,
+        //     },
+        // });
+
+
        // const { confirmed, payload } = await this.showPopup(OrderNumberPopup);
         if (!confirmed || !payload) return;
 
@@ -286,7 +284,6 @@ patch(ProductScreen.prototype, {
         
 
         if (!order || order.length === 0) {
-            console.log("order",order);
             this.popup.add(ErrorPopup, {
             title: "Orden no encontrada",
             body: `No se encontró la orden ${orderNumber}`,
@@ -391,8 +388,8 @@ patch(ProductScreen.prototype, {
             }
         }
 
-        console.log("OrdenActual", this.pos.get_order())
         // Redirigir a pantalla de recibo
+        this.pos.Sale_type = "Reembolso"; //Indico tipo de venta rembolso para imprimir en el recibo.
         this.pos.set_order(refundOrder);
         this.pos.Reembolso = true;
         this.pos.showScreen("PaymentScreen");
@@ -409,6 +406,7 @@ patch(ProductScreen.prototype, {
         }
     },
 
+
     async Discount(amount, rate) {
         //Aplica descuento del 10%
         rate = rate / 100
@@ -416,6 +414,7 @@ patch(ProductScreen.prototype, {
         const discounted = Math.round(cents * (1 - rate));
         return discounted / 100; // regresa en unidades, ej. 89.99
     },
+
 
     async get_cash_out() {
         const sessionId = this.pos?.pos_session?.id;
@@ -557,15 +556,49 @@ patch(ProductScreen.prototype, {
 
         let check = { ok: false, name: "" };
         try {
-            console.log("nip",nip)
+
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
-            console.log("check",check)
+
             if (check.ok && mode === "price")  {
                 this.change_price()
             } 
 
             if (check.ok && mode === "discount")  {
-                this.change_desc()
+                const order = this.posService.get_order();
+                const partner = order?.get_partner?.() || order?.get_client?.() || null;
+                let Is_employee = null
+
+                if (partner) {
+                    console.log("partner",partner);
+                    console.log("Is_employee",Is_employee)
+                    Is_employee = await this.orm.call(
+                        "hr.employee","search_read",
+                        [[["work_contact_id","=",partner.id]],
+                        ["id","name"]
+                        ],
+                        {limit:1}
+                    );
+                }
+                
+                console.log("Is_employee",Is_employee)
+                if (Is_employee?.length){
+                    const cfgId = this.pos?.config?.id || false;
+                    const employee_discount = await this.orm.call("pos.config", "get_employee_discount", [cfgId], {});
+                    console.log(employee_discount)
+
+                    await this.popup.add(ConfirmPopup, {
+                        title: "Confirmación",
+                        body: "¿Desea aplicar descuento al empleado?",
+                    }).then(({ confirmed }) => {
+                    if (confirmed) {
+                            this.env.bus.trigger("trigger-discount", { pc: 10 });
+                        }
+                    });
+                    //this.env.bus.trigger("trigger-discount", { pc: 10 });
+                }
+                else {
+                    this.change_desc()
+                }
             } 
 
         } catch (err) {
@@ -591,9 +624,7 @@ patch(ProductScreen.prototype, {
             });
             return;
         }
-
         //const current = line.get_unit_price();
-        
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo precio unitario"),
             body:  _t("Ingresa el precio (usa punto decimal)."),
@@ -633,7 +664,7 @@ patch(ProductScreen.prototype, {
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo descuento"),
             body:  _t("Ingresa el descuento en porcentaje (ej. 10 para 10%)."),
-            startingValue: String(current),
+            startingValue: "", //String(current),
             inputProps: { type: "text", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*" },
             confirmText: _t("Aplicar"),
             cancelText: _t("Cancelar"),
