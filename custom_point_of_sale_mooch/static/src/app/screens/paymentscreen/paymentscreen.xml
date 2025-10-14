@@ -12,7 +12,7 @@
                       t-on-input="onTxInput"
                       t-att-value="(selectedPaymentLine and selectedPaymentLine.transaction_id) or ''"/>
             </div>
-          </t> 
+          </t>
         </xpath>
     </t>
   <!-- Cambio la palabra validar por Finalizar compra -->
@@ -25,5 +25,185 @@
         <xpath expr="//div[contains(@class,'button') and contains(@class,'validation')]//span[contains(@class,'next_text') and normalize-space()='Validate']" position="replace">
           <span class="next_text">Finalizar compra</span>
         </xpath>
+    </t>
+    <!-- Vistas para cajas de muebles/hogar-->
+    <!--Validacion si entra al llenar entrega a domicilio.  -->
+    <t t-name="custom_point_of_sale_mooch.DeliveryConfirmationPopup">
+        <div class="o_delivery_confirmation_popup o_pos_popup">
+            <div class="o_popup_header">
+                <h3>🚚 Entrega a Domicilio</h3>
+            </div>
+            <div class="o_popup_body">
+                <div class="confirmation-content">
+                    <div class="icon-section">
+                        <div class="delivery-icon">📦</div>
+                    </div>
+                    <div class="message-section">
+                        <h4>¿Deseas agregar dirección de entrega?</h4>
+                        <p>Si el pedido es para entrega a domicilio, podrás capturar los datos de ubicación y contacto.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="o_popup_footer">
+                <div class="footer-actions">
+                  <button class="btn btn-confirm" t-on-click="confirmDelivery">✅ <br/>Sí, Agregar Dirección</button>
+                  <button class="btn btn-skip" t-on-click="skipDelivery">➡️ <br/>Saltar Entrega</button>
+                  <button class="btn btn-cancel" t-on-click="cancel">❌ <br/>Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </t>
+    <!-- Template para el Popup de Entrega a Domicilio -->
+    <t t-name="custom_point_of_sale_mooch.HomeDeliveryPopup">
+        <div class="o_home_delivery_popup o_pos_popup large-popup">
+            <div class="o_popup_header">
+                <h3>🚚 Entrega a Domicilio</h3>
+                <p class="popup-subtitle">Configura los detalles de entrega para el pedido</p>
+            </div>
+
+            <div class="o_popup_body">
+                <div class="popup-layout">
+                    <!-- Columna izquierda: Formulario -->
+                    <div class="form-column">
+                        <t t-if="state.loading_partner_data">
+                            <div class="loading-partner-data">
+                                <div class="small-spinner"></div>
+                                <span>📡 Cargando datos de entrega del cliente...</span>
+                            </div>
+                        </t>
+                            <div class="form-section">
+                                <h4>👤 Información de Contacto</h4>
+                                <div class="form-grid">
+                                    <label>Nombre del Contacto:</label>
+                                    <input type="text"
+                                          t-model="state.contact_name"
+                                          placeholder="Persona que recibirá el pedido"
+                                          class="form-input"/>
+
+                                    <label>📞 Teléfono:</label>
+                                    <input type="text"
+                                          t-model="state.phone"
+                                          placeholder="Número de contacto"
+                                          class="form-input"/>
+
+                                    <label>📝 Notas de Entrega:</label>
+                                    <textarea t-model="state.notes"
+                                              placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." 
+                                              class="form-textarea"></textarea>
+                                </div>
+                            </div>
+
+                        <div class="form-section">
+                            <h4>📍 Ubicación de Entrega</h4>
+
+                            <div class="address-search">
+                                <label>Buscar Dirección en Google Maps:</label>
+                                <div class="search-container">
+                                    <input type="text"
+                                           id="address-input"
+                                           t-model="state.address"
+                                           placeholder="Escribe la dirección completa..."
+                                           class="form-input search-input"/>
+                                    <button class="btn btn-search"
+                                            t-on-click="searchAddress"
+                                            title="Buscar en Google Maps">🔍</button>
+                                </div>
+                                <small class="text-muted">
+                                    💡 Escribe la dirección y haz clic en la lupa para buscarla en Google Maps
+                                </small>
+                            </div>
+
+                            <div class="coordinates-display">
+                                <div class="coordinate-group">
+                                    <label>Latitud:</label>
+                                    <input type="text"
+                                           t-model="state.lat"
+                                           readonly="readonly"
+                                           class="form-input coordinate-input"/>
+                                </div>
+                                <div class="coordinate-group">
+                                    <label>Longitud:</label>
+                                    <input type="text"
+                                           t-model="state.lng"
+                                           readonly="readonly"
+                                           class="form-input coordinate-input"/>
+                                </div>
+
+                                <!-- Indicador de Reverse Geocoding -->
+                                <t t-if="state.reverse_geocoding">
+                                    <div class="geocoding-status">
+                                        <div class="geocoding-loading">
+                                            <div class="small-spinner"></div>
+                                            <span>Obteniendo dirección...</span>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-elif="state.lat and state.lng and state.address">
+                                    <div class="geocoding-status success">
+                                        <span>✅ Dirección obtenida</span>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <div class="location-actions">
+                                <button class="btn btn-location"
+                                        t-on-click="useMyLocation"
+                                        t-att-disabled="state.searching_address">
+                                    <t t-if="state.searching_address">
+                                        <div class="small-spinner"></div>
+                                        Buscando ubicación...
+                                    </t>
+                                    <t t-else="">
+                                        📍 Usar Mi Ubicación Actual
+                                    </t>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna derecha: Mapa -->
+                    <div class="map-column">
+                        <div class="map-section">
+                            <h4>🗺️ Mapa de Entrega</h4>
+                            <p class="map-instructions">Haz clic en el mapa o arrastra el marcador para seleccionar la ubicación exacta</p>
+
+                            <div class="map-container">
+                                <div id="delivery-map" class="delivery-map">
+                                    <t t-if="!state.map_loaded">
+                                        <div class="map-loading">
+                                            <div class="loading-spinner"></div>
+                                            <p>Cargando mapa...</p>
+                                        </div>
+                                    </t>
+                                    <t t-elif="!props.config?.google_maps_api_key">
+                                        <div class="no-api-key-message">
+                                            <h5>⚠️ Google Maps no configurado</h5>
+                                            <p>Configura la API Key de Google Maps en la configuración del POS para usar el mapa interactivo.</p>
+                                            <p>Puedes continuar ingresando la dirección manualmente.</p>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <div class="map-tips">
+                                <p>💡 <strong>Tips:</strong><br/>
+                                • Haz clic en el mapa para colocar el marcador<br/>
+                                • Arrastra el marcador para ajustar la ubicación<br/>
+                                • Usa "Mi Ubicación" para ubicarte automáticamente</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="o_popup_footer">
+                <div class="footer-actions">
+                    <button class="btn btn-cancel" t-on-click="cancel">❌ Cancelar</button>
+                    <button class="btn btn-confirm" t-on-click="confirm">✅ Confirmar Entrega</button>
+                    <button class="btn btn-report" t-on-click="generateReport">🖨️ <br/>Imprimir Pedido</button>
+                </div>
+            </div>
+        </div>
     </t>
 </templates>

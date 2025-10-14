@@ -7,3 +7,4 @@ from . import pos_order_line
 from . import res_config_settings
 from . import pos_payment_method
 from . import loyalty_card
+from . import res_partner
