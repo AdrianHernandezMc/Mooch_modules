@@ -713,6 +713,170 @@ export class HomeDeliveryPopup extends Component {
     cancel() {
         this.props.close({ confirmed: false });
     }
+
+    // ✅ VERIFICA que este método esté DENTRO de la clase (no fuera)
+    async generateReport() {
+        console.log("🖨️ generateReport() ejecutándose"); // ✅ Agrega este log para debug
+        
+        // Validaciones básicas
+        if (!this.state.contact_name.trim() || !this.state.phone.trim() || !this.state.address.trim()) {
+            alert(_t("Por favor completa al menos nombre, teléfono y dirección para generar el reporte."));
+            return;
+        }
+
+        const data = {
+            contact_name: this.state.contact_name.trim(),
+            phone: this.state.phone.trim(),
+            address: this.state.address.trim(),
+            notes: this.state.notes.trim(),
+            lat: parseFloat(this.state.lat) || 0,
+            lng: parseFloat(this.state.lng) || 0,
+            maps_url: this.state.maps_url || "",
+        };
+
+        await this.generateDeliveryReport(data);
+    }
+    // ✅ NUEVO MÉTODO: Generar reporte de entrega
+    async generateDeliveryReport(deliveryData) {
+        try {
+            console.log("🖨️ Generando reporte de entrega...");
+
+            const order = this.props.order;
+            const partner = order?.get_partner?.() || {};
+
+            // Datos para el reporte
+            const reportData = {
+                order_name: order.name || "N/A",
+                order_date: new Date().toLocaleString('es-MX'),
+                partner_name: partner.name || "Cliente no especificado",
+                partner_phone: partner.phone || partner.mobile || "N/A",
+                delivery_data: deliveryData,
+                company: this.pos.company,
+                pos_config: this.pos.config
+            };
+
+            // Generar PDF via RPC
+            const pdfData = await this.orm.call(
+                'pos.order',
+                'generate_delivery_report',
+                [reportData]
+            );
+
+            if (pdfData) {
+                // Descargar el PDF
+                this.downloadPDF(pdfData, `entrega_${order.name || 'pedido'}.pdf`);
+                console.log("✅ Reporte de entrega generado exitosamente");
+            }
+
+        } catch (error) {
+            console.error("❌ Error generando reporte:", error);
+            this.popup.add(ErrorPopup, {
+                title: _t("Error al generar reporte"),
+                body: _t("No se pudo generar el reporte de entrega."),
+            });
+        }
+    }
+
+    // ✅ NUEVO MÉTODO: Descargar PDF
+    downloadPDF(pdfData, filename) {
+        try {
+            // Convertir base64 a blob
+            const byteCharacters = atob(pdfData);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/pdf' });
+
+            // Crear link de descarga
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+        } catch (error) {
+            console.error("Error descargando PDF:", error);
+            // Fallback: abrir en nueva pestaña
+            const pdfWindow = window.open("", "_blank");
+            pdfWindow.document.write(`
+                <html>
+                    <head><title>Reporte de Entrega</title></head>
+                    <body>
+                        <embed width="100%" height="100%" 
+                               src="data:application/pdf;base64,${pdfData}" 
+                               type="application/pdf">
+                    </body>
+                </html>
+            `);
+        }
+    }
+
+    // ✅ ACTUALIZA el método confirm() para incluir el reporte
+    async confirm() {
+        // VALIDACIONES COMPLETAS - TODOS LOS CAMPOS OBLIGATORIOS
+        const errors = [];
+
+        // Validar nombre del contacto
+        if (!this.state.contact_name.trim()) {
+            errors.push(_t("Por favor ingresa el nombre del contacto"));
+        }
+
+        // Validar teléfono
+        if (!this.state.phone.trim()) {
+            errors.push(_t("Por favor ingresa un número de teléfono"));
+        } else if (!this.isValidPhone(this.state.phone)) {
+            errors.push(_t("Por favor ingresa un número de teléfono válido"));
+        }
+
+        // Validar dirección
+        if (!this.state.address.trim()) {
+            errors.push(_t("Por favor ingresa una dirección de entrega"));
+        }
+
+        // Validar coordenadas
+        if (!this.state.lat || !this.state.lng) {
+            errors.push(_t("Por favor selecciona una ubicación en el mapa"));
+        } else if (parseFloat(this.state.lat) === 0.0 && parseFloat(this.state.lng) === 0.0) {
+            errors.push(_t("Por favor selecciona una ubicación válida en el mapa"));
+        }
+
+        // Mostrar errores si hay alguno
+        if (errors.length > 0) {
+            alert(errors.join('\n• '));
+            return;
+        }
+
+        // Si todo está válido, confirmar
+        const data = {
+            contact_name: this.state.contact_name.trim(),
+            phone: this.state.phone.trim(),
+            address: this.state.address.trim(),
+            notes: this.state.notes.trim(),
+            lat: parseFloat(this.state.lat),
+            lng: parseFloat(this.state.lng),
+            maps_url: this.state.maps_url || "",
+        };
+
+        // Guardar en el pedido
+        this.props.order?.set_home_delivery_data?.(data);
+
+        // ✅ NUEVO: Preguntar si generar reporte
+        const generateReport = confirm(_t("¿Deseas generar un reporte de entrega para este pedido?"));
+
+        if (generateReport) {
+            await this.generateDeliveryReport(data);
+        }
+
+        // ✅ NUEVO: Opcionalmente guardar en el cliente para futuros pedidos
+        await this.saveToPartnerIfNeeded(data);
+
+        this.props.close({ confirmed: true });
+    }
 }
 
 registry.category("pos.popups").add("HomeDeliveryPopup", HomeDeliveryPopup);

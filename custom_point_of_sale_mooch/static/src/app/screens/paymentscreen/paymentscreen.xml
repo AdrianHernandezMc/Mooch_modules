@@ -201,6 +201,7 @@
                 <div class="footer-actions">
                     <button class="btn btn-cancel" t-on-click="cancel">❌ Cancelar</button>
                     <button class="btn btn-confirm" t-on-click="confirm">✅ Confirmar Entrega</button>
+                    <button class="btn btn-report" t-on-click="generateReport">🖨️ <br/>Imprimir Pedido</button>
                 </div>
             </div>
         </div>

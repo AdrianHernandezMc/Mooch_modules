@@ -452,6 +452,23 @@ label.small.text-muted {
     background: #219653 !important;
 }
 
+.btn-report {
+    background: #f39c12 !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 25px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: background 0.3s ease !important;
+    flex: 1;
+}
+
+.btn-report:hover {
+    background: #e67e22 !important;
+}
+
 /* Textos de ayuda */
 .text-muted {
     color: #6c757d !important;
