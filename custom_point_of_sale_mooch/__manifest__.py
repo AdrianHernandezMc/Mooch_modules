@@ -3,7 +3,7 @@
     'version': '17.0.1.2.0',
     'category': 'Point of Sale',
     'summary': 'Reembolsos POS via Loyalty',
-    'depends': ['base','point_of_sale','loyalty','pos_loyalty','web','product','pos_discount','res_partner'],
+    'depends': ['base','point_of_sale','loyalty','pos_loyalty','web','product','pos_discount'],
     'data': [
         'security/ir.model.access.csv',
         'views/changes_menu.xml',
