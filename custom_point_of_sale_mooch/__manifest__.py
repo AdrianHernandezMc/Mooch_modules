@@ -26,6 +26,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.js",
           "custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.js",
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.js",
+          "custom_point_of_sale_mooch/static/src/app/utilis/Input_popups/text_inpup_popup.xml",
 
           # Screens
           "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/order_receipt.js",
@@ -61,6 +62,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.css",
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.css",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.css",
+          "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.css",
         
           # Comentados (referencia; no se cargan)
           #'custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml',

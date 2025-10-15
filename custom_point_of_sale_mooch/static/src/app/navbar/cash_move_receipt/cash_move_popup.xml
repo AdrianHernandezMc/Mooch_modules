@@ -2,13 +2,9 @@
 <templates id="template" xml:space="preserve">
     <t t-inherit="point_of_sale.CashMovePopup" t-inherit-mode="extension" owl="1">
         <xpath expr="//div[@class='cash-move d-flex flex-column']" position="inside">
-            <div class="form-floating mt-3">
-                <label for="total_cash" class="fw-bold">Efectivo:</label><br/>
-                <!-- <span t-esc="fmt(state.cashTotal)" class="text-success fs-5"/> -->
+            <div class="cash-info-box mt-1">
+                <label for="total_cash" class="fw-bold cash-label">Efectivo:</label>
                 <span t-esc="fmt(totalCashReceived)" class="text-success fs-5"/>
-                 <!-- <span id="total_cash"
-                    t-esc="env.utils.formatCurrency(totalCashReceived || 0, {currency: pos.currency})"
-                    class="text-success fs-5" /> -->
             </div> 
         </xpath>
     </t>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="point_of_sale.TextInputPopup" t-inherit-mode="extension" owl="1">
+        <xpath expr="//input[@t-ref='input']" position="replace">
+          <input
+            t-attf-class="form-control form-control-lg w-75 mx-auto {{ props.inputProps &amp;&amp; props.inputProps.className or '' }}"
+            t-model="state.inputValue"
+            t-ref="input"
+            t-att-placeholder="props.placeholder"
+            t-att="props.inputProps"
+          />
+
+            <!-- <attribute name="t-att">props.inputProps</attribute> -->
+        </xpath>
+    </t>
+</templates>

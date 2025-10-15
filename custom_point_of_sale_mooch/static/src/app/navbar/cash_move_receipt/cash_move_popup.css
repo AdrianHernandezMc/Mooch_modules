@@ -1,0 +1,10 @@
+span.text-success.fs-5 {
+    border: 2px solid red;
+    color: black !important;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+
