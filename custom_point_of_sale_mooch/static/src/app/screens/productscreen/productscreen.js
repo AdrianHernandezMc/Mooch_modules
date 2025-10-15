@@ -541,7 +541,7 @@ patch(ProductScreen.prototype, {
         const { popup, orm } = this.env.services;
 
         const { confirmed, payload } = await  this.popup.add(PasswordInputPopup, {
-            title: _t("NIP"),
+            title: _t("Contraseña de supervisor"),
             body: _t("Ingresa el NIP del Gerente de Ventas:"),
             confirmText: _t("Validar"),
             cancelText: _t("Cancelar"),
@@ -587,7 +587,7 @@ patch(ProductScreen.prototype, {
                     console.log(employee_discount)
 
                     await this.popup.add(ConfirmPopup, {
-                        title: "Confirmación",
+                        title: "Confirmación de descuento",
                         body: "¿Desea aplicar descuento al empleado?",
                     }).then(({ confirmed }) => {
                     if (confirmed) {
@@ -627,10 +627,10 @@ patch(ProductScreen.prototype, {
         //const current = line.get_unit_price();
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo precio unitario"),
-            body:  _t("Ingresa el precio (usa punto decimal)."),
+            body:  _t("Ingresa el precio."),
             //startingValue: String(current*1.16),
             // valida solo números con punto decimal (opcional)
-            inputProps: { type: "text", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*" },
+            inputProps: { type: "number", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*", className: "verde-input", },
             confirmText: _t("Aplicar"),
             cancelText: _t("Cancelar"),
         });
@@ -665,7 +665,7 @@ patch(ProductScreen.prototype, {
             title: _t("Nuevo descuento"),
             body:  _t("Ingresa el descuento en porcentaje (ej. 10 para 10%)."),
             startingValue: "", //String(current),
-            inputProps: { type: "text", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*" },
+            inputProps: { type: "number", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*",className: "verde-input", },
             confirmText: _t("Aplicar"),
             cancelText: _t("Cancelar"),
         });
