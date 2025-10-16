@@ -260,7 +260,7 @@ patch(PaymentScreen.prototype, {
           [ couponData ]     // aquí sí va un solo nivel de array
         );
         console.log("paso")
-        return false;
+        return true;
 
     // } catch (err) {
     //      await this.popup.add(ErrorPopup, {
