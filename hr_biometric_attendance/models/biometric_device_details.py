@@ -163,9 +163,12 @@ class BiometricDeviceDetails(models.Model):
         hr_attendance = self.env['hr.attendance']
 
         # Parámetros de control
-        TOL = timedelta(minutes=2)           
-        ADJUST_MAX = timedelta(minutes=10)   
-        MAX_OPEN = timedelta(hours=16)       
+        TOL = timedelta(minutes=2)
+        ADJUST_MAX = timedelta(minutes=10)
+        MAX_OPEN = timedelta(hours=16)
+
+        # 🔥 NUEVO: Obtener fecha actual
+        current_date = fields.Datetime.now().date()
 
         def _exists_same_in(emp_id, dt_str):
             """¿Ya existe un IN exactamente en dt_str para el empleado (abierto o cerrado)?"""
@@ -364,11 +367,11 @@ class BiometricDeviceDetails(models.Model):
 
                         # 🔥 MODIFICADO: Verificar abiertos pero permitir del día actual
                         open_today = hr_attendance.search_count([
-                            ('employee_id', '=', emp.id), 
+                            ('employee_id', '=', emp.id),
                             ('check_out', '=', False),
                             ('check_in', '>=', fields.Datetime.to_string(current_date))  # Solo del día actual
                         ])
-                        
+
                         if open_today:
                             _logger.warning("[BIO] Ya existe IN ABIERTO HOY para %s; nuevo IN @ %s omitido.",
                                             emp.name, atten_time)
