@@ -167,280 +167,198 @@ class AdminAttendanceReportWizard(models.TransientModel):
         return datetime.combine(date, time(hh, mm))
 
     def get_dataset(self):
-        """Construye el dataset consumido por QWeb - CORRECCIÓN DE FECHAS"""
+        """Construye el dataset consumido por QWeb (consultas en UTC; 'day_list' en LOCAL)."""
         self.ensure_one()
-        _logger.info("=== GENERANDO DATASET CON FECHAS CORREGIDAS ===")
+        _logger.info("=== GENERANDO DATASET (v3 day_list local) ===")
 
         tz = pytz.timezone(self.env.user.tz or 'UTC')
 
-        # Fechas del filtro (en UTC para consultas)
+        # 1) Fechas del filtro en UTC
         dfrom_utc = fields.Datetime.from_string(self.date_from)
-        dto_utc = fields.Datetime.from_string(self.date_to)
+        dto_utc   = fields.Datetime.from_string(self.date_to)
         if dfrom_utc > dto_utc:
             dfrom_utc, dto_utc = dto_utc, dfrom_utc
 
-        # Convertir a local SOLO para display
+        # 2) Equivalentes en LOCAL (solo display y para construir 'day_list')
         dfrom_local = self._to_user_tz(dfrom_utc, tz)
-        dto_local = self._to_user_tz(dto_utc, tz)
+        dto_local   = self._to_user_tz(dto_utc, tz)
 
-        # Lista de días (local) para el reporte
-        day_list = []
+        # 3) day_list basada en LOCAL (evita que se “salte” al día siguiente por TZ)
+        day_list_dates = []
         cur = dfrom_local.date()
         end = dto_local.date()
         while cur <= end:
-            day_list.append(cur)
+            day_list_dates.append(cur)
             cur += timedelta(days=1)
 
-        # Empleados administrativos
+        # 3.1 Etiquetas “lun/06/oct” preformateadas para el XML
+        spanish_days   = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
+        spanish_months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+        date_labels = {}
+        for d in day_list_dates:
+            label = f"{spanish_days[d.weekday()]}/{d.day:02d}/{spanish_months[d.month-1]}"
+            date_labels[d.strftime('%Y-%m-%d')] = label
+
+        # 4) Empleados
         domain = [('active', '=', True), ('is_administrative', '=', True)]
         if self.work_location_id:
             domain.append(('work_location_id', '=', self.work_location_id.id))
         employees = self.employee_ids or self.env['hr.employee'].search(domain, order='work_location_id,name')
 
-        # ===== AUSENCIAS (VACACIONES/PERMISOS) - CONSULTA EN UTC =====
+        # 5) AUSENCIAS (UTC para buscar; convertir a LOCAL para cruzar con day_list)
         Leave = self.env['hr.leave']
-        leave_domain = [
+        leaves = Leave.search([
             ('employee_id', 'in', employees.ids),
             ('state', '=', 'validate'),
-            ('date_from', '<=', dto_utc),  # USAR UTC para consulta
-            ('date_to', '>=', dfrom_utc),  # USAR UTC para consulta
-        ]
-        leaves = Leave.search(leave_domain)
-
+            ('date_from', '<=', dto_utc),
+            ('date_to',   '>=', dfrom_utc),
+        ])
         leave_index = defaultdict(dict)
         for leave in leaves:
-            # Convertir fechas del leave a local para comparar con day_list
-            leave_date_from_local = self._to_user_tz(leave.date_from, tz).date() if leave.date_from else None
-            leave_date_to_local = self._to_user_tz(leave.date_to, tz).date() if leave.date_to else None
-
-            if not leave_date_from_local or not leave_date_to_local:
+            lfrom_loc = self._to_user_tz(leave.date_from, tz).date() if leave.date_from else None
+            lto_loc   = self._to_user_tz(leave.date_to,   tz).date() if leave.date_to   else None
+            if not lfrom_loc or not lto_loc:
                 continue
+            start_date = max(lfrom_loc, dfrom_local.date())
+            end_date   = min(lto_loc,   dto_local.date())
+            cd = start_date
+            while cd <= end_date:
+                leave_index[leave.employee_id.id][cd] = {'status': leave.holiday_status_id.name, 'type': 'leave'}
+                cd += timedelta(days=1)
 
-            # Usar las fechas CONVERTIDAS a local
-            start_date = max(leave_date_from_local, dfrom_local.date())
-            end_date = min(leave_date_to_local, dto_local.date())
-
-            current_date = start_date
-            while current_date <= end_date:
-                leave_index[leave.employee_id.id][current_date] = {
-                    'status': leave.holiday_status_id.name,
-                    'type': 'leave'
-                }
-                _logger.info("AUSENCIA: %s - %s: %s", leave.employee_id.name, current_date, leave.holiday_status_id.name)
-                current_date += timedelta(days=1)
-
-        # ===== ASISTENCIAS HR.ATTENDANCE - CONSULTA EN UTC =====
+        # 6) ASISTENCIAS (UTC)
         Attend = self.env['hr.attendance']
-        att_domain = [
+        atts = Attend.search([
             ('employee_id', 'in', employees.ids),
             '|',
-            '&', ('check_in', '>=', dfrom_utc), ('check_in', '<=', dto_utc),  # USAR UTC
-            '&', ('check_in', '<', dfrom_utc), ('check_out', '>=', dfrom_utc),  # USAR UTC
-        ]
-        atts = Attend.search(att_domain, order='employee_id, check_in')
+            '&', ('check_in', '>=', dfrom_utc), ('check_in', '<=', dto_utc),
+            '&', ('check_in', '<',  dfrom_utc), ('check_out', '>=', dfrom_utc),
+        ], order='employee_id, check_in')
 
-        # Filtrar asistencias válidas
-        valid_atts = []
-        for att in atts:
-            if att.check_out and att.check_out < att.check_in:
-                _logger.warning("Asistencia con check_out anterior a check_in: %s", att.id)
-                continue
-            valid_atts.append(att)
+        # Filtrar inconsistencias
+        atts = self.env['hr.attendance'].browse([
+            a.id for a in atts if (not a.check_out) or (a.check_out >= a.check_in)
+        ])
 
-        att_ids = [att.id for att in valid_atts]
-        atts = self.env['hr.attendance'].browse(att_ids)
-
-        # ===== PROCESAMIENTO MEJORADO - DETECCIÓN CORRECTA DE COMIDA =====
+        # 7) Resumen por empleado / día LOCAL
         per_emp_day_summary = defaultdict(dict)
-
         for emp in employees:
-            emp_id = emp.id
             emp_atts = atts.filtered(lambda a: a.employee_id.id == emp.id)
 
-            # Agrupar asistencias COMPLETAS por día (check_in + check_out)
-            day_asistencias = defaultdict(list)
+            # Agrupar por día LOCAL completo (pares in/out)
+            day_asist = defaultdict(list)  # { date(): [(cin_loc, cout_loc), ...] }
             for att in emp_atts:
-                cin = self._to_user_tz(att.check_in, tz)
-                cout = self._to_user_tz(att.check_out, tz) if att.check_out else None
+                cin_loc  = self._to_user_tz(att.check_in, tz)
+                cout_loc = self._to_user_tz(att.check_out, tz) if att.check_out else None
+                if cout_loc:
+                    day_asist[cin_loc.date()].append((cin_loc, cout_loc))
 
-                # Solo considerar asistencias completas (con check_out)
-                if cout:
-                    day_asistencias[cin.date()].append((cin, cout))  # (entrada, salida)
+            for day in day_list_dates:
+                asist = list(day_asist.get(day, []))
+                asist.sort(key=lambda x: x[0])
 
-            for day in day_list:
-                asistencias = day_asistencias.get(day, [])
-                asistencias.sort(key=lambda x: x[0])  # Ordenar por hora de entrada
+                lunch_out = lunch_in = None
+                first_in = last_out = None
 
-                # ===== DETECCIÓN CORRECTA DE COMIDA =====
-                lunch_out = None
-                lunch_in = None
-                first_in = None
-                last_out = None
+                if len(asist) >= 2:
+                    first_blk, second_blk = asist[0], asist[1]
+                    lunch_out = first_blk[1]
+                    lunch_in  = second_blk[0]
+                    if not (timedelta(minutes=30) <= (lunch_in - lunch_out) <= timedelta(hours=2)):
+                        lunch_out = lunch_in = None
 
-                if len(asistencias) >= 2:
-                    # Para detectar comida: necesitamos al menos 2 asistencias
-                    # La comida está entre el check_out de la primera y el check_in de la segunda
-                    primera_asistencia = asistencias[0]
-                    segunda_asistencia = asistencias[1]
+                if asist:
+                    first_in = asist[0][0]
+                    last_out = asist[-1][1]
+                elif len(asist) == 1:
+                    first_in = asist[0][0]
+                    last_out = asist[0][1]
 
-                    # Salida a comer = check_out de la primera asistencia
-                    lunch_out = primera_asistencia[1]  # 10:25
-                    # Regreso de comer = check_in de la segunda asistencia  
-                    lunch_in = segunda_asistencia[0]   # 10:26
-
-                    # Verificar que sea un tiempo razonable para comida (30min - 2hrs)
-                    tiempo_comida = lunch_in - lunch_out
-                    if not (timedelta(minutes=30) <= tiempo_comida <= timedelta(hours=2)):
-                        # Si no es un tiempo razonable, no es comida
-                        lunch_out = None
-                        lunch_in = None
-
-                # Primera entrada y última salida del día
-                if asistencias:
-                    first_in = asistencias[0][0]  # Primera entrada del día
-                    last_out = asistencias[-1][1]  # Última salida del día
-
-                # Si solo hay una asistencia, usar esa para entrada/salida
-                elif len(asistencias) == 1:
-                    first_in = asistencias[0][0]
-                    last_out = asistencias[0][1]
-
-                # Log para debugging
-                _logger.debug("Día %s - Asistencias: %s", day, [
-                    (cin.strftime('%H:%M'), cout.strftime('%H:%M')) for cin, cout in asistencias
-                ])
-                _logger.debug("Comida detectada: %s a %s", 
-                            lunch_out.strftime('%H:%M') if lunch_out else "None", 
-                            lunch_in.strftime('%H:%M') if lunch_in else "None")
-
-                # Calcular horas trabajadas (considerando comida)
                 work_secs = 0
                 if first_in and last_out and last_out > first_in:
-                    # Sumar tiempo de todas las asistencias
-                    for cin, cout in asistencias:
+                    for cin, cout in asist:
                         work_secs += int((cout - cin).total_seconds())
-
-                    # Restar tiempo de comida si se detectó
                     if lunch_out and lunch_in:
                         work_secs -= int((lunch_in - lunch_out).total_seconds())
 
-                # ===== LÓGICA DE STATUS (MANTENER EXACTA) =====
                 status = "Asistencia"
                 retardo_seconds = 0
-
-                # 1. Verificar día de descanso
-                is_rest_day = self._is_rest_day(emp, day)
-                if is_rest_day:
-                    status = "Descanso"
-                    work_secs = 0
-
-                # 2. Verificar ausencias
-                elif day in leave_index.get(emp_id, {}):
-                    leave_info = leave_index[emp_id][day]
-                    leave_type = leave_info['status']
-
-                    if 'vacacion' in leave_type.lower() or 'vacación' in leave_type.lower():
+                if self._is_rest_day(emp, day):
+                    status = "Descanso"; work_secs = 0
+                elif day in leave_index.get(emp.id, {}):
+                    lt = (leave_index[emp.id][day]['status'] or '').lower()
+                    if 'vacacion' in lt or 'vacación' in lt:
                         status = "Vacaciones"
-                    elif 'permiso' in leave_type.lower():
-                        if 'goce' in leave_type.lower():
-                            status = "Permiso c/goce"
-                        else:
-                            status = "Permiso s/goce"
+                    elif 'permiso' in lt:
+                        status = "Permiso c/goce" if 'goce' in lt else "Permiso s/goce"
                     else:
-                        status = leave_type
+                        status = leave_index[emp.id][day]['status']
                     work_secs = 0
-
-                # 3. Verificar si hay asistencia
                 elif not first_in and not last_out:
                     status = "Falta"
-
-                # 4. Verificar retardo
                 elif first_in:
                     expected_start, lunch_segment, expected_end = self._get_planned_work_hours(emp, day)
-
                     if expected_start:
                         first_in_naive = self._make_naive(first_in, tz)
-                        expected_start_naive = expected_start
-
-                        if first_in_naive and expected_start_naive and first_in_naive > expected_start_naive:
-                            retardo_seconds = int((first_in_naive - expected_start_naive).total_seconds())
-                            if retardo_seconds > 300:  # 5 minutos de tolerancia
+                        if first_in_naive > expected_start:
+                            retardo_seconds = int((first_in_naive - expected_start).total_seconds())
+                            if retardo_seconds >= 60:
                                 status = "Retardo"
 
-                # 5. Asistencia normal
-                else:
-                    status = "Asistencia"
-
-                # Formatear resultados
-                fmt = lambda dt: dt and dt.strftime('%H:%M') or '—'
-                day_str = day.strftime('%Y-%m-%d')
-
-                per_emp_day_summary[emp_id][day_str] = {
+                fmt = lambda dt: dt.strftime('%H:%M') if dt else '—'
+                key = day.strftime('%Y-%m-%d')
+                per_emp_day_summary[str(emp.id)][key] = {
                     'first_in_s': fmt(first_in),
-                    'lunch_out_s': fmt(lunch_out),  # Salida a comer (check_out primera)
-                    'lunch_in_s': fmt(lunch_in),    # Regreso de comer (check_in segunda)
-                    'last_out_s': fmt(last_out),    # Salida final (check_out última)
+                    'lunch_out_s': fmt(lunch_out),
+                    'lunch_in_s': fmt(lunch_in),
+                    'last_out_s': fmt(last_out),
                     'work_str': self._format_hhmm(work_secs),
                     'lunch_str': self._format_hhmm(int((lunch_in - lunch_out).total_seconds()) if lunch_out and lunch_in else 0),
                     'retardo': self._format_hhmm(retardo_seconds),
-                    'status': status
+                    'status': status,
                 }
 
-        # Serializar empleados
-        employees_data = []
-        for emp in employees:
-            employees_data.append({
-                'id': emp.id,
-                'name': emp.name,
-                'barcode': emp.barcode or 'No asignado',
-                'department_name': emp.department_id.name if emp.department_id else '—',
-                'work_location_name': emp.work_location_id.name if emp.work_location_id else '—',
-            })
+        # 8) Serialización empleados
+        employees_data = [{
+            'id': emp.id,
+            'name': emp.name,
+            'barcode': emp.barcode or 'No asignado',
+            'department_name': emp.department_id.name if emp.department_id else '—',
+            'work_location_name': emp.work_location_id.name if emp.work_location_id else '—',
+        } for emp in employees]
 
-        # ===== CALCULAR TOTAL DE RETARDOS POR EMPLEADO =====
+        # 9) Totales de retardo
         per_emp_total_retardo = {}
-
         for emp in employees:
-            emp_id = emp.id
-            total_retardo_minutos = 0
-
-            for day in day_list:
-                day_str = day.strftime('%Y-%m-%d')
-                day_data = per_emp_day_summary.get(emp_id, {}).get(day_str, {})
-                retardo_str = day_data.get('retardo', '00:00')
-
-                # Convertir "HH:MM" a minutos
-                if retardo_str and retardo_str != '00:00' and retardo_str != '—':
+            total_min = 0
+            for d in day_list_dates:
+                ds = d.strftime('%Y-%m-%d')
+                r = per_emp_day_summary.get(str(emp.id), {}).get(ds, {}).get('retardo', '00:00')
+                if r not in ('00:00', '—'):
                     try:
-                        hours, minutes = map(int, retardo_str.split(':'))
-                        total_retardo_minutos += hours * 60 + minutes
-                    except (ValueError, AttributeError):
-                        # Si hay error en la conversión, ignorar
+                        h, m = map(int, r.split(':')); total_min += h*60 + m
+                    except Exception:
                         pass
+            per_emp_total_retardo[str(emp.id)] = f"{total_min//60:02d}:{total_min%60:02d}"
 
-            # Convertir minutos totales a formato "HH:MM"
-            total_hours = total_retardo_minutos // 60
-            total_minutes = total_retardo_minutos % 60
-            per_emp_total_retardo[str(emp_id)] = f"{total_hours:02d}:{total_minutes:02d}"
-
-        _logger.info("Total de retardos calculados para %s empleados", len(per_emp_total_retardo))
-
-        _logger.info("Dataset con detección correcta de comida generado exitosamente")
-        _logger.info("Empleados: %s, Días: %s", len(employees_data), len(day_list))
-
+        _logger.info("Dataset OK (local days) - Empleados:%s Días:%s",
+                    len(employees_data), len(day_list_dates))
 
         return {
             'title': "Reporte Administrativos (Asistencias) - HR",
             'employees': employees_data,
-            'day_list': [day.strftime('%Y-%m-%d') for day in day_list],
+            'day_list': [d.strftime('%Y-%m-%d') for d in day_list_dates],
+            'date_labels': date_labels,  # << nuevo
             'per_emp_day_summary': dict(per_emp_day_summary),
             'per_emp_total_retardo': per_emp_total_retardo,
             'dfrom': dfrom_local.strftime('%Y-%m-%d %H:%M'),
-            'dto': dto_local.strftime('%Y-%m-%d %H:%M'),
+            'dto':   dto_local.strftime('%Y-%m-%d %H:%M'),
             'tz': self.env.user.tz or 'UTC',
             'include_signature': self.include_signature,
             'cards_per_page': 2,
+            'date_labels': date_labels,
         }
+
 
     def action_save_snapshot(self):
         self.ensure_one()
