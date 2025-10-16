@@ -246,7 +246,7 @@
                       <t t-set="day_index" t-value="(int(day_num) % 7)"/>
                       <t t-set="day_name" t-value="spanish_days[day_index]"/>
                       <t t-set="month_name" t-value="spanish_months[int(month_num)-1]"/>
-                      <t t-set="formatted_date" t-value="'%s/%s/%s' % (day_name, day_num, month_name)"/>
+                      <t t-set="formatted_date" t-value="report_data.get('date_labels', {}).get(d_str, d_str)"/>
 
                       <tr>
                         <td class="nowrap" style="text-align:center;"><t t-esc="formatted_date"/></td>
