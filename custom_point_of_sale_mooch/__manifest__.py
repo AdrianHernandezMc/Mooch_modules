@@ -50,6 +50,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.xml",
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.xml",
+          "custom_point_of_sale_mooch/static/src/app/screens/ticketscreen/ticketscreen.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/control_buttons_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/refund_button/refund_button.xml",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.xml",

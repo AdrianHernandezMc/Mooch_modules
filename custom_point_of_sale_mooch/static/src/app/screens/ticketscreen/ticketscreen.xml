@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="ticket_screen_custom_actionpad" xml:space="preserve">
+    <t t-inherit="point_of_sale.TicketScreen" t-inherit-mode="extension" owl="1">
+        <!-- Reemplazamos el bloque que contiene ActionpadWidget y Numpad -->
+        <xpath expr="//div[contains(@class, 'subpads')]" position="replace">
+            <div class="subpads d-flex bg-warning">
+                 <ActionpadWidget
+                    partner="getSelectedPartner()"
+                    actionName="'Cambiar Articulos'"
+                    actionType="'refund'"
+                    actionToTrigger.bind="onClickTicketExchange"
+                    isActionButtonHighlighted="getHasItemsToRefund()" />
+                <Numpad buttons="getNumpadButtons()" class="'max-width-325px'"/>
+            </div>
+        </xpath>
+    </t>
+</templates>

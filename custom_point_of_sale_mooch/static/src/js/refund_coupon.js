@@ -18,6 +18,7 @@ patch(TicketScreen.prototype, {
     },
 
     async onClickTicketExchange() {
+        alert("cambios")
         this.clearOrderlines()
         const destinationOrder = this.pos.get_order();
 
