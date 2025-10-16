@@ -92,8 +92,6 @@ patch(TicketScreen.prototype, {
         _superOnClickOrder.apply(this, arguments);
         this.clearRefundlines()
 
-        
-
         const orderBackendId = order.backendId
         //console.log("order",order)
 
@@ -124,7 +122,6 @@ patch(TicketScreen.prototype, {
         ); 
 
         order.voucher_code = pos_voucher_code
-        console.log("order",order)
         const addcode_to_orderline =  order.get_orderlines()
         addcode_to_orderline.forEach(l => {    
             if (!l.full_product_name.includes(l.product.barcode) && l.product.id !== order.product_changes_id && l.product.id !== order.product_voucher_id) {
@@ -144,7 +141,6 @@ patch(TicketScreen.prototype, {
         });
 
         const isRefund = order.orderlines.some(line => line.quantity < 0);
-        console.log("isRefund",isRefund)
 
         if (isRefund) {
             this.pos.Sale_type = "Reembolso";
@@ -173,7 +169,6 @@ patch(TicketScreen.prototype, {
             l.changes = 0;
             delete this.pos.toRefundLines?.[l.id];
         });
-
 
         this.render();
     },
