@@ -642,10 +642,15 @@ patch(ProductScreen.prototype, {
 
         let check = { ok: false, name: "" };
         try {
-
+            
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
-
-            if (check.ok && mode === "price")  {
+            console.log("manda el id del user",check.id)
+            // const currentEmployer_id = this.pos.get_cashier()?.id
+            const advancedEmployeeIds = this.pos.config.advanced_employee_ids; // Lista de IDs
+            const isAdvancedUser = advancedEmployeeIds.includes(check.id);
+            
+            console.log("Entro a validar con avanzado.", isAdvancedUser)
+            if (isAdvancedUser && mode === "price")  {
                 this.change_price()
             } 
 

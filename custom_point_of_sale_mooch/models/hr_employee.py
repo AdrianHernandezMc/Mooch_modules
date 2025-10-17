@@ -14,7 +14,7 @@ class HrEmployee(models.Model):
         # Busca por NIP y puesto (job_id.name). Ajusta si tu campo se llama diferente.
         emp = self.sudo().search([
             ('pin', '=', nip),
-            ('job_id.name', '=', 'Gerente ventas'),
+            # ('job_id.name', '=', 'Gerente ventas'),
             ('company_id', '=', self.env.company.id),
         ], limit=1)
-        return {'ok': bool(emp), 'name': emp.name or ''}
+        return {'ok': bool(emp), 'name': emp.name or '' , 'id': emp.id }
