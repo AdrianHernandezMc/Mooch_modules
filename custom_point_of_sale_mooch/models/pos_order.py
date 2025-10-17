@@ -26,6 +26,9 @@ class PosOrder(models.Model):
     delivery_geo_lng = fields.Float("Longitud (entrega)")
     delivery_maps_url = fields.Char("URL de Maps")
     #################Fin de campos######################################
+    #################Campos nuevos para valdiacion rembolso#############
+    refund_order_id = fields.Many2one('pos.order', string='Orden de Reembolso', readonly=True)
+    #################Fin de campos######################################
 
     @api.model
     def get_order_locations(self, order_ids):

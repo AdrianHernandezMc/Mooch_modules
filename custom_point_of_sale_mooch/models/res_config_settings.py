@@ -34,6 +34,7 @@ class ResConfigSettings(models.TransientModel):
         help="% Porcentaje entero de descuento automático aplicado a empleados en el punto de venta.",
         company_dependent=True,
         config_parameter="point_of_sale.pos_employee_discount",
+        default=10
     )
 
     # Lee y guarda de forma manual en ir.config_parameter
