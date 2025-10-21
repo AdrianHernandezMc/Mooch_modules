@@ -17,7 +17,7 @@ const _superSetNumpadMode = ProductScreen.prototype.onNumpadClick;
 const _super_getRefundableDetails = TicketScreen.prototype._getRefundableDetails;
 const _super_prepareRefundOrderlineOptions = TicketScreen.prototype._prepareRefundOrderlineOptions 
 
-patch(ProductScreen.prototype, {    
+patch(ProductScreen.prototype, {
     setup() {
         super.setup(...arguments);
         const popup = useService("popup");
@@ -51,7 +51,7 @@ patch(ProductScreen.prototype, {
         useHotkey("Alt+d", (ev) => {
             this.onNumpadClick("discount")
         });
-        
+
         // ALT % ejecuta el descuento
         useHotkey("Alt+p", (ev) => {
           //  this.notification.add("Modo descuento activado", { type: "info" });
@@ -61,7 +61,7 @@ patch(ProductScreen.prototype, {
         // Alt + h → muestra ayuda
         useHotkey("Alt+h", async (ev) => {
             const order = this.pos.get_order();
-            
+
             await popup.add(HotkeyHelpPopup, {
                 title: "📖 Ayuda de Atajos",
                 body: markup(`
@@ -74,7 +74,7 @@ patch(ProductScreen.prototype, {
                     </div>`),
             });
         });
-        
+
         // **************   para hacer pruebad en productscreen  *******************
         useHotkey("alt+x", (ev) => {
             //this.createvale()
@@ -107,13 +107,13 @@ patch(ProductScreen.prototype, {
             //console.log(this.pos.pos_session.user_id)
             //console.log(this.pos.get_cashier()?.id )
         });
-        
+
         // Alt + g para entrar a las ordenes guardadas
         useHotkey("alt+g", (ev) => {
             this.pos.showScreen("TicketScreen");
         });
 
-         useHotkey("alt+r", (ev) => {
+        useHotkey("alt+r", (ev) => {
             const order = this.pos.get_order();
             order.disabledRewards.clear();
             alert("limpio reward")
@@ -152,15 +152,15 @@ patch(ProductScreen.prototype, {
         });
 
         if (!confirmed) {
-          return;  
+            return;
         }
 
         const defaults = await this.orm.call(
-            'loyalty.card',        
-            'default_get',       
-            [ ['code'] ]  
+            'loyalty.card',
+            'default_get',
+            [ ['code'] ]
         );
-        
+
         let total = Number(amount_total)
         if (total < 1){
             amount_total =  amount_total/1.16 * -1
@@ -168,7 +168,7 @@ patch(ProductScreen.prototype, {
 
         //******* Agrego la linea del producto a la pantalla de productos de venta. */
         const order   = this.currentOrder;
-        const cfgId = this.pos.config.id; 
+        const cfgId = this.pos.config.id;
         const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
         const product_id = await this.orm.call(
             "loyalty.reward", "search_read",
@@ -180,14 +180,14 @@ patch(ProductScreen.prototype, {
         let product = this.pos.db.get_product_by_id(product_id[0].discount_line_product_id[0]);
         product.display_name = product.name
         product.display_name = product.display_name + " Code: " +  defaults.code
-        
+
         order.add_product(product, {
             quantity: 1,
             price:    amount_total,
             merge:    false,
             uom_id:   [1, 'Unidad'],
         });
-        
+
         const product_voucher_id =  await this.env.services.orm.call(
             "loyalty.reward",
             "search_read",
@@ -596,7 +596,7 @@ patch(ProductScreen.prototype, {
 
         let list = original;
         if (typeof list?.[0] === "number") {
-            const { db } = this.pos;                    
+            const { db } = this.pos;
             list = list.map((id) => db.get_product_by_id(id));
         }
 
@@ -605,9 +605,9 @@ patch(ProductScreen.prototype, {
     },
 
     async onNumpadClick(mode) {
-         if (mode === "price" || mode === "discount" ) {
-             await this.change_price_desc(mode);
-         }
+        if (mode === "price" || mode === "discount" ) {
+            await this.change_price_desc(mode);
+        }
         return _superSetNumpadMode.call(this, mode);
     },
 
@@ -632,7 +632,7 @@ patch(ProductScreen.prototype, {
             confirmText: _t("Validar"),
             cancelText: _t("Cancelar"),
         });
-        
+
         if (!confirmed || !payload) {
             return; 
         }
@@ -642,13 +642,13 @@ patch(ProductScreen.prototype, {
 
         let check = { ok: false, name: "" };
         try {
-            
+
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
             console.log("manda el id del user",check.id)
             // const currentEmployer_id = this.pos.get_cashier()?.id
             const advancedEmployeeIds = this.pos.config.advanced_employee_ids; // Lista de IDs
             const isAdvancedUser = advancedEmployeeIds.includes(check.id);
-            
+
             console.log("Entro a validar con avanzado.", isAdvancedUser)
             if (isAdvancedUser && mode === "price")  {
                 this.change_price()
@@ -670,7 +670,7 @@ patch(ProductScreen.prototype, {
                         {limit:1}
                     );
                 }
-                
+
                 console.log("Is_employee",Is_employee)
                 console.log("Is_employee?.length",Is_employee?.length)
                 if (Is_employee?.length){
@@ -692,7 +692,7 @@ patch(ProductScreen.prototype, {
                 else {
                     this.change_desc()
                 }
-            } 
+            }
 
         } catch (err) {
             console.error("Error al validar NIP:", err);
@@ -702,11 +702,11 @@ patch(ProductScreen.prototype, {
                 startingValue: "",
                 confirmText: "OK",
             });
-            return; 
+            return;
         }
-        return;     
+        return;
     },
-  
+
     async change_price() {
         const order = this.pos.get_order();
         const line  = order?.get_selected_orderline();
@@ -737,10 +737,10 @@ patch(ProductScreen.prototype, {
                 });
                 return;
             }
-        // aqui retorno el precio 
+        // aqui retorno el precio
         line.set_unit_price(value/1.16);
     },
-  
+
     async change_desc() {
         const order = this.pos.get_order();
         const line  = order?.get_selected_orderline();
@@ -753,7 +753,7 @@ patch(ProductScreen.prototype, {
             return;
         }
 
-        const current = line.get_discount(); 
+        const current = line.get_discount();
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo descuento"),
             body:  _t("Ingresa el descuento en porcentaje (ej. 10 para 10%)."),
