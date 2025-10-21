@@ -18,7 +18,6 @@ patch(TicketScreen.prototype, {
     },
 
     async onClickTicketExchange() {
-        alert("cambios")
         this.clearOrderlines()
         const destinationOrder = this.pos.get_order();
 
@@ -44,9 +43,10 @@ patch(TicketScreen.prototype, {
                 }
 
                 let totalRefund = refundDetails.reduce((sum, detail) => {
-                  const netPrice = detail.orderline.price / 1.16;    // sin impuestos
+                  let netPrice = detail.orderline.price / 1.16;    // sin impuestos
+                  netPrice = netPrice * (1 - detail.orderline.discount / 100);
                   const qty      = detail.qty;
-
+ 
                   let unitTax = 0;
                   if (includeTax) {
                       for (const taxId of detail.orderline.tax_ids) {
@@ -80,27 +80,9 @@ patch(TicketScreen.prototype, {
                 const origin_id = refundDetails.map(d => d.orderline.orderBackendId);
                 const productId_origin =  refundDetails.map(d => d.orderline.productId);
 
-                  // await this.orm.call(
-                  //   'pos.changes',
-                  //   'poschanges_links_pre',
-                  //   [
-                  //     origin_id[0],
-                  //     destinationOrder.uid,
-                  //     productId_origin,
-                  //   ]
-                  //   );
-              // *****
-
                 await ProductScreen.prototype._applyCoupon.call(this, totalRefund, ordername, refund_codes);
                 this.pos.showScreen("ProductScreen");
-                this.pos.activate_changes = true
-                //this.pos.toRefundLines = {};            
-               
-                //const couponId = await this.createCoupon(destinationOrder,totalRefund);
-        // } catch (error) {
-        //     this.pos.toRefundLines = {};
-        //     alert("Error al guardar reembolso: " + (error.message || "Hubo un error al guardar la orden de reembolso."));
-        // }
+                this.pos.activate_changes = true            
       }
     },
 });

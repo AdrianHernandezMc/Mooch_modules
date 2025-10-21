@@ -71,6 +71,8 @@ patch(PaymentScreen.prototype, {
     },
 
     async onMounted() {
+        //const c= null
+        //this.requiresTxId(c)
         if (this.pos.TicketScreen_onDoRefund){
             const line = this.selectedPaymentLine;
             line.transaction_id = String(this.pos.sharedtcode);
@@ -103,6 +105,14 @@ patch(PaymentScreen.prototype, {
     get requiresTxId() {
         const line = this.selectedPaymentLine;
         const method = line?.payment_method;
+
+        if (!method) return false;
+        return !!method.require_transaction_id;
+    },
+
+    requiresTextId(line){
+        const method = line?.payment_method;
+        //console.log("method",method)
         if (!method) return false;
         return !!method.require_transaction_id;
     },
@@ -118,18 +128,23 @@ patch(PaymentScreen.prototype, {
 
     async validateOrder() {
         // Bloquea validación si hace falta y no se capturó t.credito t.de
-        const line = this.selectedPaymentLine;
-        if (this.requiresTxId && (!line?.transaction_id || !line.transaction_id.trim())) {
-            await this.popup.add(ErrorPopup, {
-                title: _t("Falto capturar id de la tarjeta"),
+        const order = this.pos.get_order();
+        const paymentLines = order.get_paymentlines();
+        paymentLines.forEach(line => {
+            console.log("transaction_id",line.transaction_id)
+             console.log("required", this.requiresTextId(line))
+             console.log("orderline",line)
+            if (this.requiresTextId(line) && (!line?.transaction_id || !line.transaction_id.trim())) {
+                console.warn(`:`, line);
+                this.popup.add(ErrorPopup, {
+                title: _t("Falto capturar id de "+ line?.name),
                 body: _t("Captura el Transaction ID para pagos con tarjeta."),
             });
-            return;
-        }
+                return
+            }
+        });
 
         // bloque para mover los cambios de los articulos
-        const order = this.pos.get_order();
-        console.log("Order", order);
         const order_iines = order.get_orderlines();
         const product_id = order.product_changes_id;
         const existe = order_iines.some(line => line.product.id === product_id);
@@ -149,7 +164,6 @@ patch(PaymentScreen.prototype, {
         }
 
         if (exist_vale) {
-            console.log("Entro");
             const cfgId = this.pos.config.id;
             const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
             const crate_vale = await this.create_vale(order, loyalty_program_id);
@@ -356,5 +370,20 @@ patch(PaymentScreen.prototype, {
             await this.orm.call("stock.picking", "button_validate", [[pickingId]]);
         }
         return true;
+    },
+
+    addNewPaymentLine(paymentMethod) {        
+        // Validar que el total de la venta sea mayor que 0
+        const orderTotal = this.currentOrder.get_total_with_tax ? this.currentOrder.get_total_with_tax() : this.currentOrder.total;
+        console.log("orderTotal",orderTotal)
+        if (orderTotal <= 0) {
+            this.popup.add(ErrorPopup, {
+                title: _t("Error"),
+                body: _t("No se puede agregar metodo de pago: Total de la orden debe se mayor a 0."),
+            });
+            return false;
+        }
+        const result = super.addNewPaymentLine(...arguments);
+        return result;
     }
 });
