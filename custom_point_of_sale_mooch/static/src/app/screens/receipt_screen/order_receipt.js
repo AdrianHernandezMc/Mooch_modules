@@ -17,7 +17,7 @@ patch(Order.prototype, {
         super.setup(...arguments);
         this.changes_codes = this.changes_codes || [];
         this.product_changes_id = Number(this.pos?.product_changes_id);
-        this.voucher_code = this.voucher_code || null;
+        this.voucher_code = null;
         this.product_voucher_id = Number(this.pos?.product_voucher_id);
     },
   
@@ -75,8 +75,6 @@ patch(Order.prototype, {
         r.amount_total = r.amount_total + r.rounding_applied;
         r.rounding_applied = null;
 
-
-
     //---Articulos vendido -------
         const lines = this.get_orderlines?.() || [];
         const qty_articles_Pos = lines.reduce((a, l) => a + Math.max(l.quantity ?? 0, 0), 0);
@@ -90,6 +88,7 @@ patch(Order.prototype, {
             const prod = oline_?.product;
             const code = prod?.default_code || "";
 
+            //console.log("r.productName",r.productName)
             if (line.price_without_discount.length > 0){
               const price_without_discount = line.price_without_discount
               line.price_without_discount = line.price
@@ -103,7 +102,7 @@ patch(Order.prototype, {
             if (prod.id === oline_.pos.product_changes_id) shortName += " " + oline_.order.changes_codes;
           
             // detecto si el producot es un vale
-            if (oline_.order.voucher_code && prod.id === oline_?.order?.product_voucher_id ) shortName += oline_.order.voucher_code;
+            //if (oline_.order.voucher_code && prod.id === oline_?.order?.product_voucher_id ) shortName += oline_.order.voucher_code;
 
             return { ...line, 
                 default_code: code, 
@@ -139,8 +138,9 @@ patch(Order.prototype, {
                 expiration_date: dateexpire,   // o una fecha real si la tienes
           }];
           r.new_coupon_info = base
+          console.log("base",base)
         }
-        console.log("r",r)
+        console.log("r.new_coupon_info",r.new_coupon_info)
         // Indico cual es el tipo de venta
         r.sale_type = this.pos.Sale_type
         
@@ -148,7 +148,6 @@ patch(Order.prototype, {
   },
 
   pay() {
-    console.log(this.pos.bloqueodecaja)
     if (this.pos.bloqueodecaja) {
          this.pos.env.services.popup.add(ErrorPopup, {
                 title: _t("Bloqueo de caja"),
