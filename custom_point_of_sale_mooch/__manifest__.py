@@ -42,7 +42,7 @@
 
           # XML
           "custom_point_of_sale_mooch/static/src/xml/refund_coupon.xml",
-          "custom_point_of_sale_mooch/static/src/xml/process_exchange.xml",
+          #"custom_point_of_sale_mooch/static/src/xml/process_exchange.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/reserved/btn_reserved.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/receipt_screen.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/paymentscreen/paymentscreen.xml",
