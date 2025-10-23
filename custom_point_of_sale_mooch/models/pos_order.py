@@ -259,9 +259,7 @@ class PosOrder(models.Model):
 ##################### MÉTODOS MODIFICACION REMBOLSO POS ##########################################
     def _create_order_picking(self):
         """Método mejorado para diagnóstico y manejo de devoluciones"""
-        _logger.info("🎯 [DIAGNÓSTICO] _create_order_picking llamado")
-        _logger.info("🎯 [DIAGNÓSTICO] Orden: %s", self.name)
-        
+
         # ✅ DETECCIÓN ROBUSTA - No depender solo de is_return
         order_name_upper = (self.name or '').upper()
         is_refund = any([
@@ -272,25 +270,11 @@ class PosOrder(models.Model):
             self.amount_total < 0,  # Total negativo
             any('REEMBOLSO' in (line.name or '').upper() for line in self.lines)
         ])
-        
-        _logger.info("🎯 [DIAGNÓSTICO] is_return field: %s", getattr(self, 'is_return', 'No existe'))
-        _logger.info("🎯 [DIAGNÓSTICO] Nombre orden: %s", self.name)
-        _logger.info("🎯 [DIAGNÓSTICO] Total orden: %s", self.amount_total)
-        _logger.info("🎯 [DIAGNÓSTICO] Detectado como devolución: %s", is_refund)
-        _logger.info("🎯 [DIAGNÓSTICO] Líneas: %s", len(self.lines))
-        
-        for line in self.lines:
-            product = line.product_id
-            department = product.product_tmpl_id.department_id
-            _logger.info("🎯 [DIAGNÓSTICO] Producto: %s, Departamento: %s", 
-                        product.name, department.nombre if department else "Sin departamento")
-        
+
         # ✅ EJECUTAR LÓGICA PERSONALIZADA SI ES DEVOLUCIÓN
         if is_refund:
-            _logger.info("🎯 [DIAGNÓSTICO] 🚀 Ejecutando lógica personalizada para DEVOLUCIÓN")
             return self._create_custom_return_picking()
         else:
-            _logger.info("🎯 [DIAGNÓSTICO] Ejecutando lógica estándar de Odoo")
             return super()._create_order_picking()
 
     def _create_custom_return_picking(self):
@@ -298,54 +282,39 @@ class PosOrder(models.Model):
         Crea picking de reembolso con ubicaciones personalizadas por departamento
         UN PICKING POR DEPARTAMENTO (ubicación destino)
         """
-        _logger.info("🎯 [ODOO-CUSTOM] Creando picking personalizado para reembolso POS")
-        
+
         try:
             # ✅ OBTENER EL ALMACÉN CORRECTO
             warehouse = self._get_correct_warehouse()
             if not warehouse:
-                _logger.error("🎯 [ODOO-CUSTOM] No se pudo determinar el almacén para la orden")
                 raise UserError("No se pudo determinar el almacén para procesar el reembolso")
-
-            _logger.info(f"🎯 [ODOO-CUSTOM] Usando almacén: {warehouse.name}")
 
             # 1. BÚSQUEDA ROBUSTA DE TIPO DE OPERACIÓN
             picking_type = self._find_picking_type_for_returns(warehouse)
             if not picking_type:
-                _logger.error("🎯 [ODOO-CUSTOM] No se pudo encontrar ningún tipo de operación válido")
                 raise UserError("No se encontró un tipo de operación configurado para reembolsos")
-
-            _logger.info(f"🎯 [ODOO-CUSTOM] Usando tipo de operación: {picking_type.name}")
 
             # 2. OBTENER UBICACIÓN ORIGEN (Clientes)
             location_id = self.env.ref('stock.stock_location_customers')
             if not location_id:
-                _logger.error("🎯 [ODOO-CUSTOM] No se pudo encontrar la ubicación de clientes")
                 raise UserError("No se pudo encontrar la ubicación de clientes")
-
-            _logger.info(f"🎯 [ODOO-CUSTOM] Ubicación origen (Clientes): {location_id.complete_name}")
 
             # 3. ✅ AGRUPAR LÍNEAS POR DEPARTAMENTO (ubicación destino)
             lines_by_department = {}
-            
+
             for line in self.lines:
                 product = line.product_id
-                _logger.info(f"🎯 [ODOO-CUSTOM] Procesando línea: {product.name}")
-                
+
                 # ✅ OBTENER EL DEPARTAMENTO DESDE EL PRODUCT TEMPLATE
                 product_template = product.product_tmpl_id
                 department = product_template.department_id
-                
-                _logger.info(f"🎯 [ODOO-CUSTOM] Departamento del producto: {department.nombre if department else 'Sin departamento'}")
-                
+
                 # Determinar la ubicación destino específica
                 custom_location_dest_id = self._get_custom_destination_location(
                     warehouse.lot_stock_id,
                     department,
                     warehouse
                 )
-
-                _logger.info(f"🎯 [ODOO-CUSTOM] Ubicación destino: {custom_location_dest_id.complete_name}")
 
                 # Agrupar por ubicación destino
                 location_key = custom_location_dest_id.id
@@ -354,7 +323,7 @@ class PosOrder(models.Model):
                         'location_dest': custom_location_dest_id,
                         'lines': []
                     }
-                
+
                 lines_by_department[location_key]['lines'].append((0, 0, {
                     'name': f"REEMBOLSO POS: {product.name}",
                     'product_id': product.id,
@@ -364,17 +333,12 @@ class PosOrder(models.Model):
                     'location_dest_id': custom_location_dest_id.id,
                 }))
 
-            _logger.info(f"🎯 [ODOO-CUSTOM] Se crearán {len(lines_by_department)} picking(s) por departamento")
-
             # 4. ✅ CREAR UN PICKING POR DEPARTAMENTO (ubicación destino)
             created_pickings = []
-            
+
             for location_key, department_data in lines_by_department.items():
                 custom_location_dest_id = department_data['location_dest']
                 move_lines = department_data['lines']
-                
-                _logger.info(f"🎯 [ODOO-CUSTOM] Creando picking para ubicación: {custom_location_dest_id.complete_name}")
-                _logger.info(f"🎯 [ODOO-CUSTOM] Líneas en este picking: {len(move_lines)}")
 
                 picking_vals = {
                     'origin': self.name,
@@ -392,7 +356,6 @@ class PosOrder(models.Model):
                 }
 
                 picking = self.env['stock.picking'].create(picking_vals)
-                _logger.info(f"🎯 [ODOO-CUSTOM] Picking Devoluciones POS creado: {picking.name} para {custom_location_dest_id.complete_name}")
 
                 # 5. Confirmar y validar cada picking
                 picking.action_confirm()
@@ -400,35 +363,27 @@ class PosOrder(models.Model):
 
                 if picking.state == 'assigned':
                     picking.button_validate()
-                    _logger.info(f"🎯 [ODOO-CUSTOM] Picking POS validado: {picking.name}")
-                else:
-                    _logger.warning(f"🎯 [ODOO-CUSTOM] Picking POS no pudo ser validado automáticamente: {picking.state}")
 
                 created_pickings.append(picking)
 
-            _logger.info(f"🎯 [ODOO-CUSTOM] Se crearon {len(created_pickings)} picking(s) exitosamente")
-            
             # Retornar el primer picking creado (para compatibilidad con el flujo existente)
             return created_pickings[0] if created_pickings else False
 
         except Exception as e:
-            _logger.error(f"🎯 [ODOO-CUSTOM] Error crítico creando picking de reembolso: {str(e)}")
             return False
 
     def _find_picking_type_for_returns(self, warehouse):
         """
         Búsqueda robusta de tipos de operación para reembolsos
         """
-        _logger.info(f"🎯 [PICKING-TYPE] Buscando tipo de operación para almacén: {warehouse.name}")
-        
+
         # Estrategia 1: Buscar tipo específico para reembolsos POS
         picking_type = self.env['stock.picking.type'].search([
             ('code', '=', 'pos_returns'),
             ('warehouse_id', '=', warehouse.id),
         ], limit=1)
-        
+
         if picking_type:
-            _logger.info(f"🎯 [PICKING-TYPE] Encontrado tipo 'pos_returns': {picking_type.name}")
             return picking_type
 
         # Estrategia 2: Buscar tipo de entrada en el almacén específico
@@ -436,9 +391,8 @@ class PosOrder(models.Model):
             ('code', '=', 'incoming'),
             ('warehouse_id', '=', warehouse.id),
         ], limit=1)
-        
+
         if picking_type:
-            _logger.info(f"🎯 [PICKING-TYPE] Encontrado tipo 'incoming' en almacén: {picking_type.name}")
             return picking_type
 
         # Estrategia 3: Buscar tipo de entrada en cualquier almacén de la compañía
@@ -446,30 +400,26 @@ class PosOrder(models.Model):
             ('code', '=', 'incoming'),
             ('warehouse_id.company_id', '=', self.company_id.id),
         ], limit=1)
-        
+
         if picking_type:
-            _logger.info(f"🎯 [PICKING-TYPE] Encontrado tipo 'incoming' en compañía: {picking_type.name}")
             return picking_type
 
         # Estrategia 4: Buscar CUALQUIER tipo de operación de entrada
         picking_type = self.env['stock.picking.type'].search([
             ('code', '=', 'incoming'),
         ], limit=1)
-        
+
         if picking_type:
-            _logger.info(f"🎯 [PICKING-TYPE] Encontrado tipo 'incoming' global: {picking_type.name}")
             return picking_type
 
         # Estrategia 5: Último recurso - cualquier tipo de operación interno
         picking_type = self.env['stock.picking.type'].search([
             ('code', 'in', ['internal', 'incoming', 'outgoing']),
         ], limit=1)
-        
+
         if picking_type:
-            _logger.warning(f"🎯 [PICKING-TYPE] Usando tipo de operación genérico: {picking_type.name}")
             return picking_type
 
-        _logger.error("🎯 [PICKING-TYPE] No se encontró ningún tipo de operación")
         return False
 
     def _get_correct_warehouse(self):
@@ -479,18 +429,17 @@ class PosOrder(models.Model):
         try:
             # Opción 1: Usar el almacén de la configuración del POS
             if self.config_id and self.config_id.warehouse_id:
-                _logger.info(f"🎯 [WAREHOUSE] Usando almacén de la configuración POS: {self.config_id.warehouse_id.name}")
                 return self.config_id.warehouse_id
-            
+
             # Opción 2: Buscar por el nombre de la orden (ej: GRAL/TLAJO/01/...)
             order_name = self.name or ""
             warehouse_mapping = {
                 'TLAJO': 'Tlajomulco',  # Nombre exacto del almacén
-                'IXTLA': 'Ixtlahuacán', 
+                'IXTLA': 'Ixtlahuacán',
                 'TERRA': 'Terranova',
                 'ALMAC': 'Almacen'
             }
-            
+
             for key, warehouse_name in warehouse_mapping.items():
                 if key in order_name.upper():
                     warehouse = self.env['stock.warehouse'].search([
@@ -498,23 +447,19 @@ class PosOrder(models.Model):
                         ('company_id', '=', self.company_id.id)
                     ], limit=1)
                     if warehouse:
-                        _logger.info(f"🎯 [WAREHOUSE] Encontrado por nombre de orden: {warehouse.name}")
                         return warehouse
-            
+
             # Opción 3: Usar el almacén por defecto de la compañía
             default_warehouse = self.env['stock.warehouse'].search([
                 ('company_id', '=', self.company_id.id)
             ], limit=1)
-            
+
             if default_warehouse:
-                _logger.info(f"🎯 [WAREHOUSE] Usando almacén por defecto: {default_warehouse.name}")
                 return default_warehouse
-                
-            _logger.error("🎯 [WAREHOUSE] No se encontró ningún almacén")
+
             return False
-            
+
         except Exception as e:
-            _logger.error(f"🎯 [WAREHOUSE] Error buscando almacén: {str(e)}")
             return False
 
     def _get_original_sale_location(self):
@@ -525,24 +470,21 @@ class PosOrder(models.Model):
         try:
             # Buscar por el nombre de la orden original (quitando 'REEMBOLSO')
             original_order_name = self.name.replace('REEMBOLSO', '').strip()
-            
+
             # Buscar movimientos de la orden original
             original_moves = self.env['stock.move'].search([
                 ('picking_id.origin', 'ilike', original_order_name),
                 ('state', '=', 'done')
             ], order='id desc', limit=10)
-            
+
             for move in original_moves:
                 if move.location_dest_id:
                     original_location = move.location_dest_id
-                    _logger.info(f"🎯 [ORIGINAL] Ubicación destino original encontrada: {original_location.complete_name}")
                     return original_location
-            
-            _logger.warning("🎯 [ORIGINAL] No se encontró movimiento original con ubicación destino")
+
             return False
-            
+
         except Exception as e:
-            _logger.error(f"🎯 [ORIGINAL] Error buscando ubicación original: {str(e)}")
             return False
 
     def _get_custom_destination_location(self, default_location, department, warehouse=False):
@@ -550,38 +492,28 @@ class PosOrder(models.Model):
         Determine the custom destination location based on product department
         for return pickings, using ONLY EXISTING locations.
         """
-        _logger.info(f"🎯 [LOCATION] Buscando ubicación personalizada para departamento: {department.nombre if department else 'Sin departamento'}")
-        
+
         try:
             # Si no hay departamento, retornar ubicación por defecto
             if not department:
-                _logger.info(f"🎯 [LOCATION] Sin departamento, usando ubicación por defecto: {default_location.complete_name}")
                 return default_location
-            
+
             # Obtener el nombre REAL del departamento desde barcode.parameter.line
             dept_name = department.nombre
             if not dept_name:
-                _logger.warning("🎯 [LOCATION] El departamento no tiene nombre, usando ubicación por defecto")
                 return default_location
 
-            _logger.info(f"🎯 [LOCATION] Buscando ubicación existente para departamento: {dept_name}")
-            
             # ✅ SOLO BUSCAR UBICACIONES EXISTENTES - NO CREAR NUEVAS
             custom_location = self._find_existing_department_location(dept_name, warehouse)
-            
+
             if custom_location:
-                _logger.info(f"🎯 [LOCATION] Ubicación encontrada para {dept_name}: {custom_location.complete_name}")
                 return custom_location
             else:
-                _logger.warning(f"🎯 [LOCATION] No se encontró ubicación existente para departamento: {dept_name}")
                 # ✅ NO CREAR UBICACIÓN - Usar ubicación por defecto del almacén
-                _logger.info(f"🎯 [LOCATION] Usando ubicación por defecto del almacén: {default_location.complete_name}")
                 return default_location
-            
+
         except Exception as e:
-            _logger.error(f"🎯 [LOCATION] Error buscando ubicación personalizada: {str(e)}")
             if default_location:
-                _logger.info(f"🎯 [LOCATION] Usando ubicación por defecto por error: {default_location.complete_name}")
                 return default_location
             else:
                 return self._get_fallback_location(warehouse)
@@ -591,8 +523,7 @@ class PosOrder(models.Model):
         Busca SOLO ubicaciones EXISTENTES por nombre de departamento
         con estructura ALMACÉN/DEPARTAMENTO. NO crea nuevas ubicaciones.
         """
-        _logger.info(f"🎯 [LOCATION-SEARCH] Buscando ubicación EXISTENTE: {dept_name} en almacén {warehouse.name if warehouse else 'N/A'}")
-        
+
         # Estrategia 1: Buscar en el almacén específico con estructura ALMACÉN/DEPARTAMENTO
         if warehouse:
             # Buscar ubicación que sea hija directa del almacén y tenga el nombre del departamento
@@ -601,11 +532,10 @@ class PosOrder(models.Model):
                 ('location_id', '=', warehouse.lot_stock_id.id),
                 ('usage', '=', 'internal'),
             ], limit=1)
-            
+
             if location:
-                _logger.info(f"🎯 [LOCATION-SEARCH] Encontrada en almacén específico: {location.complete_name}")
                 return location
-            
+
             # Posibilidades de rutas
             possible_paths = [
                 f"{warehouse.name}/{dept_name}",
@@ -615,17 +545,16 @@ class PosOrder(models.Model):
                 f"TERRA/{dept_name}",  # Nombre específico para Terranova
                 f"ALMAC/{dept_name}",  # Nombre específico para Almacen
             ]
-            
+
             for path in possible_paths:
                 location = self.env['stock.location'].search([
                     ('complete_name', '=ilike', path),
                     ('usage', '=', 'internal'),
                 ], limit=1)
-                
+
                 if location:
-                    _logger.info(f"🎯 [LOCATION-SEARCH] Encontrada por path: {location.complete_name}")
                     return location
-        
+
         # Buscar ubicaciones que contengan el nombre del departamento Y estén en el almacén correcto
         if warehouse:
             all_dept_locations = self.env['stock.location'].search([
@@ -633,35 +562,32 @@ class PosOrder(models.Model):
                 ('usage', '=', 'internal'),
                 ('company_id', '=', self.company_id.id),
             ])
-            
+
             # Filtrar las que pertenecen al almacén correcto verificando la jerarquía
             for location in all_dept_locations:
                 current_loc = location
                 found_in_warehouse = False
-                
+
                 # Recorrer la jerarquía hacia arriba para verificar si está en el almacén correcto
                 while current_loc.location_id:
                     if current_loc == warehouse.lot_stock_id:
                         found_in_warehouse = True
                         break
                     current_loc = current_loc.location_id
-                
+
                 if found_in_warehouse:
-                    _logger.info(f"🎯 [LOCATION-SEARCH] Encontrada en jerarquía del almacén: {location.complete_name}")
                     return location
-        
+
         # Buscar por nombre exacto en cualquier lugar (fallback)
         location = self.env['stock.location'].search([
             ('name', '=', dept_name),
             ('usage', '=', 'internal'),
             ('company_id', '=', self.company_id.id),
         ], limit=1)
-        
+
         if location:
-            _logger.info(f"🎯 [LOCATION-SEARCH] Encontrada por nombre exacto: {location.complete_name}")
             return location
-        
-        _logger.warning(f"🎯 [LOCATION-SEARCH] No se encontró ubicación existente para {dept_name}")
+
         return False
 
     def _create_department_location_with_structure(self, dept_name, warehouse):
@@ -672,38 +598,33 @@ class PosOrder(models.Model):
             # Usar la ubicación de stock del almacén como padre
             if warehouse and warehouse.lot_stock_id:
                 parent_location = warehouse.lot_stock_id
-                _logger.info(f"🎯 [LOCATION-CREATE] Creando ubicación {dept_name} bajo {parent_location.complete_name}")
             else:
                 parent_location = self.env['stock.location'].search([
                     ('usage', '=', 'internal'),
                     ('company_id', '=', self.company_id.id),
                 ], limit=1)
                 if not parent_location:
-                    _logger.error("🎯 [LOCATION-CREATE] No se encontró ubicación padre para crear departamento")
                     return False
-            
+
             existing_location = self.env['stock.location'].search([
                 ('name', '=', dept_name),
                 ('location_id', '=', parent_location.id),
             ], limit=1)
-            
+
             if existing_location:
-                _logger.info(f"🎯 [LOCATION-CREATE] Ubicación ya existe: {existing_location.complete_name}")
                 return existing_location
-            
+
             location_vals = {
                 'name': dept_name,
                 'location_id': parent_location.id,
                 'usage': 'internal',
                 'company_id': self.company_id.id,
             }
-            
+
             new_location = self.env['stock.location'].create(location_vals)
-            _logger.info(f"🎯 [LOCATION-CREATE] Ubicación creada: {new_location.complete_name}")
             return new_location
-            
+
         except Exception as e:
-            _logger.error(f"🎯 [LOCATION-CREATE] Error creando ubicación {dept_name}: {str(e)}")
             return False
 
     def _get_fallback_location(self, warehouse):
@@ -712,14 +633,14 @@ class PosOrder(models.Model):
         """
         if warehouse and warehouse.lot_stock_id:
             return warehouse.lot_stock_id
-        
+
         any_location = self.env['stock.location'].search([
             ('usage', '=', 'internal'),
             ('company_id', '=', self.company_id.id),
         ], limit=1)
-        
+
         if any_location:
             return any_location
-        
+
         raise UserError("No hay ubicaciones internas configuradas en el sistema. Contacte al administrador.")
 ##################### FIN MÉTODOS MODIFICACION REMBOLSO POS ######################################
