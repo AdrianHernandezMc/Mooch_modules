@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="point_of_sale.SelectionPopup" t-inherit-mode="extension">
+        <!-- Insertar nuestro botón ANTES del botón Cancelar -->
+        <xpath expr="//footer[hasclass('modal-footer')]/div[contains(@class, 'cancel')]" position="before">
+            <button t-if="props.title &amp;&amp; props.title.includes('cajero')" 
+                    class="btn btn-lg btn-secondary me-2" 
+                    t-on-click="showAdvancedEmployees">
+                Administradores
+            </button>
+        </xpath>
+    </t>
+</templates>
