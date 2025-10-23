@@ -130,6 +130,7 @@ patch(PaymentScreen.prototype, {
         // Bloquea validación si hace falta y no se capturó t.credito t.de
         const order = this.pos.get_order();
         const paymentLines = order.get_paymentlines();
+        let requireErro = false
         paymentLines.forEach(line => {
             console.log("transaction_id",line.transaction_id)
              console.log("required", this.requiresTextId(line))
@@ -140,9 +141,12 @@ patch(PaymentScreen.prototype, {
                 title: _t("Falto capturar id de "+ line?.name),
                 body: _t("Captura el Transaction ID para pagos con tarjeta."),
             });
-                return
+                requireErro = true
             }
         });
+        if (requireErro) {
+            return
+        }
 
         // bloque para mover los cambios de los articulos
         const order_iines = order.get_orderlines();
