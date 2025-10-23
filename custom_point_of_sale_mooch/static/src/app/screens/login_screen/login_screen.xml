@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="pos_hr.LoginScreen" t-inherit-mode="extension">
+        <xpath expr="//div[contains(@class, 'login-body')]" position="after">
+            <!-- Botón con estilo inline - máximo control -->
+            <div style="text-align: center; margin-top: 8px;">
+                <button style="
+                    background-color: #875A7B;
+                    border: 1px solid #875A7B;
+                    color: white;
+                    padding: 0px 10px;
+                    font-size: 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    line-height: 1.2;
+                    height: 35px;
+                " t-on-click="cancelarYSalir">
+                    Cancelar
+                </button>
+            </div>
+        </xpath>
+    </t>
+</templates>

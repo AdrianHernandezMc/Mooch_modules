@@ -3,7 +3,7 @@
     'version': '17.0.1.2.0',
     'category': 'Point of Sale',
     'summary': 'Reembolsos POS via Loyalty',
-    'depends': ['base','point_of_sale','loyalty','pos_loyalty','web','product','pos_discount'],
+    'depends': ['base','point_of_sale','loyalty','pos_loyalty','web','product','pos_discount','pos_hr'],
     'data': [
         'security/ir.model.access.csv',
         'views/changes_menu.xml',
@@ -21,6 +21,7 @@
           "custom_point_of_sale_mooch/static/src/js/pos_discount_discount_button.js",
 
           # Popups
+          "custom_point_of_sale_mooch/static/src/app/popup/selection_popup_patch.js",
           "custom_point_of_sale_mooch/static/src/app/popup/delivery_confirmation_popup.js",
           "custom_point_of_sale_mooch/static/src/app/popup/home_delivery_popup.js",
           "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.js",
@@ -29,6 +30,7 @@
           "custom_point_of_sale_mooch/static/src/app/utilis/Input_popups/text_inpup_popup.xml",
 
           # Screens
+          "custom_point_of_sale_mooch/static/src/app/screens/login_screen/login_screen.js",
           "custom_point_of_sale_mooch/static/src/app/screens/receipt_screen/order_receipt.js",
           "custom_point_of_sale_mooch/static/src/app/screens/reserved/btn_reserved.js",
           "custom_point_of_sale_mooch/static/src/app/screens/paymentscreen/paymentscreen.js",
@@ -41,6 +43,8 @@
           "custom_point_of_sale_mooch/static/src/app/navbar/navbar.js",
 
           # XML
+          "custom_point_of_sale_mooch/static/src/app/screens/login_screen/login_screen.xml",
+          "custom_point_of_sale_mooch/static/src/app/popup/selection_popup_patch.xml",
           "custom_point_of_sale_mooch/static/src/xml/refund_coupon.xml",
           #"custom_point_of_sale_mooch/static/src/xml/process_exchange.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/reserved/btn_reserved.xml",
