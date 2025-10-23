@@ -28,6 +28,7 @@ class PosOrder(models.Model):
     #################Fin de campos######################################
     #################Campos nuevos para valdiacion rembolso#############
     refund_order_id = fields.Many2one('pos.order', string='Orden de Reembolso', readonly=True)
+    is_return = fields.Boolean(string='Es Reembolso', default=False)
     #################Fin de campos######################################
 
     @api.model
@@ -73,7 +74,7 @@ class PosOrder(models.Model):
             })
         return result
 
-    ################# NUEVO MÉTODO: Generar Reporte de Entrega ##############################
+##################### NUEVO MÉTODO: Generar Reporte de Entrega ##################################
     @api.model
     def generate_delivery_report(self, report_data):
         """Generar PDF con reporte de entrega"""
@@ -253,4 +254,393 @@ class PosOrder(models.Model):
         except Exception as e:
             _logger.error(f"❌ Error generando reporte de entrega: {str(e)}")
             return None
-##################### FIN MÉTODO GENERAR REPORTE ######################################
+##################### FIN MÉTODOS GENERAR REPORTE ################################################
+
+##################### MÉTODOS MODIFICACION REMBOLSO POS ##########################################
+    def _create_order_picking(self):
+        """Método mejorado para diagnóstico y manejo de devoluciones"""
+
+        # ✅ DETECCIÓN ROBUSTA - No depender solo de is_return
+        order_name_upper = (self.name or '').upper()
+        is_refund = any([
+            getattr(self, 'is_return', False),
+            'REEMBOLSO' in order_name_upper,
+            'DEVOLUCIÓN' in order_name_upper, 
+            'REFUND' in order_name_upper,
+            self.amount_total < 0,  # Total negativo
+            any('REEMBOLSO' in (line.name or '').upper() for line in self.lines)
+        ])
+
+        # ✅ EJECUTAR LÓGICA PERSONALIZADA SI ES DEVOLUCIÓN
+        if is_refund:
+            return self._create_custom_return_picking()
+        else:
+            return super()._create_order_picking()
+
+    def _create_custom_return_picking(self):
+        """
+        Crea picking de reembolso con ubicaciones personalizadas por departamento
+        UN PICKING POR DEPARTAMENTO (ubicación destino)
+        """
+
+        try:
+            # ✅ OBTENER EL ALMACÉN CORRECTO
+            warehouse = self._get_correct_warehouse()
+            if not warehouse:
+                raise UserError("No se pudo determinar el almacén para procesar el reembolso")
+
+            # 1. BÚSQUEDA ROBUSTA DE TIPO DE OPERACIÓN
+            picking_type = self._find_picking_type_for_returns(warehouse)
+            if not picking_type:
+                raise UserError("No se encontró un tipo de operación configurado para reembolsos")
+
+            # 2. OBTENER UBICACIÓN ORIGEN (Clientes)
+            location_id = self.env.ref('stock.stock_location_customers')
+            if not location_id:
+                raise UserError("No se pudo encontrar la ubicación de clientes")
+
+            # 3. ✅ AGRUPAR LÍNEAS POR DEPARTAMENTO (ubicación destino)
+            lines_by_department = {}
+
+            for line in self.lines:
+                product = line.product_id
+
+                # ✅ OBTENER EL DEPARTAMENTO DESDE EL PRODUCT TEMPLATE
+                product_template = product.product_tmpl_id
+                department = product_template.department_id
+
+                # Determinar la ubicación destino específica
+                custom_location_dest_id = self._get_custom_destination_location(
+                    warehouse.lot_stock_id,
+                    department,
+                    warehouse
+                )
+
+                # Agrupar por ubicación destino
+                location_key = custom_location_dest_id.id
+                if location_key not in lines_by_department:
+                    lines_by_department[location_key] = {
+                        'location_dest': custom_location_dest_id,
+                        'lines': []
+                    }
+
+                lines_by_department[location_key]['lines'].append((0, 0, {
+                    'name': f"REEMBOLSO POS: {product.name}",
+                    'product_id': product.id,
+                    'product_uom_qty': abs(line.qty),
+                    'product_uom': product.uom_id.id,
+                    'location_id': location_id.id,
+                    'location_dest_id': custom_location_dest_id.id,
+                }))
+
+            # 4. ✅ CREAR UN PICKING POR DEPARTAMENTO (ubicación destino)
+            created_pickings = []
+
+            for location_key, department_data in lines_by_department.items():
+                custom_location_dest_id = department_data['location_dest']
+                move_lines = department_data['lines']
+
+                picking_vals = {
+                    'origin': self.name,
+                    'partner_id': self.partner_id.id or False,
+                    'user_id': False,
+                    'date_deadline': fields.Datetime.now(),
+                    'picking_type_id': picking_type.id,
+                    'company_id': self.company_id.id,
+                    'move_ids_without_package': move_lines,
+                    'location_id': location_id.id,
+                    'location_dest_id': custom_location_dest_id.id,
+                    'note': f"Reembolso generado automáticamente desde POS. Orden: {self.name}. Departamento: {custom_location_dest_id.name}",
+                    # ✅ VINCULAR CON LA ORDEN POS
+                    'pos_order_id': self.id,
+                }
+
+                picking = self.env['stock.picking'].create(picking_vals)
+
+                # 5. Confirmar y validar cada picking
+                picking.action_confirm()
+                picking.action_assign()
+
+                if picking.state == 'assigned':
+                    picking.button_validate()
+
+                created_pickings.append(picking)
+
+            # Retornar el primer picking creado (para compatibilidad con el flujo existente)
+            return created_pickings[0] if created_pickings else False
+
+        except Exception as e:
+            return False
+
+    def _find_picking_type_for_returns(self, warehouse):
+        """
+        Búsqueda robusta de tipos de operación para reembolsos
+        """
+
+        # Estrategia 1: Buscar tipo específico para reembolsos POS
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'pos_returns'),
+            ('warehouse_id', '=', warehouse.id),
+        ], limit=1)
+
+        if picking_type:
+            return picking_type
+
+        # Estrategia 2: Buscar tipo de entrada en el almacén específico
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'incoming'),
+            ('warehouse_id', '=', warehouse.id),
+        ], limit=1)
+
+        if picking_type:
+            return picking_type
+
+        # Estrategia 3: Buscar tipo de entrada en cualquier almacén de la compañía
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'incoming'),
+            ('warehouse_id.company_id', '=', self.company_id.id),
+        ], limit=1)
+
+        if picking_type:
+            return picking_type
+
+        # Estrategia 4: Buscar CUALQUIER tipo de operación de entrada
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'incoming'),
+        ], limit=1)
+
+        if picking_type:
+            return picking_type
+
+        # Estrategia 5: Último recurso - cualquier tipo de operación interno
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', 'in', ['internal', 'incoming', 'outgoing']),
+        ], limit=1)
+
+        if picking_type:
+            return picking_type
+
+        return False
+
+    def _get_correct_warehouse(self):
+        """
+        Obtiene el almacén correcto basado en la configuración del POS
+        """
+        try:
+            # Opción 1: Usar el almacén de la configuración del POS
+            if self.config_id and self.config_id.warehouse_id:
+                return self.config_id.warehouse_id
+
+            # Opción 2: Buscar por el nombre de la orden (ej: GRAL/TLAJO/01/...)
+            order_name = self.name or ""
+            warehouse_mapping = {
+                'TLAJO': 'Tlajomulco',  # Nombre exacto del almacén
+                'IXTLA': 'Ixtlahuacán',
+                'TERRA': 'Terranova',
+                'ALMAC': 'Almacen'
+            }
+
+            for key, warehouse_name in warehouse_mapping.items():
+                if key in order_name.upper():
+                    warehouse = self.env['stock.warehouse'].search([
+                        ('name', '=', warehouse_name),  # Búsqueda exacta
+                        ('company_id', '=', self.company_id.id)
+                    ], limit=1)
+                    if warehouse:
+                        return warehouse
+
+            # Opción 3: Usar el almacén por defecto de la compañía
+            default_warehouse = self.env['stock.warehouse'].search([
+                ('company_id', '=', self.company_id.id)
+            ], limit=1)
+
+            if default_warehouse:
+                return default_warehouse
+
+            return False
+
+        except Exception as e:
+            return False
+
+    def _get_original_sale_location(self):
+        """
+        Busca la ubicación de destino de la venta original
+        para usarla como ubicación origen del reembolso
+        """
+        try:
+            # Buscar por el nombre de la orden original (quitando 'REEMBOLSO')
+            original_order_name = self.name.replace('REEMBOLSO', '').strip()
+
+            # Buscar movimientos de la orden original
+            original_moves = self.env['stock.move'].search([
+                ('picking_id.origin', 'ilike', original_order_name),
+                ('state', '=', 'done')
+            ], order='id desc', limit=10)
+
+            for move in original_moves:
+                if move.location_dest_id:
+                    original_location = move.location_dest_id
+                    return original_location
+
+            return False
+
+        except Exception as e:
+            return False
+
+    def _get_custom_destination_location(self, default_location, department, warehouse=False):
+        """
+        Determine the custom destination location based on product department
+        for return pickings, using ONLY EXISTING locations.
+        """
+
+        try:
+            # Si no hay departamento, retornar ubicación por defecto
+            if not department:
+                return default_location
+
+            # Obtener el nombre REAL del departamento desde barcode.parameter.line
+            dept_name = department.nombre
+            if not dept_name:
+                return default_location
+
+            # ✅ SOLO BUSCAR UBICACIONES EXISTENTES - NO CREAR NUEVAS
+            custom_location = self._find_existing_department_location(dept_name, warehouse)
+
+            if custom_location:
+                return custom_location
+            else:
+                # ✅ NO CREAR UBICACIÓN - Usar ubicación por defecto del almacén
+                return default_location
+
+        except Exception as e:
+            if default_location:
+                return default_location
+            else:
+                return self._get_fallback_location(warehouse)
+
+    def _find_existing_department_location(self, dept_name, warehouse):
+        """
+        Busca SOLO ubicaciones EXISTENTES por nombre de departamento
+        con estructura ALMACÉN/DEPARTAMENTO. NO crea nuevas ubicaciones.
+        """
+
+        # Estrategia 1: Buscar en el almacén específico con estructura ALMACÉN/DEPARTAMENTO
+        if warehouse:
+            # Buscar ubicación que sea hija directa del almacén y tenga el nombre del departamento
+            location = self.env['stock.location'].search([
+                ('name', '=ilike', dept_name),
+                ('location_id', '=', warehouse.lot_stock_id.id),
+                ('usage', '=', 'internal'),
+            ], limit=1)
+
+            if location:
+                return location
+
+            # Posibilidades de rutas
+            possible_paths = [
+                f"{warehouse.name}/{dept_name}",
+                f"{warehouse.lot_stock_id.name}/{dept_name}",
+                f"TLAJO/{dept_name}",  # Nombre específico para Tlajomulco
+                f"IXTLA/{dept_name}",  # Nombre específico para Ixtlahuacán
+                f"TERRA/{dept_name}",  # Nombre específico para Terranova
+                f"ALMAC/{dept_name}",  # Nombre específico para Almacen
+            ]
+
+            for path in possible_paths:
+                location = self.env['stock.location'].search([
+                    ('complete_name', '=ilike', path),
+                    ('usage', '=', 'internal'),
+                ], limit=1)
+
+                if location:
+                    return location
+
+        # Buscar ubicaciones que contengan el nombre del departamento Y estén en el almacén correcto
+        if warehouse:
+            all_dept_locations = self.env['stock.location'].search([
+                ('name', '=ilike', dept_name),
+                ('usage', '=', 'internal'),
+                ('company_id', '=', self.company_id.id),
+            ])
+
+            # Filtrar las que pertenecen al almacén correcto verificando la jerarquía
+            for location in all_dept_locations:
+                current_loc = location
+                found_in_warehouse = False
+
+                # Recorrer la jerarquía hacia arriba para verificar si está en el almacén correcto
+                while current_loc.location_id:
+                    if current_loc == warehouse.lot_stock_id:
+                        found_in_warehouse = True
+                        break
+                    current_loc = current_loc.location_id
+
+                if found_in_warehouse:
+                    return location
+
+        # Buscar por nombre exacto en cualquier lugar (fallback)
+        location = self.env['stock.location'].search([
+            ('name', '=', dept_name),
+            ('usage', '=', 'internal'),
+            ('company_id', '=', self.company_id.id),
+        ], limit=1)
+
+        if location:
+            return location
+
+        return False
+
+    def _create_department_location_with_structure(self, dept_name, warehouse):
+        """
+        Crea automáticamente una ubicación para un departamento con estructura ALMACÉN/DEPARTAMENTO
+        """
+        try:
+            # Usar la ubicación de stock del almacén como padre
+            if warehouse and warehouse.lot_stock_id:
+                parent_location = warehouse.lot_stock_id
+            else:
+                parent_location = self.env['stock.location'].search([
+                    ('usage', '=', 'internal'),
+                    ('company_id', '=', self.company_id.id),
+                ], limit=1)
+                if not parent_location:
+                    return False
+
+            existing_location = self.env['stock.location'].search([
+                ('name', '=', dept_name),
+                ('location_id', '=', parent_location.id),
+            ], limit=1)
+
+            if existing_location:
+                return existing_location
+
+            location_vals = {
+                'name': dept_name,
+                'location_id': parent_location.id,
+                'usage': 'internal',
+                'company_id': self.company_id.id,
+            }
+
+            new_location = self.env['stock.location'].create(location_vals)
+            return new_location
+
+        except Exception as e:
+            return False
+
+    def _get_fallback_location(self, warehouse):
+        """
+        Obtiene una ubicación de fallback segura
+        """
+        if warehouse and warehouse.lot_stock_id:
+            return warehouse.lot_stock_id
+
+        any_location = self.env['stock.location'].search([
+            ('usage', '=', 'internal'),
+            ('company_id', '=', self.company_id.id),
+        ], limit=1)
+
+        if any_location:
+            return any_location
+
+        raise UserError("No hay ubicaciones internas configuradas en el sistema. Contacte al administrador.")
+##################### FIN MÉTODOS MODIFICACION REMBOLSO POS ######################################
