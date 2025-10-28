@@ -1,0 +1,30 @@
+/* static/src/css/apartados.css */
+.apartados-popup {
+    width: 90%;
+    max-width: 1200px;
+    height: 90vh;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+
+.apartados-popup .header {
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.apartados-popup .list-group-item {
+    border: none;
+    border-bottom: 1px solid #eee;
+}
+
+.apartados-popup .list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.apartados-popup .list-group-item.active {
+    background-color: #007bff;
+    border-color: #007bff;
+}

@@ -77,35 +77,25 @@ patch(ProductScreen.prototype, {
 
         // **************   para hacer pruebad en productscreen  *******************
         useHotkey("alt+x", (ev) => {
-            //this.createvale()
-            const order = this.posService.get_order();
-            const partner = order?.get_partner?.() || order?.get_client?.() || null;
-            console.log("partner",partner);
-            //const p = this.pos.get_order?.()?.get_partner?.() || null;
-            if (!partner) return false;
-            const Is_employee =  this.orm.call(
-                "hr.employee","search_read",
-                [[["work_contact_id","=",partner.id]],
-                ["id","name"]
-                ],
-                {limit:1}
-            );
-            console.log("Is_employee",Is_employee)
-            return !!(Is_employee?.length);
-            this.env.bus.trigger("trigger-discount", { pc: 10 });
-            // console.log("this.pos.Sale_type",this.pos.Sale_type);
-            // this.pos.Sale_type = "Reembolso";
-            // console.log("this.pos.Sale_type",this.pos.Sale_type);
-            // const { updated } =  this.orm.call(
-            //     "loyalty.card",
-            //     "sync_source_order_by_posref",
-            //     [],                 // args
-            //     { limit: 1000 }     // kwargs opcional
-            // );
+            const orden = this.pos.get_order()
+            const orderlines = orden.get_orderlines()
+            console.log(orderlines)
+            const match = 'descuento';
 
-            // console.log("loyalty.cards actualizados:", updated);
-            //console.log(this.pos.pos_session.user_id)
-            //console.log(this.pos.get_cashier()?.id )
+            const discountLines = orderlines.filter(line => {
+            // intentar obtener el nombre del producto de formas comunes
+            const prodName =
+                (line.product && line.product.name) ||
+                line.product_name ||
+                line.name ||
+                line.display_name ||
+                '';
+
+            return typeof prodName === 'string' && prodName.toLowerCase().includes(match.toLowerCase());
+            });
+
+            console.log("discountLines",discountLines)
+
         });
 
         // Alt + g para entrar a las ordenes guardadas
@@ -122,10 +112,10 @@ patch(ProductScreen.prototype, {
     },
 
     async _getProductByBarcode(code) {
-        // 🔁 Ejecutar la lógica original
+        // Ejecutar la lógica original
         const product = await super._getProductByBarcode(code);
 
-        // 🧩 Tu lógica adicional después de obtener el producto
+        // Tu lógica adicional después de obtener el producto
         if (product && product.default_code) {
             if (!product.display_name.includes(product.default_code)){
                 product.display_name = `${product.display_name} - [${product.default_code}]`;
@@ -138,7 +128,7 @@ patch(ProductScreen.prototype, {
         if (amount_total > 0) {
             await this.popup.add(ErrorPopup, {
                 title: "Error",
-                body: "Para crear un vale el Total debe ser un valor negativo",
+                body: "Para crear un vale el total debe ser un valor negativo",
                 confirmText: "OK",
             });
             return
@@ -239,12 +229,6 @@ patch(ProductScreen.prototype, {
                 console.log("Popup cerrado:", result);
             }
         });
-
-
-        // if (confirmed) {
-        //     alert("C")
-        // }
-
         // const { confirmed, payload } = await this.popup.add(TextInputPopup, {
         //     title: _t("Reembolso por Ticket"),
         //     body: _t("Ingresa el número de ticket (pos_reference)."),
@@ -271,7 +255,6 @@ patch(ProductScreen.prototype, {
         //     },
         // });
 
-
         if (!confirmed || !payload) return;
 
         // Buscar la orden original
@@ -280,7 +263,6 @@ patch(ProductScreen.prototype, {
             [["pos_reference", "=", orderNumber]],
             ["id", "pos_reference", "partner_id", "fiscal_position_id", "name"]
         ], { limit: 1 });
-
 
         if (!orders || orders.length === 0) {
             this.popup.add(ErrorPopup, {
@@ -639,17 +621,13 @@ patch(ProductScreen.prototype, {
 
         const nip = String(payload).trim();
         if (!nip) return;
-
+    
         let check = { ok: false, name: "" };
         try {
-
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
-            console.log("manda el id del user",check.id)
-            // const currentEmployer_id = this.pos.get_cashier()?.id
             const advancedEmployeeIds = this.pos.config.advanced_employee_ids; // Lista de IDs
             const isAdvancedUser = advancedEmployeeIds.includes(check.id);
-
-            console.log("Entro a validar con avanzado.", isAdvancedUser)
+            
             if (isAdvancedUser && mode === "price")  {
                 this.change_price()
             } 
@@ -658,9 +636,30 @@ patch(ProductScreen.prototype, {
                 const order = this.posService.get_order();
                 const partner = order?.get_partner?.() || order?.get_client?.() || null;
                 let Is_employee = null
+                const orderlines = order.get_orderlines()
+                const match = 'descuento';
+
+                const discountLines = orderlines.filter(line => {
+                // intentar obtener el nombre del producto de formas comunes
+                const prodName =
+                (line.product && line.product.name) ||
+                line.product_name ||
+                line.name ||
+                line.display_name ||
+                '';
+
+                return typeof prodName === 'string' && prodName.toLowerCase().includes(match.toLowerCase());
+                });
+
+                if (discountLines.length > 0){
+                    this.popup.add(ErrorPopup, {
+                        title: _t("Descuentos"),
+                        body:  _t("Ya exite un desuento global"),
+                    });
+                    return;
+                }
 
                 if (partner) {
-                    console.log("partner",partner);
                     console.log("Is_employee",Is_employee)
                     Is_employee = await this.orm.call(
                         "hr.employee","search_read",
@@ -670,13 +669,19 @@ patch(ProductScreen.prototype, {
                         {limit:1}
                     );
                 }
-
-                console.log("Is_employee",Is_employee)
-                console.log("Is_employee?.length",Is_employee?.length)
+                
                 if (Is_employee?.length){
+                    const discountLines = orderlines.filter(line => line.discount > 0);
+                    if (discountLines.length > 0){
+                        this.popup.add(ErrorPopup, {
+                            title: _t("Descuentos"),
+                            body:  _t("Ya exite un desuento en la venta"),
+                        });
+                        return;
+                    }
+
                     const cfgId = this.pos?.config?.id || false;
                     const employee_discount = await this.orm.call("pos.config", "get_employee_discount", [cfgId], {});
-                    console.log(employee_discount)
 
                     await this.popup.add(ConfirmPopup, {
                         title: "Confirmación de descuento",
@@ -687,19 +692,18 @@ patch(ProductScreen.prototype, {
                             this.env.bus.trigger("trigger-discount", { pc: 10 });
                         }
                     });
-                    //this.env.bus.trigger("trigger-discount", { pc: 10 });
                 }
                 else {
                     this.change_desc()
                 }
-            }
+
+            } 
 
         } catch (err) {
             console.error("Error al validar NIP:", err);
                 await popup.add(TextInputPopup, {
                 title: "Error",
                 body: "No se pudo validar el NIP. Revisa el servidor.",
-                startingValue: "",
                 confirmText: "OK",
             });
             return;

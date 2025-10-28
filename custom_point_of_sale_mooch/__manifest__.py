@@ -19,6 +19,7 @@
           "custom_point_of_sale_mooch/static/src/js/refund_coupon.js",
           "custom_point_of_sale_mooch/static/src/js/selection_popup.js",
           "custom_point_of_sale_mooch/static/src/js/pos_discount_discount_button.js",
+          "custom_point_of_sale_mooch/static/src/overrides/components/discount_button/discount_button.js",
 
           # Popups
           "custom_point_of_sale_mooch/static/src/app/popup/selection_popup_patch.js",
@@ -37,6 +38,7 @@
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.js",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/product_list/product_list.js",
           "custom_point_of_sale_mooch/static/src/app/screens/ticketscreen/ticketscreen.js",
+          #"custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.js",
 
           # Models y navbar
           "custom_point_of_sale_mooch/static/src/app/store/models.js",
@@ -59,6 +61,8 @@
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/refund_button/refund_button.xml",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml",
+          "custom_point_of_sale_mooch/static/src/overrides/components/discount_button/discount_button.xml",
+          #"custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.xml",
 
           # CSS
           "custom_point_of_sale_mooch/static/src/css/refund_coupon.css",
@@ -68,6 +72,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.css",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.css",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.css",
+          #"custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.css",
         
           # Comentados (referencia; no se cargan)
           #'custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml',

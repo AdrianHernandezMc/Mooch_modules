@@ -22,6 +22,8 @@ export class Reserved extends Component {
 
         //window.open('/web#action=custom_point_of_sale_mooch.exchange_change_action', '_blank');
         this.showScreen("custom_point_of_sale_mooch.exchange_change_action", { recordId: null });
+
+        //this.popup.add(ApartadosPopup);
     }
 }
 
@@ -31,3 +33,10 @@ ProductScreen.addControlButton({
         return true;
     },
 });
+
+// ProductScreen.addControlButton({
+//     component: (_, { popup }) => ({
+//         onClick: () => popup.add(ApartadosPopup),
+//     }),
+//     condition: () => true,
+// });

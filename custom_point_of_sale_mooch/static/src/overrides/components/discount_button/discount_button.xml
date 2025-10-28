@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="global_discount_button_inherit" xml:space="preserve">
+     <t t-inherit="pos_discount.DiscountButton" t-inherit-mode="extension" owl="1">
+        <xpath expr="//span[contains(@class,'control-button') and contains(@class,'js_discount')]/span[text()='Discount']" position="replace">
+            <span>Descuento global</span>
+        </xpath>
+    </t> 
+</templates>
