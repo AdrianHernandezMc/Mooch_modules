@@ -1,8 +1,11 @@
 /** @odoo-module **/
 import { patch } from "@web/core/utils/patch";
 import { TicketScreen } from "@point_of_sale/app/screens/ticket_screen/ticket_screen";
+import { MaskedInputPopup } from "@custom_point_of_sale_mooch/app/popup/masked_input_popup"
+import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
 import { useService } from "@web/core/utils/hooks";
 import { useState, onMounted } from "@odoo/owl";
+import { Order } from "@point_of_sale/app/store/models";
 
 const _superOnClickOrder = TicketScreen.prototype.onClickOrder;
 const _superSetup = TicketScreen.prototype.setup;
@@ -13,17 +16,127 @@ patch(TicketScreen.prototype, {
         this.pos = useService("pos");
         this.orm = useService("orm");
 
+        // // Estado reactivo si lo necesitas
+        // // ✅ Inicializa el estado reactivo
+        // this._state = useState({
+        //     orders: [], // ahora puedes asignar sin error
+        // });
+
+        // // ✅ Asigna las órdenes desde el POS
+        // this._state.orders = this.pos.db.get_orders?.() || []
+
+        // // Métodos personalizados
+
+        // this.findOrderByReceipt = (receiptNumber) => {
+            
+        //     return Array.isArray(this._state.orders)
+        //         ? this._state.orders.find(order =>  order.trackingNumber === receiptNumber)
+        //         : null;
+        // };
+
+        // this.triggerClickByReceipt = async (receiptNumber) => {
+        //     const order = this.findOrderByReceipt(receiptNumber);
+            
+        //     if (order) {
+        //         await this.onClickOrder(order);
+        //     } else {
+        //         console.warn("No se encontró la orden con ese recibo:", receiptNumber);
+        //     }
+        // };
+
+
         if (!this.pos.sharedVar) {
             this.pos.sharedtcode = useState({ value: "" });
         }
         _superSetup.apply(this, arguments);
         
         onMounted(() => {
+        (async () => {
+            let searchOrder;
+            while (!searchOrder) {
+                const { confirmed, payload } = await this.popup.add(MaskedInputPopup, {
+                    title: "Buscar orden",
+                    body: "Ingresa el número de orden",
+                });
+
+                if (!confirmed) {
+                    console.log("Popup cancelado");
+                    return; 
+                }
+
+                const receiptNumber = "Orden " + payload?.trim();
+                if (!receiptNumber) continue; // si no escribe nada, vuelve a mostrar el popup
+                //obtengo la lista de las ordenes
+                const result = await this.get_all_synced_orders();
+                //filtro mi orden capturada
+                searchOrder  = result.find(order => order.name === receiptNumber);
+                //ubico la pagina de la orden
+                const index = result.findIndex(order => order.name === receiptNumber);    
+                const nPerPage = this._state.syncedOrders.nPerPage;
+                const page = Math.floor(index / nPerPage) + 1;
+
+                this._state.syncedOrders.currentPage = page;
+                
+                await this._fetchSyncedOrders();
+                //***************************************** */    
+                if (!searchOrder ) {
+                    await this.popup.add(ErrorPopup, {
+                        title: "No encontrada",
+                        body: `No existe una orden con el número ${receiptNumber}`,
+                    });
+                }
+            }
+
+            //this._state.syncedOrders.currentPage += 2;
+            //await this._fetchSyncedOrders();
+
+            console.log("oncilck")
+            this.onClickOrder(searchOrder);
             this.clearRefundlines();
-            //this.clearOrderlines()
             this.render?.();
+        })();
         });
     },
+
+    async get_all_synced_orders() {
+        const domain = this._computeSyncedOrdersDomain();
+        const config_id = this.pos.config.id;
+
+        this._state.syncedOrders.currentPage = 1
+        const offset = (this._state.syncedOrders.currentPage - 1) * this._state.syncedOrders.nPerPage;
+
+        // Llamamos sin limit ni offset para traer todas las órdenes
+        const { ordersInfo } = await this.orm.call(
+            "pos.order",
+            "search_paid_order_ids",
+            [],
+            { config_id, domain, limit: 1000000, offset }
+        );
+
+        const ids = ordersInfo.map(info => info[0]);
+        if (!ids.length) return [];
+
+        let fetchedOrders = await this.orm.call("pos.order", "export_for_ui", [ids]);
+
+        await this.pos._loadMissingProducts(fetchedOrders);
+        await this.pos._loadMissingPartners(fetchedOrders);
+
+        fetchedOrders = fetchedOrders.map(o => new Order({ env: this.env }, { pos: this.pos, json: o }));
+        return fetchedOrders; // 🔹 Devuelve todas las órdenes completas
+    },
+
+    // bueno secundario
+    // getFilteredOrderList() {
+    //     const baseFiltered = super.getFilteredOrderList();
+    //     //return 0
+    //     return baseFiltered.filter(order => order.name === "Orden 00018-009-0004");
+    // },
+
+    //Bueno
+    // getFilteredOrderList() {
+    //     return super.getFilteredOrderList(); // reutilizas el original
+    // },
+
 
     async clearRefundlines() {
         this.pos.toRefundLines = {};
@@ -41,11 +154,10 @@ patch(TicketScreen.prototype, {
     },
 
     async onClickOrder(order) {
+        console.log("order",order)
         _superOnClickOrder.apply(this, arguments);
         this.clearRefundlines()
-
         const orderBackendId = order.backendId
-        //console.log("order",order)
 
         /******************* agrego los codigos al producot  */
         let pos_changes = await this.orm.call(
@@ -103,20 +215,12 @@ patch(TicketScreen.prototype, {
             this.pos.Sale_type = null;   
         }
 
-        
 /// **** Echo para los camios de producto ********
         const refundLines = order.get_orderlines().filter(l => l.changes > 0);
         if (!refundLines.length) {
             this.render();
             return;
         } 
-
-        // await this.orm.call(
-        //     "pos.order.line",          // modelo
-        //     "action_simple_refund",    // método
-        //     [lineIds, qtys],           // *args*
-        //     {}                         // *kwargs* (vacío si no usas)
-        // );
 
         refundLines.forEach(l => {
             l.refunded_qty += l.changes;   // refleja el cambio en memoria
