@@ -169,7 +169,7 @@ patch(ProductScreen.prototype, {
         order.voucher_code = defaults.code
         let product = this.pos.db.get_product_by_id(product_id[0].discount_line_product_id[0]);
         product.display_name = product.name
-        product.display_name = product.display_name + " Code: " +  defaults.code
+        product.display_name = product.display_name + " Code: " +  order.voucher_code
 
         order.add_product(product, {
             quantity: 1,
