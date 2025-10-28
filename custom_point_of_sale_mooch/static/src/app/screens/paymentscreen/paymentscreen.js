@@ -244,7 +244,7 @@ patch(PaymentScreen.prototype, {
     },
 
     async create_vale(order,loyaty_program_id){
-    // try {
+        // Normalizar y validar datos antes del RPC para evitar errores de validación
         const companyId = this.pos.company?.id;   // ← ID de la compañía
         const exp = addMonthtoday(new Date());
         const dateAddOneMonth = exp.toISOString().slice(0, 10); // "YYYY-MM-DD"
@@ -253,41 +253,48 @@ patch(PaymentScreen.prototype, {
             (l) => l?.product?.id === order.product_voucher_id
         );
 
+        // Calcular puntos como número (no string)
         let totalWithTax = (lines || []).reduce((acc, l) => {
             const p = l.get_all_prices?.();
             return acc + (p?.priceWithTax ?? 0);
         }, 0);
-        totalWithTax = totalWithTax.toFixed(2);
+        totalWithTax = Number(totalWithTax) || 0;
 
+        // Asegurar que exista un código (field 'code' es obligatorio en el modelo loyalty.card)
+        let code = order.voucher_code || null;
+        if (!code) {
+            // Generar un código seguro por defecto para evitar la validación
+            const sanitizedOrder = (order.name || order.uid || 'ORD').toString().replace(/\s+/g, '_');
+            code = `VALE-${sanitizedOrder}-${Date.now().toString(36)}`;
+            // Guardar en el objeto order para uso posterior (opcional)
+            try { order.voucher_code = code; } catch (e) { /* noop */ }
+        }
 
-        // Preparas el diccionario con todos los campos
         const couponData = {
-          program_id:          loyaty_program_id,
-          company_id:          companyId,                // compañía
-          partner_id:          partner?.id || false,
-          code:                order.voucher_code,
-          expiration_date:     dateAddOneMonth,
-          points:              totalWithTax,
-          //source_pos_order_id: order.server_id,
-          pos_reference: order.name,         // referenciamos la venta
+          program_id:      loyaty_program_id,
+          company_id:      companyId,
+          partner_id:      partner?.id || false,
+          code:            code,
+          expiration_date: dateAddOneMonth,
+          points:          totalWithTax,
+          pos_reference:   order.name,
         };
 
-        console.log("couponData",couponData)
-        const couponId = await this.orm.create(
-          "loyalty.card",    // modelo
-          [ couponData ]     // aquí sí va un solo nivel de array
-        );
-        console.log("paso")
-        return true;
+        console.log("couponData", couponData);
 
-    // } catch (err) {
-    //      await this.popup.add(ErrorPopup, {
-    //             title: "Error",
-    //             body: err,
-    //             confirmText: "OK",
-    //         });
-    //     return false;
-    // }
+        try {
+            const couponId = await this.orm.create("loyalty.card", [ couponData ]);
+            console.log("coupon created", couponId);
+            return true;
+        } catch (err) {
+            console.error("create_vale RPC error:", err);
+            // Mostrar popup de error con información amigable
+            await this.popup.add(ErrorPopup, {
+                title: _t("Error al crear vale"),
+                body: _t("No se pudo crear el vale en el servidor. Revisa los logs del servidor para más detalles."),
+            });
+            return false;
+        }
 
     },
 

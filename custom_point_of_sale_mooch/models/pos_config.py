@@ -13,9 +13,16 @@ class PosConfig(models.Model):
     #     compute_sudo=True,
     #     store=False,  # si quieres verlo siempre en el POS, no es necesario store=True
     # )
+    basic_employee_ids = fields.Many2many(
+        'hr.employee',
+        string='Empleados Básicos',
+        help='Empleados que aparecen en la lista principal sin validación'
+    )
+
     advanced_employee_ids = fields.Many2many(
         'hr.employee',
-        string='Advanced Employees'
+        string='Empleados Avanzados',
+        help='Empleados que requieren validación con NIP'
     )
 
 #################Campos Adrian Muebles##############################
