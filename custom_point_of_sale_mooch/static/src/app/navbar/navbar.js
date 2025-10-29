@@ -42,8 +42,18 @@ patch(Navbar.prototype, {
     },
 
     get showCashMoveButton() {
+        const currentEmployer_id = this.pos.get_cashier()?.id
+        const advancedEmployeeIds = this.pos.config.advanced_employee_ids; // Lista de IDs
+        const isAdvancedUser = advancedEmployeeIds.includes(currentEmployer_id);
         // usa el estado para controlar la visibilidad
-        return true //this.state.showCashMoveOverride;
+        console.log("usuaruio es? ", isAdvancedUser);
+        if (isAdvancedUser) {
+            return true;
+        }
+        else {
+            return false //this.state.showCashMoveOverride;
+        }
+
     },
 
     onCashMoveToggle() {
