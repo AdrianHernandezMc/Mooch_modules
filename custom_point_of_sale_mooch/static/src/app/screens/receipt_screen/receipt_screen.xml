@@ -1,40 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="pos_receipt_items_ext" xml:space="preserve">
-  <!-- Heredamos la plantilla del recibo -->
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
-    
 
-
-    <!-- Insertar DESPUÉS del bloque que itera paymentlines -->
     <xpath expr="//div[contains(@class,'paymentlines') and @t-foreach='props.data.paymentlines']" position="after">
       <div class="paymentlines items-count">
-        <span>Artiulos vendidos</span>
+        <span>Artículos vendidos</span>
         <span t-esc="props.data.qty_articles" class="pos-receipt-right-align"/>
       </div>
     </xpath>
-    
-    <!-- Elimina el bloque CHANGE original para evitar duplicado -->
+
     <xpath expr="//div[contains(@class,'pos-receipt-amount') and contains(@class,'receipt-change')]" position="replace">
-    <t/>
+      <t/>
     </xpath>
-    
-    <!-- Mover CHANGE debajo de TOTAL -->
+
     <xpath expr="//div[contains(@class,'pos-receipt-amount')][span[@t-esc='props.formatCurrency(props.data.amount_total)']]" position="after">
-    <div class="pos-receipt-amount receipt-change mt-2">
-        CHANGE
-        <span t-esc="props.formatCurrency(props.data.change)" class="pos-receipt-right-align"/>
-    </div>
+      <div class="pos-receipt-amount receipt-change mt-2">
+          CHANGE
+          <span t-esc="props.formatCurrency(props.data.change)" class="pos-receipt-right-align"/>
+      </div>
     </xpath>
- 
-    <!-- quita la palabra con la tecnologia de Odoo -->
+
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')]/p[1]" position="replace">
-    <t/>
+      <t/>
     </xpath>
-    <!-- Campo para agregar el tipo de venta -->
+
     <xpath expr="//div[@class='pos-receipt-taxes']" position="after">
       <div class="pos-sale-type">
-         <!-- <span style="display:block; text-align:center; font-weight:bold; font-size:18px;">Sale Type:</span> -->
-        <span t-esc="props.data.sale_type"  style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
+        <span t-esc="props.data.sale_type" style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
       </div>
     </xpath>
 

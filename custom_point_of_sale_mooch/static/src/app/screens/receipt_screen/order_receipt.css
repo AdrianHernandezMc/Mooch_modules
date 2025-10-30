@@ -1,54 +1,76 @@
-/* tu_modulo/static/src/scss/receipt_times.scss */
-
 .pos-receipt {
-  /* Times New Roman con fallbacks clásicos */
-  /* font-family: "Times New Roman", Times, serif; */
-  font-size: 12pt;        /* ajusta 10–12pt según tu impresora */
-  line-height: 1.25;
+  width: 95mm;
+  margin: 0 auto;
+  font-size: 15pt; /* Tamaño base más grande */
+  line-height: 1.6;
+  font-family: "Arial", sans-serif;
+  color: #000;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-
-  /* Tips para térmica 80mm */
-  width: 90mm;               /* área útil en rollo 80mm */
-  margin: 0 auto;
 }
 
-/* Encabezados ligeramente más marcados */
+/* LOGO o imágenes */
+.pos-receipt img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto 10px auto;
+  transform: scale(1.5); /* escalar logo */
+}
+
+/* Encabezados */
 .pos-receipt h1, .pos-receipt h2, .pos-receipt h3 {
-  font-weight: 700;
-  letter-spacing: 0.1px;
+  font-size: 25pt;
+  font-weight: bold;
+  text-align: center;
+  margin: 0.3em 0;
 }
 
-/* Totales y cambio con mayor presencia */
+/* Datos numéricos grandes */
 .pos-receipt .pos-receipt-amount,
 .pos-receipt .receipt-change {
-  font-weight: 700;       /* negrita para legibilidad en térmica */
-  font-size: 11pt;
+  font-weight: bold;
+  font-size: 15pt;
 }
 
-/* Alineados a la derecha (importes) */
+/* Alineación derecha */
 .pos-receipt .pos-receipt-right-align {
   text-align: right;
 }
 
+/* Línea de productos */
+.pos-receipt .pos-line {
+  font-size: 17pt;
+  margin: 3px 0;
+}
 
+/* Pie o mensajes */
+.pos-receipt .pos-receipt-footer {
+  font-size: 17pt;
+  text-align: center;
+  margin-top: 10px;
+}
 
-/* Solo al imprimir (si usas PDF/navegador) */
-@media print { 
-  @page { size: 150mm auto; margin: 0;}  /* algunos navegadores lo respetan */
+/* Medios de pago */
+.pos-receipt .paymentlines span {
+  font-size: 17pt;
+}
 
- .pos-receipt, .pos-receipt * {
-    font-family:
-      "Hiragino Kaku Gothic ProN",
-      "Hiragino Kaku Gothic Pro",
-      "Hiragino Sans",
-      "Yu Gothic",
-      "Meiryo",
-      "Noto Sans JP",
-      Arial, sans-serif !important;
-    color: #000 !important; 
-    font-weight: 800 !important;     /* negrita fuerte */
-    /* -webkit-print-color-adjust: exact;
-    print-color-adjust: exact; */
+/* Cambios visuales en impresión */
+@media print {
+  @page {
+    size: 95mm auto;
+    margin: 0;
+  }
+
+  .pos-receipt, .pos-receipt * {
+    font-size: 30pt !important;
+    font-family: "Arial", sans-serif !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+  }
+
+  .pos-receipt img {
+    transform: scale(2.0); /* aplicar también en impresión */
   }
 }
