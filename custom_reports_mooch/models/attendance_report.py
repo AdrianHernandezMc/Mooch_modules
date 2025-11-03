@@ -477,25 +477,25 @@ class ReportAttendancePDF(models.AbstractModel):
         """
         print(f"=== _process_attendance_data PARA {emp.name if emp else 'None'} - {d} ===")
         print(f"events_raw recibidos: {len(events_raw)} eventos")
-        
+
         # Función para convertir a naive si es necesario
         def to_naive(dt):
             if dt and dt.tzinfo is not None:
                 return dt.replace(tzinfo=None)
             return dt
-        
+
         # Clasificar eventos
         check_ins, check_outs, lunch_outs, lunch_ins = [], [], [], []
         all_events = []  # Para todos los eventos
-        
+
         for event in events_raw:
             if isinstance(event, (list, tuple)) and len(event) >= 2:
                 dt, punch_type = event[0], event[1]
                 dt = to_naive(dt)
                 print(f"Evento: {dt.strftime('%H:%M')} - {punch_type}")
-                
+
                 all_events.append((dt, punch_type))
-                
+
                 if punch_type == 'in':
                     check_ins.append(dt)
                 elif punch_type == 'out':
@@ -520,7 +520,7 @@ class ReportAttendancePDF(models.AbstractModel):
         salida_estimada = None
         if not salida and entrada:  # Solo si hay entrada pero no salida en biometrico
             print("No hay salida en biometrico, buscando horario programado en Odoo...")
-            
+
             # Obtener horario programado del empleado
             cal = (
                 getattr(emp, 'work_calendar_id', False)
@@ -528,13 +528,13 @@ class ReportAttendancePDF(models.AbstractModel):
                 or emp.company_id.resource_calendar_id
                 or self.env.company.resource_calendar_id
             )
-            
+
             if cal:
                 dow = str(d.weekday())
                 lines = cal.attendance_ids.filtered(
                     lambda l: l.dayofweek == dow and (not l.resource_id or l.resource_id == emp.resource_id)
                 ).sorted(key=lambda l: l.hour_from)
-                
+
                 # Buscar última hora de salida (excluyendo breaks)
                 work_lines = [l for l in lines if not self._is_break_line(l)]
                 if work_lines:
@@ -545,12 +545,12 @@ class ReportAttendancePDF(models.AbstractModel):
                     mm = int(round((hour_out - hh) * 60))
                     salida_estimada = datetime(d.year, d.month, d.day, hh, mm)
                     print(f"Salida estimada desde Odoo: {salida_estimada.strftime('%H:%M')}")
-            
+
             # Si no se encontró horario, usar una salida por defecto (ej: 6 horas después de la entrada)
             if not salida_estimada and entrada:
                 salida_estimada = entrada + timedelta(hours=6)
                 print(f"Salida estimada por defecto (6hrs después): {salida_estimada.strftime('%H:%M')}")
-        
+
         # Usar salida del biometrico si existe, si no usar la estimada
         salida_final = salida if salida else salida_estimada
         print(f"Salida final: {salida_final.strftime('%H:%M') if salida_final else 'No disponible'}")
@@ -558,80 +558,92 @@ class ReportAttendancePDF(models.AbstractModel):
         # ===== DETECCIÓN MEJORADA DE COMIDA =====
         comida_ini = None
         comida_fin = None
-        
+
         # Obtener horario de comida de Odoo
         lunch_start, lunch_end = self._get_employee_lunch_schedule(emp, d)
-        
+
         # Solo procesar comidas si hay horario de Odoo
         if lunch_start and lunch_end:
             print(f"Horario comida Odoo: {lunch_start.strftime('%H:%M')} a {lunch_end.strftime('%H:%M')}")
-            
+
             # Crear ventana de tolerancia (±60 minutos)
             tolerance = timedelta(minutes=60)
             window_start = lunch_start - tolerance
             window_end = lunch_end + tolerance
-            
+
             print(f"Ventana comida con tolerancia: {window_start.strftime('%H:%M')} a {window_end.strftime('%H:%M')}")
-            
+
             # Buscar TODOS los eventos dentro de la ventana de comida
             events_in_lunch_window = []
             for dt, punch_type in all_events:
                 if window_start <= dt <= window_end:
                     events_in_lunch_window.append((dt, punch_type))
-            
+
             print(f"Eventos en ventana comida: {len(events_in_lunch_window)}")
             for dt, pt in events_in_lunch_window:
                 print(f"  - {dt.strftime('%H:%M')} - {pt}")
-            
+
             # Separar eventos de comida explícitos (Overtime) y eventos regulares (Check In/Out)
             explicit_lunch_outs = [dt for dt, pt in events_in_lunch_window if pt == 'lunch_out']
             explicit_lunch_ins = [dt for dt, pt in events_in_lunch_window if pt == 'lunch_in']
             check_ins_in_window = [dt for dt, pt in events_in_lunch_window if pt == 'in']
             check_outs_in_window = [dt for dt, pt in events_in_lunch_window if pt == 'out']
-            
+
             print(f"Explicit lunch outs: {[dt.strftime('%H:%M') for dt in explicit_lunch_outs]}")
             print(f"Explicit lunch ins: {[dt.strftime('%H:%M') for dt in explicit_lunch_ins]}")
             print(f"Check ins en ventana: {[dt.strftime('%H:%M') for dt in check_ins_in_window]}")
             print(f"Check outs en ventana: {[dt.strftime('%H:%M') for dt in check_outs_in_window]}")
-            
+
             # PRIORIDAD 1: Eventos explícitos de comida (Overtime In/Out)
             if explicit_lunch_outs or explicit_lunch_ins:
                 print("Usando eventos explícitos de comida")
-                
+
                 # CASO 1: Hay ambos tipos (Overtime In y Overtime Out)
                 if explicit_lunch_outs and explicit_lunch_ins:
                     comida_ini = min(explicit_lunch_outs)
                     comida_fin = max(explicit_lunch_ins)
                     print("Caso 1: Ambos tipos explícitos encontrados")
-                
+
                 # CASO 2: Solo hay Overtime In (múltiples)
                 elif explicit_lunch_outs and not explicit_lunch_ins:
                     comida_ini = min(explicit_lunch_outs)
-                    
+
                     if len(explicit_lunch_outs) >= 2:
                         comida_fin = max(explicit_lunch_outs)
                         print("Caso 2: Múltiples Overtime In, usando último como fin")
                     else:
                         print("Caso 2: Un solo Overtime In, sin fin de comida")
-                
+
                 # CASO 3: Solo hay Overtime Out (raro)
                 elif explicit_lunch_ins and not explicit_lunch_outs:
                     comida_fin = max(explicit_lunch_ins)
                     print("Caso 3: Solo Overtime Out, solo fin de comida")
-            
+
+                # CASO 4: NUEVO - Hay Overtime Out Y Check Out dentro del horario de comida
+                if explicit_lunch_ins and check_outs_in_window:
+                    print("Caso 4: Overtime Out y Check Out en ventana de comida detectados")
+
+                    # Tomar el Overtime Out como Overtime In (inicio de comida)
+                    comida_ini = min(explicit_lunch_ins)
+                    print(f"Overtime Out tratado como Overtime In: {comida_ini.strftime('%H:%M')}")
+
+                    # Tomar el Check Out como Overtime Out (fin de comida)
+                    comida_fin = max(check_outs_in_window)
+                    print(f"Check Out tratado como Overtime Out: {comida_fin.strftime('%H:%M')}")
+
             # PRIORIDAD 2: Eventos regulares (Check In/Out) dentro del horario de comida
             elif check_ins_in_window or check_outs_in_window:
                 print("Usando Check In/Out como eventos de comida")
-                
+
                 # Si hay Check In/Out en la ventana, tratarlos como comida
                 if check_ins_in_window:
                     comida_ini = min(check_ins_in_window)
                     print(f"Check In como inicio comida: {comida_ini.strftime('%H:%M')}")
-                
+
                 if check_outs_in_window:
                     comida_fin = max(check_outs_in_window)
                     print(f"Check Out como fin comida: {comida_fin.strftime('%H:%M')}")
-                
+
                 # Si tenemos inicio pero no fin, buscar el siguiente evento después del inicio
                 if comida_ini and not comida_fin:
                     for dt, pt in all_events:
@@ -639,18 +651,18 @@ class ReportAttendancePDF(models.AbstractModel):
                             comida_fin = dt
                             print(f"Usando siguiente evento como fin: {comida_fin.strftime('%H:%M')}")
                             break
-            
+
             # PRIORIDAD 3: No hay eventos en la ventana - dejar vacío
             else:
                 print("No hay eventos en la ventana de comida - dejar vacío")
-            
+
             # Validar que la comida sea razonable (solo si tenemos ambos)
             if comida_ini and comida_fin:
                 if comida_fin <= comida_ini:
                     # Si el fin es antes del inicio, solo mostrar inicio
                     comida_fin = None
                     print("Comida inválida (fin <= inicio), mostrando solo inicio")
-                
+
                 # Ajustar si se sale del rango laboral
                 if entrada and comida_ini < entrada:
                     comida_ini = entrada
@@ -671,19 +683,19 @@ class ReportAttendancePDF(models.AbstractModel):
         print("==========================================")
 
         expected_start_naive = to_naive(expected_start)
-        
+
         work_secs, lunch_secs = 0, 0
-        
+
         # CALCULAR HORAS TRABAJADAS CON SALIDA FINAL (que puede ser estimada)
         if entrada and salida_final and salida_final > entrada:
             total_secs = int((salida_final - entrada).total_seconds())
-            
+
             if comida_ini and comida_fin:
                 lunch_start_in_range = max(comida_ini, entrada)
                 lunch_end_in_range = min(comida_fin, salida_final)
                 if lunch_end_in_range > lunch_start_in_range:
                     lunch_secs = int((lunch_end_in_range - lunch_start_in_range).total_seconds())
-            
+
             work_secs = max(0, total_secs - lunch_secs)
 
         retardo_sec = 0
