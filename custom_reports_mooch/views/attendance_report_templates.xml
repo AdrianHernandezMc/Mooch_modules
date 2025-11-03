@@ -73,10 +73,10 @@
 
         /* === Control de anchos y ajuste del Status === */
         .tbl { table-layout: fixed; }
-        .tbl col.w-date   { width: 18%; }   <!-- Aumentado -->
+        .tbl col.w-date   { width: 16%; }   <!-- Aumentado -->
         .tbl col.w-time   { width: 18%; }   <!-- Aumentado -->
         .tbl col.w-work   { width: 18%; }   <!-- Aumentado -->
-        .tbl col.w-status { width: 32%; }   <!-- Aumentado -->
+        .tbl col.w-status { width: 34%; }   <!-- Aumentado -->
 
         .nowrap      { white-space: nowrap; }
         .status-cell { white-space: normal; word-break: break-word; }
