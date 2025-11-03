@@ -1,8 +1,8 @@
 .pos-receipt {
   width: 95mm;
   margin: 0 auto;
-  font-size: 15pt; /* Tamaño base más grande */
-  line-height: 1.6;
+  font-size: 12pt; /* Tamaño base para texto general */
+  line-height: 1.5;
   font-family: "Arial", sans-serif;
   color: #000;
   -webkit-print-color-adjust: exact;
@@ -11,66 +11,68 @@
 
 /* LOGO o imágenes */
 .pos-receipt img {
-  max-width: 100%;
+  max-width: 90%;
   height: auto;
   display: block;
-  margin: 0 auto 10px auto;
-  transform: scale(1.5); /* escalar logo */
+  margin: 10px auto;
+  transform: scale(1.55);
 }
 
-/* Encabezados */
-.pos-receipt h1, .pos-receipt h2, .pos-receipt h3 {
-  font-size: 25pt;
+/* ENCABEZADO: Usamos el selector correcto de Odoo para mayor precisión */
+.pos-receipt .pos-receipt-contact {
+  font-size: 15pt; /* Tamaño grande para el nombre de la tienda */
   font-weight: bold;
   text-align: center;
-  margin: 0.3em 0;
+  margin: 5px 0;
 }
 
-/* Datos numéricos grandes */
+/* LÍNEA DE PRODUCTOS */
+.pos-receipt .pos-line {
+  font-size: 14pt; /* Un tamaño claro y legible para los artículos */
+  margin: 4px 0;
+}
+
+/* TOTALES Y CAMBIO: Los hacemos más grandes para que destaquen */
 .pos-receipt .pos-receipt-amount,
 .pos-receipt .receipt-change {
   font-weight: bold;
-  font-size: 15pt;
+  font-size: 14pt; /* Hacemos los totales muy visibles */
+  margin-top: 5px;
 }
 
-/* Alineación derecha */
-.pos-receipt .pos-receipt-right-align {
-  text-align: right;
-}
-
-/* Línea de productos */
-.pos-receipt .pos-line {
-  font-size: 17pt;
-  margin: 3px 0;
-}
-
-/* Pie o mensajes */
-.pos-receipt .pos-receipt-footer {
-  font-size: 17pt;
-  text-align: center;
-  margin-top: 10px;
-}
-
-/* Medios de pago */
+/* LÍNEAS DE PAGO */
 .pos-receipt .paymentlines span {
-  font-size: 17pt;
+  font-size: 14pt;
 }
 
-/* Cambios visuales en impresión */
+/* PIE DE PÁGINA: Usamos el selector correcto que ya te funcionó */
+/* Este es el selector para el texto que configuras en el backend de Odoo */
+.pos-receipt .pos-receipt-header-footer-note {
+  font-size: 12pt; /* Tamaño destacado para el mensaje de pie de página */
+  text-align: center;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+/* --- CAMBIOS VISUALES EN IMPRESIÓN (LA PARTE MÁS IMPORTANTE) --- */
 @media print {
   @page {
     size: 95mm auto;
-    margin: 0;
+    margin: 0; /* Eliminamos márgenes de la impresora */
   }
 
-  .pos-receipt, .pos-receipt * {
-    font-size: 30pt !important;
-    font-family: "Arial", sans-serif !important;
-    color: #000 !important;
-    font-weight: 700 !important;
+  /*
+   * LA CORRECCIÓN CLAVE:
+   * Quitamos el selector universal '*' para que no fuerce a todo
+   * a tener el mismo tamaño de fuente.
+   * Ahora, cada sección respetará los tamaños definidos arriba.
+  */
+  .pos-receipt {
+    padding: 5mm 4mm; /* Creamos un margen interno para que no se pegue al borde */
+    font-weight: bold !important; /* Hacemos todo en negrita para impresoras térmicas */
   }
 
   .pos-receipt img {
-    transform: scale(2.0); /* aplicar también en impresión */
+    transform: scale(2.5); /* Hacemos el logo un poco más grande al imprimir */
   }
 }

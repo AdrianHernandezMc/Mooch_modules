@@ -71,6 +71,7 @@ patch(ProductScreen.prototype, {
                     <b><b>Alt + T</b> → Limpiar líneas de venta</p>
                     <p><b>Alt + D</b> → Activa descuento</p>
                     <p><b>Alt + G</b> → Activa ventas guardadas</p>
+                    <p><b>Alt + O</b> → Abre Caja</p>
                     </div>`),
             });
         });
@@ -109,6 +110,9 @@ patch(ProductScreen.prototype, {
             alert("limpio reward")
         });
 
+        useHotkey("alt+o", async (ev) => {
+            await this.openCashDrawer();
+        });
     },
 
     async _getProductByBarcode(code) {
@@ -778,5 +782,49 @@ patch(ProductScreen.prototype, {
             return;
         }
         line.set_discount(value);
+    },
+
+    async openCashDrawer() {
+        try {
+            // Obtener la configuración actual del POS
+            const config = this.pos.config;
+
+            // Verificar si hay una impresora configurada para abrir el cajón
+            if (config.iface_cashdrawer && config.cashdrawer_printer_id) {
+                // Obtener la impresora del cajón
+                const cashdrawerPrinter = this.pos.printers.find(
+                    printer => printer.id === config.cashdrawer_printer_id[0]
+                );
+                
+                if (cashdrawerPrinter) {
+                    // Enviar comando para abrir el cajón
+                    await cashdrawerPrinter.openCashbox();
+                    this.notification.add("Cajón de dinero abierto", { type: "success" });
+                } else {
+                    await this.popup.add(ErrorPopup, {
+                        title: "Error",
+                        body: "No se encontró la impresora del cajón configurada",
+                    });
+                }
+            } else {
+                // Alternativa: usar el método del protocolo de impresión POS
+                const printer = this.pos.proxy.printer;
+                if (printer && typeof printer.open_cash_drawer === 'function') {
+                    await printer.open_cash_drawer();
+                    this.notification.add("Cajón de dinero abierto", { type: "success" });
+                } else {
+                    await this.popup.add(ErrorPopup, {
+                        title: "Configuración requerida",
+                        body: "No hay un cajón de dinero configurado o no se puede acceder al dispositivo",
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error al abrir el cajón:", error);
+            await this.popup.add(ErrorPopup, {
+                title: "Error",
+                body: "No se pudo abrir el cajón de dinero: " + error.message,
+            });
+        }
     }
 });
