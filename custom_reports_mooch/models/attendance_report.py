@@ -617,7 +617,16 @@ class ReportAttendancePDF(models.AbstractModel):
                 # CASO 3: Solo hay Overtime Out (raro)
                 elif explicit_lunch_ins and not explicit_lunch_outs:
                     comida_fin = max(explicit_lunch_ins)
-                    print("Caso 3: Solo Overtime Out, solo fin de comida")
+                    
+                    # NUEVA LÓGICA: Si hay 3 o más Overtime Out, usar el primero como inicio
+                    if len(explicit_lunch_ins) >= 3:
+                        comida_ini = min(explicit_lunch_ins)
+                        print(f"Caso 3: 3+ Overtime Out detectados - usando primero {comida_ini.strftime('%H:%M')} y último {comida_fin.strftime('%H:%M')}")
+                    elif len(explicit_lunch_ins) == 2:
+                        comida_ini = min(explicit_lunch_ins)
+                        print(f"Caso 3: 2 Overtime Out - usando ambos {comida_ini.strftime('%H:%M')} a {comida_fin.strftime('%H:%M')}")
+                    else:
+                        print("Caso 3: Un solo Overtime Out, solo fin de comida")
 
                 # CASO 4: NUEVO - Hay Overtime Out Y Check Out dentro del horario de comida
                 if explicit_lunch_ins and check_outs_in_window:
@@ -750,7 +759,28 @@ class ReportAttendancePDF(models.AbstractModel):
                 idx[dd] = lv
         return idx
 
-    # Dentro de class ReportAttendancePDF(models.AbstractModel):
+    # ---------- Determinar si un leave es permiso por horas ----------
+    def _is_hourly_leave(self, leave):
+        """
+        Determina si un leave es permiso por horas (Salida Temprana, Entrada Tarde)
+        y por lo tanto NO debe ocultar los horarios.
+        """
+        if not leave or not leave.holiday_status_id:
+            return False
+        
+        leave_name = (leave.holiday_status_id.name or '').lower()
+        
+        # Lista de permisos que son por horas y NO deben ocultar los horarios
+        hourly_leaves = [
+            'salida temprana',
+            'entrada tarde', 
+            'permiso por horas',
+            'salida temprana',
+            'entrada tardía',
+            'horas permiso'
+        ]
+        
+        return any(hour_leave in leave_name for hour_leave in hourly_leaves)
 
     def _build_events_index_from_attendance(self, emp, dfrom, dto):
         """
@@ -982,14 +1012,38 @@ class ReportAttendancePDF(models.AbstractModel):
                             })
 
                     # Si hay leave ese día, predomina
+                    # Si hay leave ese día, verificar el tipo
                     leave = leave_idx.get(_as_date(d))
                     if leave:
-                        status = leave.holiday_status_id.name or 'Tiempo libre'
-                        row.update({
-                            'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
-                            'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
-                            'retardo': '00:00', 'retardo_sec': 0,
-                        })
+                        # Validar que leave y holiday_status_id no sean None
+                        if leave and leave.holiday_status_id:
+                            if self._is_hourly_leave(leave):
+                                # Permisos por horas: MANTENER los horarios, solo cambiar el status
+                                status = leave.holiday_status_id.name or 'Permiso por horas'
+                                
+                                # === NUEVA LÓGICA: Si es permiso de "Entrada Tarde", resetear retardo ===
+                                leave_name = (leave.holiday_status_id.name or '').lower()
+                                if 'entrada tarde' in leave_name or 'entrada tardía' in leave_name:
+                                    row['retardo'] = '00:00'
+                                    row['retardo_sec'] = 0
+                                # NO actualizar row - mantener los horarios originales
+                                
+                            else:
+                                # Ausencias/permisos completos: OCULTAR horarios como antes
+                                status = leave.holiday_status_id.name or 'Tiempo libre'
+                                row.update({
+                                    'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                                    'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
+                                    'retardo': '00:00', 'retardo_sec': 0,
+                                })
+                        else:
+                            # Si leave existe pero no tiene holiday_status_id, usar valor por defecto
+                            status = 'Tiempo libre'
+                            row.update({
+                                'entrada': DASH, 'comida_ini': DASH, 'comida_fin': DASH, 'salida': DASH,
+                                'h_trab': DASH, 'h_comida': DASH, 'h_extra': DASH,
+                                'retardo': '00:00', 'retardo_sec': 0,
+                            })
 
                     filas_tmp.append({
                         'd': d,
