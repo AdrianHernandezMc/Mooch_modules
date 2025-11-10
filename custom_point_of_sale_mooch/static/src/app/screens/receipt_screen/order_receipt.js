@@ -74,6 +74,7 @@ patch(Order.prototype, {
         r.tax_details = [];
         r.amount_total = r.amount_total + r.rounding_applied;
         r.rounding_applied = null;
+        r.order_barcode = this.pos_reference || this.name || "000000000000";
 
     //---Articulos vendido -------
         const lines = this.get_orderlines?.() || [];
