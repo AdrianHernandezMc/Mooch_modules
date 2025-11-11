@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <!-- Heredar la vista form de pos.order -->
+    <record id="view_pos_order_form_inherit_pos_reference" model="ir.ui.view">
+      <field name="name">pos.order.form.inherit.pos.reference</field>
+      <field name="model">pos.order</field>
+      <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+      <field name="arch" type="xml">
+        <!-- Agregar el campo pos_reference después del campo name -->
+        <xpath expr="//field[@name='name']" position="after">
+          <field name="pos_reference"
+                 string="Número de Recibo"
+                 readonly="1"
+                 placeholder="00007-006-0001"/>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

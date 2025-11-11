@@ -174,13 +174,14 @@ patch(PaymentScreen.prototype, {
         }
 
         /********* Agrego el vale al programa */
-        const exist_vale = order_iines.some(line => line.product.id === order.product_voucher_id);
-
-        if (!exist_vale) {
+        // const exist_vale = order_iines.some(line => line.product.id === order.voucher_code);
+        // console.log("order.voucher_code_super",order.voucher_code)
+        // console.log("exist_vale",exist_vale)
+        if (!order.voucher_code) {
             this.currentOrder.couponPointChanges = [];
         }
 
-        if (exist_vale) {
+        if (order.voucher_code) {
             const cfgId = this.pos.config.id;
             const loyalty_program_id = await this.orm.call("pos.config","get_loyalty_program_id", [cfgId], {});
             const crate_vale = await this.create_vale(order, loyalty_program_id);
@@ -283,14 +284,15 @@ patch(PaymentScreen.prototype, {
         totalWithTax = Number(totalWithTax) || 0;
 
         // Asegurar que exista un código (field 'code' es obligatorio en el modelo loyalty.card)
-        let code = order.voucher_code || null;
-        if (!code) {
-            // Generar un código seguro por defecto para evitar la validación
-            const sanitizedOrder = (order.name || order.uid || 'ORD').toString().replace(/\s+/g, '_');
-            code = `VALE-${sanitizedOrder}-${Date.now().toString(36)}`;
-            // Guardar en el objeto order para uso posterior (opcional)
-            try { order.voucher_code = code; } catch (e) { /* noop */ }
-        }
+        let code = order.voucher_code;
+        console.log("code",code)
+        // if (!code) {
+        //     // Generar un código seguro por defecto para evitar la validación
+            // const sanitizedOrder = (order.name || order.uid || 'ORD').toString().replace(/\s+/g, '_');
+            // code = `VALE-${sanitizedOrder}-${Date.now().toString(36)}`;
+        //     // Guardar en el objeto order para uso posterior (opcional)
+        //     try { order.voucher_code = code; } catch (e) { /* noop */ }
+        //}
 
         const couponData = {
           program_id:      loyaty_program_id,

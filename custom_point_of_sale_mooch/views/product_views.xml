@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="view_product_template_form_inherit_pos_pickings" model="ir.ui.view">
+      <field name="name">product.template.form.inherit.pos.pickings</field>
+      <field name="model">product.template</field>
+      <field name="inherit_id" ref="product.product_template_only_form_view"/>
+      <field name="arch" type="xml">
+        <!-- Buscar botón con icono de archivos (documentos) -->
+        <xpath expr="//button[contains(@icon, 'archive') or contains(@icon, 'file')]" position="after">
+          <button name="action_view_pending_pos_pickings"
+                  type="object"
+                  class="oe_stat_button"
+                  icon="fa-shopping-cart">
+            <field name="pending_pos_pickings_count" widget="statinfo" string="POS Pendientes"/>
+          </button>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

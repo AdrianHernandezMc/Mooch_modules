@@ -1,54 +1,106 @@
-/* tu_modulo/static/src/scss/receipt_times.scss */
-
 .pos-receipt {
-  /* Times New Roman con fallbacks clásicos */
-  /* font-family: "Times New Roman", Times, serif; */
-  font-size: 12pt;        /* ajusta 10–12pt según tu impresora */
-  line-height: 1.25;
+  width: 95mm;
+  margin: 0 auto;
+  font-size: 14pt;
+  line-height: 1.5;
+  font-family: "Arial", sans-serif;
+  color: #000;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-
-  /* Tips para térmica 80mm */
-  width: 90mm;               /* área útil en rollo 80mm */
-  margin: 0 auto;
 }
 
-/* Encabezados ligeramente más marcados */
-.pos-receipt h1, .pos-receipt h2, .pos-receipt h3 {
-  font-weight: 700;
-  letter-spacing: 0.1px;
+/* LOGO */
+.pos-receipt img:not(.barcode) {
+  max-width: 90%;
+  height: auto;
+  display: block;
+  margin: 10px auto;
+  transform: scale(1.55);
 }
 
-/* Totales y cambio con mayor presencia */
+/* CÓDIGO DE BARRAS EXISTENTE - TAMAÑO REDUCIDO */
+.pos-receipt .barcode {
+  max-width: 85% !important;
+  width: 85% !important;
+  height: 25mm !important;
+  display: block;
+  margin: 10px auto 5px auto;
+  transform: none !important;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  filter: contrast(1.5) brightness(0.9);
+  object-fit: contain;
+}
+
+/* CONTENEDOR DEL CÓDIGO EXISTENTE */
+.pos-receipt .barcode-container {
+  text-align: center;
+  margin: 8px 0;
+  padding: 5px;
+  background: white;
+  border: 1px solid #000;
+}
+
+/* FORZAR VISIBILIDAD DEL TEXTO DEL CÓDIGO EXISTENTE */
+.pos-receipt .barcode-container > *:not(.barcode) {
+  display: block !important;
+  visibility: visible !important;
+  font-size: 12pt !important;
+  font-weight: bold !important;
+  text-align: center !important;
+  margin: 8px 0 0 0 !important;
+  padding: 4px !important;
+  color: #000 !important;
+  font-family: "Courier New", monospace !important;
+  letter-spacing: 1px;
+}
+
+/* ENCABEZADO */
+.pos-receipt .pos-receipt-contact {
+  font-size: 15pt;
+  font-weight: bold;
+  text-align: center;
+  margin: 5px 0;
+}
+
+/* LÍNEA DE PRODUCTOS */
+.pos-receipt .pos-line {
+  font-size: 14pt;
+  margin: 4px 0;
+}
+
+/* TOTALES Y CAMBIO */
 .pos-receipt .pos-receipt-amount,
 .pos-receipt .receipt-change {
-  font-weight: 700;       /* negrita para legibilidad en térmica */
-  font-size: 11pt;
+  font-weight: bold;
+  font-size: 14pt;
+  margin-top: 5px;
 }
 
-/* Alineados a la derecha (importes) */
-.pos-receipt .pos-receipt-right-align {
-  text-align: right;
+/* LÍNEAS DE PAGO */
+.pos-receipt .paymentlines span {
+  font-size: 14pt;
 }
 
+/* VALE SIMPLIFICADO */
+.pos-receipt .voucher-simple {
+  text-align: center;
+  margin: 15px 0;
+  padding: 12px;
+  border: 2px solid #000;
+  background: #ffffcc;
+  page-break-inside: avoid;
+}
 
+.pos-receipt .voucher-simple p {
+  margin: 0;
+  font-size: 16pt;
+  font-weight: bold;
+}
 
-/* Solo al imprimir (si usas PDF/navegador) */
-@media print { 
-  @page { size: 150mm auto; margin: 0;}  /* algunos navegadores lo respetan */
-
- .pos-receipt, .pos-receipt * {
-    font-family:
-      "Hiragino Kaku Gothic ProN",
-      "Hiragino Kaku Gothic Pro",
-      "Hiragino Sans",
-      "Yu Gothic",
-      "Meiryo",
-      "Noto Sans JP",
-      Arial, sans-serif !important;
-    color: #000 !important; 
-    font-weight: 800 !important;     /* negrita fuerte */
-    /* -webkit-print-color-adjust: exact;
-    print-color-adjust: exact; */
-  }
+.pos-receipt .voucher-code {
+  font-family: "Courier New", monospace;
+  letter-spacing: 3px;
+  font-size: 18pt;
+  font-weight: bold;
 }

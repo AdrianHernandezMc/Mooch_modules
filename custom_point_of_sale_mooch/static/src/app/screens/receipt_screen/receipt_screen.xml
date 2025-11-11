@@ -1,42 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="pos_receipt_items_ext" xml:space="preserve">
-  <!-- Heredamos la plantilla del recibo -->
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
-    
 
-
-    <!-- Insertar DESPUÉS del bloque que itera paymentlines -->
-    <xpath expr="//div[contains(@class,'paymentlines') and @t-foreach='props.data.paymentlines']" position="after">
+    <xpath expr="//div[contains(@class,'paymentlines')][@t-foreach='props.data.paymentlines']" position="after">
       <div class="paymentlines items-count">
-        <span>Artiulos vendidos</span>
+        <span>Artículos vendidos</span>
         <span t-esc="props.data.qty_articles" class="pos-receipt-right-align"/>
       </div>
     </xpath>
-    
-    <!-- Elimina el bloque CHANGE original para evitar duplicado -->
-    <xpath expr="//div[contains(@class,'pos-receipt-amount') and contains(@class,'receipt-change')]" position="replace">
-    <t/>
+
+    <xpath expr="//div[contains(@class,'receipt-change')]" position="replace">
+      <t/>
     </xpath>
-    
-    <!-- Mover CHANGE debajo de TOTAL -->
+
+    <!-- Agregar CHANGE después del TOTAL -->
     <xpath expr="//div[contains(@class,'pos-receipt-amount')][span[@t-esc='props.formatCurrency(props.data.amount_total)']]" position="after">
-    <div class="pos-receipt-amount receipt-change mt-2">
+      <div class="pos-receipt-amount receipt-change mt-2">
         CHANGE
         <span t-esc="props.formatCurrency(props.data.change)" class="pos-receipt-right-align"/>
-    </div>
-    </xpath>
- 
-    <!-- quita la palabra con la tecnologia de Odoo -->
-    <xpath expr="//div[contains(@class,'pos-receipt-order-data')]/p[1]" position="replace">
-    <t/>
-    </xpath>
-    <!-- Campo para agregar el tipo de venta -->
-    <xpath expr="//div[@class='pos-receipt-taxes']" position="after">
-      <div class="pos-sale-type">
-         <!-- <span style="display:block; text-align:center; font-weight:bold; font-size:18px;">Sale Type:</span> -->
-        <span t-esc="props.data.sale_type"  style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
       </div>
     </xpath>
 
+    <!-- Eliminar "Powered by Odoo" -->
+    <xpath expr="//div[contains(@class,'pos-receipt-order-data')]//p[contains(text(),'Powered by Odoo')]" position="replace">
+      <t/>
+    </xpath>
+
+    <!-- Agregar tipo de venta después de los impuestos -->
+    <xpath expr="//div[contains(@class,'pos-receipt-taxes')]" position="after">
+      <t t-if="props.data.sale_type">
+        <div class="pos-sale-type">
+          <span t-esc="props.data.sale_type" style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
+        </div>
+      </t>
+    </xpath>
+
+    <!-- Agregar VALE después del tipo de venta -->
+    <xpath expr="//div[contains(@class,'pos-sale-type')]" position="after">
+      <t t-if="props.data.new_coupon_info and props.data.new_coupon_info.length > 0">
+        <div class="voucher-simple" style="text-align: center; margin: 15px 0; padding: 8px; border: 2px solid #000; background: #ffffcc;">
+          <p style="margin: 0; font-size: 16pt; font-weight: bold;">
+            VALE: <span t-esc="props.data.new_coupon_info[0].code" style="font-family: 'Courier New', monospace; letter-spacing: 3px; font-size: 18pt;"/>
+          </p>
+        </div>
+      </t>
+    </xpath>
+
+    <!-- CÓDIGO DE BARRAS CON CENTRADO Y ESPACIADO CORREGIDOS -->
+    <xpath expr="//div[contains(@class,'pos-receipt-order-data')][div[@id='order-date']]" position="before">
+        <t t-if="props.data.order_barcode">
+            <div class="barcode-container" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: center;">
+                    <img t-att-src="'/report/barcode/Code128/' + props.data.order_barcode + '?width=800&amp;height=150&amp;humanreadable=0'"
+                        t-att-alt="props.data.order_barcode"
+                        class="thermal-barcode"
+                        style="width: 95%; max-width: 200px; height: 80px;"/>
+                </div>
+                <div class="barcode-number" style="margin-top: 10px; font-family: 'monospace'; font-size: 14pt; font-weight: bold; letter-spacing: 2px;">
+                    <t t-esc="props.data.order_barcode"/>
+                </div>
+            </div>
+        </t>
+    </xpath>
   </t>
 </templates>

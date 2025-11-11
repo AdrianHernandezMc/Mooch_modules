@@ -71,6 +71,7 @@ patch(ProductScreen.prototype, {
                     <b><b>Alt + T</b> → Limpiar líneas de venta</p>
                     <p><b>Alt + D</b> → Activa descuento</p>
                     <p><b>Alt + G</b> → Activa ventas guardadas</p>
+                    <p><b>Alt + O</b> → Abre Caja</p>
                     </div>`),
             });
         });
@@ -113,6 +114,9 @@ patch(ProductScreen.prototype, {
             alert("limpio reward")
         });
 
+        useHotkey("alt+o", async (ev) => {
+            await this.openCashDrawer();
+        });
     },
 
 
@@ -174,7 +178,7 @@ patch(ProductScreen.prototype, {
         order.voucher_code = defaults.code
         let product = this.pos.db.get_product_by_id(product_id[0].discount_line_product_id[0]);
         product.display_name = product.name
-        product.display_name = product.display_name + " Code: " +  defaults.code
+        product.display_name = product.display_name + " Code: " +  order.voucher_code
 
         order.add_product(product, {
             quantity: 1,
@@ -782,5 +786,132 @@ return
             return;
         }
         line.set_discount(value);
+    },
+
+    async openCashDrawer() {
+        try {
+            // 1. Pedir contraseña del operador
+            const { confirmed, payload } = await this.popup.add(PasswordInputPopup, {
+                title: _t("Apertura de Cajón"),
+                body: _t("Ingresa tu contraseña para abrir el cajón:"),
+                confirmText: _t("Abrir"),
+                cancelText: _t("Cancelar"),
+            });
+
+            if (!confirmed || !payload) {
+                return; // Usuario canceló
+            }
+
+            // 2. Validar contraseña del operador actual
+            const password = String(payload).trim();
+            let employeeCheck = { ok: false, name: "", id: null };
+            
+            try {
+                employeeCheck = await this.orm.call("hr.employee", "check_pos_nip", [password], {});
+            } catch (err) {
+                console.error("Error al validar contraseña:", err);
+                await this.popup.add(ErrorPopup, {
+                    title: "Error de validación",
+                    body: "No se pudo validar la contraseña. Intenta nuevamente.",
+                });
+                return;
+            }
+
+            if (!employeeCheck.ok) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Contraseña incorrecta",
+                    body: "La contraseña ingresada no es válida.",
+                });
+                return;
+            }
+
+            console.log("🔑 Contraseña válida. Operador:", employeeCheck.name);
+            
+            // 3. Intentar abrir el cajón
+            console.log("🔵 Intentando abrir cajón...");
+
+            let cajonAbierto = false;
+            let metodoUsado = "";
+
+            // Camino 1: hardwareProxy.openCashbox
+            if (this.pos.hardwareProxy && typeof this.pos.hardwareProxy.openCashbox === 'function') {
+                console.log("🔵 Camino 1: Usando hardwareProxy.openCashbox()");
+                const success = await this.pos.hardwareProxy.openCashbox();
+                console.log("✅ hardwareProxy.openCashbox() ejecutado, resultado:", success);
+                
+                if (success) {
+                    cajonAbierto = true;
+                    metodoUsado = "hardwareProxy.openCashbox";
+                    console.log("🟢 ÉXITO - Cajón abierto via hardwareProxy.openCashbox()");
+                } else {
+                    console.log("🟡 hardwareProxy.openCashbox() devolvió false, probando siguiente método...");
+                }
+            }
+
+            // Camino 2: Comando ESC/POS si el primero falló
+            if (!cajonAbierto && this.pos.hardwareProxy && this.pos.hardwareProxy.printer) {
+                console.log("🔵 Camino 2: Usando hardwareProxy.printer con comando ESC/POS");
+                try {
+                    const command = "\x1B\x70\x00\x19\xFA"; // Comando estándar para abrir cajón
+                    console.log("📋 Enviando comando ESC/POS");
+                    await this.pos.hardwareProxy.printer.printReceipt(command);
+                    cajonAbierto = true;
+                    metodoUsado = "ESC/POS command";
+                    console.log("🟢 ÉXITO - Cajón abierto via comando ESC/POS");
+                } catch (error) {
+                    console.error("❌ Error con comando ESC/POS:", error);
+                }
+            }
+
+            if (!cajonAbierto) {
+                console.log("❌ TODOS los caminos fallaron");
+                throw new Error("No se pudo acceder al dispositivo del cajón");
+            }
+
+            // 4. Registrar la apertura en el servidor
+            try {
+                const ahora = new Date().toISOString();
+                console.log("📝 Registrando apertura de cajón...");
+                
+                // Guardar en el servidor
+                await this.orm.call(
+                    "pos.session", 
+                    "register_cash_drawer_open", 
+                    [this.pos.pos_session.id, employeeCheck.id, ahora, metodoUsado], 
+                    {}
+                );
+                
+                console.log("✅ Registro guardado en servidor");
+                
+            } catch (error) {
+                console.error("⚠️ No se pudo guardar el registro en servidor:", error);
+                // Fallback: guardar en localStorage
+                try {
+                    const registro = {
+                        empleado_id: employeeCheck.id,
+                        empleado_nombre: employeeCheck.name,
+                        fecha_hora: new Date().toISOString(),
+                        metodo: metodoUsado,
+                        session_id: this.pos.pos_session.id
+                    };
+                    
+                    const registrosExistentes = JSON.parse(localStorage.getItem('cash_drawer_open_logs') || '[]');
+                    registrosExistentes.push(registro);
+                    localStorage.setItem('cash_drawer_open_logs', JSON.stringify(registrosExistentes));
+                    
+                    console.log("📋 Registro guardado en localStorage");
+                } catch (localError) {
+                    console.error("❌ No se pudo guardar ni en localStorage:", localError);
+                }
+            }
+
+            // 5. Mostrar mensaje de éxito
+            this.notification.add(`Cajón abierto por ${employeeCheck.name} ✓`, { type: "success" });
+            console.log("🎉 Apertura de cajón completada exitosamente");
+
+        } catch (error) {
+            console.error("🔴 ERROR en openCashDrawer:", error);
+            // Solo log en consola, sin mostrar popup de error al usuario
+        }
     }
 });

@@ -116,6 +116,7 @@ class AttendanceReportWizard(models.TransientModel):
                 workday_events[workday_date].append((event_time, event_type, hour, minute))
 
         return workday_events
+
     # ----------------- DATASET SOLO DESDE daily.attendance -----------------
     def _fetch_dataset(self):
         """Obtiene dataset de asistencias, normalizado a la TZ del usuario."""
@@ -227,6 +228,7 @@ class AttendanceReportWizard(models.TransientModel):
         # Agrupar por empleado/día con tiempos ya en TZ del usuario
         from collections import defaultdict as dd
         per_emp_day = dd(lambda: dd(list))
+        per_emp_day_for_report = dd(lambda: dd(list))  # <-- NUEVO: para el reporte PDF
 
         # En la sección donde se procesan los eventos, agregar:
         for r in recs:
@@ -243,30 +245,53 @@ class AttendanceReportWizard(models.TransientModel):
 
             punch = _classify(r.get('attendance_type'), r.get('punch_type'))
 
+            # Mantener tu estructura original (4 elementos)
             per_emp_day[r['employee_id']][localized_time.date()].append(
                 (localized_time, punch, localized_time.hour, localized_time.minute)
             )
 
-        # ===== NUEVO: AJUSTAR FECHAS CRUZADAS =====
+            # NUEVO: Crear versión para reporte (2 elementos)
+            per_emp_day_for_report[r['employee_id']][localized_time.date()].append(
+                (localized_time, punch)  # Solo datetime y tipo
+            )
+
+        # ===== NUEVO: AJUSTAR FECHAS CRUZADAS (para ambas versiones) =====
+        # ===== NUEVO: AJUSTAR FECHAS CRUZADAS (para ambas versiones) =====
         for emp_id, days in per_emp_day.items():
             # Primero ajustar fechas cruzadas
             adjusted_days = {}
+            adjusted_days_report = {}  # Para la versión reporte
+            
             for day_date, events in days.items():
                 adjusted_events = self.adjust_crossed_dates(events, tz)
                 for event_time, event_type, hour, minute in adjusted_events:
                     adjusted_date = event_time.date()
                     if adjusted_date not in adjusted_days:
                         adjusted_days[adjusted_date] = []
+                        adjusted_days_report[adjusted_date] = []
                     adjusted_days[adjusted_date].append((event_time, event_type, hour, minute))
+                    # NUEVO: Versión para reporte
+                    adjusted_days_report[adjusted_date].append((event_time, event_type))
 
             # Luego reagrupar por día de trabajo
             workday_events = self.group_events_by_workday(adjusted_days)
+            
+            # Para la versión reporte, crear una versión simple
+            workday_events_report = defaultdict(list)
+            for workday_date, events in workday_events.items():
+                for event_time, event_type, hour, minute in events:
+                    workday_events_report[workday_date].append((event_time, event_type))
 
             # Reemplazar los días originales con los días de trabajo
             per_emp_day[emp_id] = workday_events
+            per_emp_day_for_report[emp_id] = workday_events_report  # Para reporte
 
-        # Ordenar marcas por hora
+        # Ordenar marcas por hora (para ambas versiones)
         for emp_id, days in per_emp_day.items():
+            for d in days:
+                days[d].sort(key=lambda tup: tup[0])
+
+        for emp_id, days in per_emp_day_for_report.items():
             for d in days:
                 days[d].sort(key=lambda tup: tup[0])
 
@@ -366,8 +391,8 @@ class AttendanceReportWizard(models.TransientModel):
         return {
             'employees': employees,
             'day_list': day_list,
-            'per_emp_day': per_emp_day,                     # conserva marcas detalladas
-            'per_emp_day_summary': per_emp_day_summary,     # NUEVO: resumen para pintar comida
+            'per_emp_day': per_emp_day_for_report,  # <-- CAMBIADO: usar versión para reporte
+            'per_emp_day_summary': per_emp_day_summary,
             'dfrom': dfrom,
             'dto': dto,
             'tz': self.env.user.tz or 'UTC',
