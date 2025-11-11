@@ -3,12 +3,15 @@
     'version': '17.0.1.2.0',
     'category': 'Point of Sale',
     'summary': 'Reembolsos POS via Loyalty',
-    'depends': ['base','point_of_sale','loyalty','pos_loyalty','web','product','pos_discount','pos_hr'],
+    'depends': ['base','point_of_sale','loyalty','pos_loyalty','web','product','pos_discount','pos_hr','stock'],
     'data': [
         'security/ir.model.access.csv',
         'views/changes_menu.xml',
         'views/res_config_settings_views.xml',
         'views/pos_payment_method_views.xml',
+        'views/stock_picking_views.xml',
+        'views/pos_order_views.xml',
+        'views/product_views.xml',
     ],
     'assets': {
       'point_of_sale._assets_pos': [

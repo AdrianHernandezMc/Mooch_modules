@@ -17,7 +17,7 @@ _logger = logging.getLogger(__name__)
 class PosOrder(models.Model):
     _inherit = 'pos.order'
 
-    #################Campos Adrian Muebles##############################
+#####################Campos Adrian Muebles##############################
     delivery_contact_name = fields.Char("Nombre de contacto (entrega)")
     delivery_phone = fields.Char("Teléfono (entrega)")
     delivery_address = fields.Char("Dirección (entrega)")
@@ -25,12 +25,32 @@ class PosOrder(models.Model):
     delivery_geo_lat = fields.Float("Latitud (entrega)")
     delivery_geo_lng = fields.Float("Longitud (entrega)")
     delivery_maps_url = fields.Char("URL de Maps")
-    #################Fin de campos######################################
-    #################Campos nuevos para valdiacion rembolso#############
+#####################Fin de campos######################################
+#####################Campos nuevos para valdiacion rembolso#############
     refund_order_id = fields.Many2one('pos.order', string='Orden de Reembolso', readonly=True)
     is_return = fields.Boolean(string='Es Reembolso', default=False)
-    #################Fin de campos######################################
-
+#####################Fin de campos######################################
+#####################CAMPOS NUEVOS PARA EL APARTADO DE INVENTARIO#######
+        # Campo para mostrar picking relacionado
+    picking_ids = fields.One2many(
+        'stock.picking',
+        'pos_order_id',
+        string='Traslados'
+    )
+    
+    # Campo computado para órdenes pendientes
+    pending_pickings_count = fields.Integer(
+        string='Traslados Pendientes',
+        compute='_compute_pending_pickings_count',
+        store=False
+    )
+    
+    pending_pickings_info = fields.Char(
+        string='Información de Traslados',
+        compute='_compute_pending_pickings_count',
+        store=False
+    )
+#####################Fin de campos######################################
     @api.model
     def get_order_locations(self, order_ids):
         """
@@ -644,3 +664,31 @@ class PosOrder(models.Model):
 
         raise UserError("No hay ubicaciones internas configuradas en el sistema. Contacte al administrador.")
 ##################### FIN MÉTODOS MODIFICACION REMBOLSO POS ######################################
+##################### MÉTODOS PARA VISTAS DE INVENTARIO ##########################################
+    def _compute_display_name(self):
+        for order in self:
+            if order.pos_reference:
+                order.display_name = f"Orden {order.pos_reference}"
+            else:
+                super(PosOrder, order)._compute_display_name()
+
+    @api.depends('picking_ids', 'picking_ids.state')
+    def _compute_pending_pickings_count(self):
+        for order in self:
+            if order.picking_ids:
+                pending_pickings = order.picking_ids.filtered(
+                    lambda p: p.state in ['draft', 'waiting', 'confirmed', 'assigned']
+                )
+                order.pending_pickings_count = len(pending_pickings)
+
+                if pending_pickings:
+                    picking_info = []
+                    for picking in pending_pickings:
+                        picking_info.append(f"{picking.name} - {picking.state}")
+                    order.pending_pickings_info = "; ".join(picking_info)
+                else:
+                    order.pending_pickings_info = "Todos los traslados completados"
+            else:
+                order.pending_pickings_count = 0
+                order.pending_pickings_info = "Sin traslados creados"
+##################### FIN MÉTODOS PARA VISTAS DE INVENTARIO ######################################
