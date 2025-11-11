@@ -4,3 +4,5 @@
 "access_loyalty_card_pos_user","loyalty.card: usuario POS","model_loyalty_card","point_of_sale.group_pos_user",1,1,1,0
 "access_loyalty_card_pos_user","loyalty.card: usuario POS","model_loyalty_card","point_of_sale.group_pos_user",1,1,1,0
 "access_hr_employee_pos_user",hr.employee: usuario POS,model_hr_employee,point_of_sale.group_pos_user,1,1,1,0
+"access_pos_reserved_pos_user",pos.reserved: usuario POS,model_pos_reserved,point_of_sale.group_pos_user,1,1,1,0
+"access_pos_reserved_line_pos_user",pos.reserved.line: usuario POS,model_pos_reserved_line,point_of_sale.group_pos_user,1,1,1,0

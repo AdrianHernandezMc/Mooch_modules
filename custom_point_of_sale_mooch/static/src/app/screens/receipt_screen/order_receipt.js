@@ -93,7 +93,11 @@ patch(Order.prototype, {
             if (line.price_without_discount.length > 0){
               const price_without_discount = line.price_without_discount
               line.price_without_discount = line.price
-              line.price = price_without_discount
+              console.log("price",price_without_discount,"type",typeof price_without_discount)
+              console.log(Math.round(Number(price_without_discount)))
+              //line.price = String(Math.round(Number(price_without_discount)))
+              let num = parseFloat(Math.round(price_without_discount.replace(/[^\d.-]/g, ''))) || 0;
+              line.price = num.toFixed(2);
             }
 
             let shortName = line.productName.substring(0, 20); 

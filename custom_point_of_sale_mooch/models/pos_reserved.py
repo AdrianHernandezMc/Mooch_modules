@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models
 
-class PosReserverd(models.Model):
-    _name = "pos.reserverd"
+class PosReserved(models.Model):
+    _name = "pos.reserved"
     _description = "POS Apartados / Reservados"
     _rec_name = "name"   # campo usado como display_name
 
     # Campos base
     user_id = fields.Many2one("res.users", string="Usuario")
     company_id = fields.Many2one("res.company", string="Compañía")
-    sequence_number = fields.Integer(string="Número de secuencia")
+    # sequence_number = fields.Integer(string="Número de secuencia")
     session_id = fields.Many2one("pos.session", string="Sesión")
     name = fields.Char(string="Referencia")
     state = fields.Selection([
@@ -18,7 +18,7 @@ class PosReserverd(models.Model):
         ("done", "Confirmado"),
         ("cancel", "Cancelado")
     ], string="Estado", default="draft")
-    note = fields.Text(string="Nota")
+    # note = fields.Text(string="Nota")
     amount_tax = fields.Float(string="Impuestos")
     amount_total = fields.Float(string="Total")
     amount_paid = fields.Float(string="Pagado")
@@ -28,17 +28,17 @@ class PosReserverd(models.Model):
 
     # Relación con líneas
     line_ids = fields.One2many(
-        "pos.reserverd.line",
-        "reserverd_id",
+        "pos.reserved.line",
+        "reserved_id",
         string="Líneas reservadas"
     )
     
 class PosReserverdLine(models.Model):
-    _name = "pos.reserverd.line"
+    _name = "pos.reserved.line"
     _description = "Líneas de Apartado POS"
 
     product_id = fields.Many2one("product.product", string="Producto")
-    reserverd_id = fields.Many2one("pos.reserverd", string="Apartado")
+    reserved_id = fields.Many2one("pos.reserved", string="Apartado")
     name = fields.Char(string="Descripción")
     notice = fields.Char(string="Aviso")
     full_product_name = fields.Char(string="Nombre completo del producto")

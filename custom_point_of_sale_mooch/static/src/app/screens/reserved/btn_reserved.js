@@ -1,6 +1,7 @@
 /** @odoo-module */
 
 import { ProductScreen } from "@point_of_sale/app/screens/product_screen/product_screen";
+import { ApartadosPopup } from "@custom_point_of_sale_mooch/app/screens/reserved/reserved";
 import { Component } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
@@ -8,21 +9,30 @@ export class Reserved extends Component {
     static template = "point_of_sale.reserved";
     
     setup() {
-        this.orm = useService("orm");
-        this.action = useService("action"); 
-        this.pos = useService("pos"); 
-        this.cfgId = null;
+        this.popup = useService("popup");
+        this.pos = useService("pos");
     }
 
-    click() {
+    async click() {
+        const order = this.pos.get_order();
+        if (!order) return;
 
-        //const cfgId = this.pos.config.id;
-        //const pid =  this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
-        //console.log("🟢 changes_product_id (RPC) =", pid);
+        console.log("lines", order.get_orderlines())
 
-        //window.open('/web#action=custom_point_of_sale_mooch.exchange_change_action', '_blank');
-        this.showScreen("custom_point_of_sale_mooch.exchange_change_action", { recordId: null });
+        // 🔵 Tomamos las líneas del pedido actual
+        const lines = order.get_orderlines().map(l => ({
+            product_id: l.product.id,
+            name: l.product.display_name,
+            qty: l.quantity,
+            price_unit: l.get_price_with_tax(),
+            price_subtotal_incl: l.get_price_with_tax(),
+            discount: l.discount,
+            full_product_name: l.product.full_name || l.product.display_name + "- ["+ l.barcode + "]"  ,
+        }));
 
+
+        // 🟢 Abrimos el popup con las líneas
+        await this.popup.add(ApartadosPopup, { title: "Apartar productos", lines: lines || [] });
         //this.popup.add(ApartadosPopup);
     }
 }
@@ -33,10 +43,3 @@ ProductScreen.addControlButton({
         return true;
     },
 });
-
-// ProductScreen.addControlButton({
-//     component: (_, { popup }) => ({
-//         onClick: () => popup.add(ApartadosPopup),
-//     }),
-//     condition: () => true,
-// });

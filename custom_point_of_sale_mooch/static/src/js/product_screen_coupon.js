@@ -13,10 +13,11 @@ patch(ProductScreen.prototype, {
     _superSetup.apply(this, arguments);
   },
 
-  async _applyCoupon(totalRefund, ordername, refund_codes) {
+  async _applyCoupon(totalRefund, ordername, refund_codes,partner) {
     const order = this.pos.get_order();
     const cfgId = this.pos.config.id;
     const pid = await this.orm.call("pos.config", "get_changes_product_id", [cfgId], {});
+    order.set_partner(partner);
 
     this.changesProductId = pid || null;
 
