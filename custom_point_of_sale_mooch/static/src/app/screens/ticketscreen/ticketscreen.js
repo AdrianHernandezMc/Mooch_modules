@@ -16,35 +16,6 @@ patch(TicketScreen.prototype, {
         this.pos = useService("pos");
         this.orm = useService("orm");
 
-        // // Estado reactivo si lo necesitas
-        // // ✅ Inicializa el estado reactivo
-        // this._state = useState({
-        //     orders: [], // ahora puedes asignar sin error
-        // });
-
-        // // ✅ Asigna las órdenes desde el POS
-        // this._state.orders = this.pos.db.get_orders?.() || []
-
-        // // Métodos personalizados
-
-        // this.findOrderByReceipt = (receiptNumber) => {
-            
-        //     return Array.isArray(this._state.orders)
-        //         ? this._state.orders.find(order =>  order.trackingNumber === receiptNumber)
-        //         : null;
-        // };
-
-        // this.triggerClickByReceipt = async (receiptNumber) => {
-        //     const order = this.findOrderByReceipt(receiptNumber);
-            
-        //     if (order) {
-        //         await this.onClickOrder(order);
-        //     } else {
-        //         console.warn("No se encontró la orden con ese recibo:", receiptNumber);
-        //     }
-        // };
-
-
         if (!this.pos.sharedVar) {
             this.pos.sharedtcode = useState({ value: "" });
         }
@@ -87,9 +58,6 @@ patch(TicketScreen.prototype, {
                 }
             }
 
-            //this._state.syncedOrders.currentPage += 2;
-            //await this._fetchSyncedOrders();
-
             console.log("oncilck")
             this.onClickOrder(searchOrder);
             this.clearRefundlines();
@@ -125,19 +93,6 @@ patch(TicketScreen.prototype, {
         return fetchedOrders; // 🔹 Devuelve todas las órdenes completas
     },
 
-    // bueno secundario
-    // getFilteredOrderList() {
-    //     const baseFiltered = super.getFilteredOrderList();
-    //     //return 0
-    //     return baseFiltered.filter(order => order.name === "Orden 00018-009-0004");
-    // },
-
-    //Bueno
-    // getFilteredOrderList() {
-    //     return super.getFilteredOrderList(); // reutilizas el original
-    // },
-
-
     async clearRefundlines() {
         this.pos.toRefundLines = {};
     },
@@ -154,7 +109,6 @@ patch(TicketScreen.prototype, {
     },
 
     async onClickOrder(order) {
-        console.log("order",order)
         _superOnClickOrder.apply(this, arguments);
         this.clearRefundlines()
         const orderBackendId = order.backendId
@@ -185,8 +139,6 @@ patch(TicketScreen.prototype, {
             { fields: ["code"] }
         ); 
 
-        console.log("pos_voucher_code",pos_voucher_code)
-        //console.log("pos_voucher_code",pos_voucher_code[0]?.code)
         order.voucher_code = pos_voucher_code[0]?.code
         const addcode_to_orderline =  order.get_orderlines()
         addcode_to_orderline.forEach(l => {    

@@ -38,7 +38,7 @@
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.js",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/product_list/product_list.js",
           "custom_point_of_sale_mooch/static/src/app/screens/ticketscreen/ticketscreen.js",
-          #"custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.js",
+          "custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.js",
 
           # Models y navbar
           "custom_point_of_sale_mooch/static/src/app/store/models.js",
@@ -62,7 +62,7 @@
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml",
           "custom_point_of_sale_mooch/static/src/overrides/components/discount_button/discount_button.xml",
-          #"custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.xml",
+          "custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.xml",
 
           # CSS
           "custom_point_of_sale_mooch/static/src/css/refund_coupon.css",
@@ -72,7 +72,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.css",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.css",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.css",
-          #"custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.css",
+          "custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.css",
         
           # Comentados (referencia; no se cargan)
           #'custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml',

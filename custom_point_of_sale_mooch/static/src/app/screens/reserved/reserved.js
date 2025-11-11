@@ -2,13 +2,12 @@
 
 import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { usePos } from "@point_of_sale/app/store/pos_store";
 
 export class ApartadosPopup extends Component {
-    static template = "pos_apartados.ApartadosPopup";
+    static template = "point_of_sale.ApartadosPopup";
     
     setup() {
-        this.pos = usePos();
+        this.pos = useService("pos");
         this.orm = useService("orm");
         this.notification = useService("notification");
         
@@ -17,44 +16,41 @@ export class ApartadosPopup extends Component {
             apartadoSeleccionado: null,
             cargando: false
         });
-        
         // Cargar apartados al abrir
         this.cargarApartados();
+    }
+
+    closePopup() {
+        if (this.props.close) this.props.close();
     }
 
     // Cargar apartados desde la base de datos
     async cargarApartados() {
         this.state.cargando = true;
-        try {
             const apartados = await this.orm.call(
-                "pos.reserverd",
+                "pos.reserved",
                 "search_read",
                 [],
                 {
-                    fields: ["name", "state", "amount_total", "amount_paid", "cashier", "note"],
+                    fields: ["name", "state", "amount_total", "amount_paid", "cashier"],
                     order: "id desc"
                 }
             );
             
             // Cargar líneas para cada apartado
-            for (let apartado of apartados) {
+           for (let apartado of apartados) {
                 const lineas = await this.orm.call(
-                    "pos.reserverd.line",
+                    "pos.reserved.line",
                     "search_read",
-                    [["reserverd_id", "=", apartado.id]],
+                    [[["reserved_id", "=", apartado.id]]],  // 🔵 lista de listas
                     {
                         fields: ["product_id", "name", "qty", "price_unit", "price_subtotal_incl"]
                     }
                 );
-                apartado.lineas = lineas;
+                apartado.lineas = lineas || [];
             }
-            
             this.state.apartados = apartados;
-        } catch (error) {
-            this.notification.add("Error cargando apartados: " + error, {type: "danger"});
-        } finally {
             this.state.cargando = false;
-        }
     }
 
     // Seleccionar un apartado
@@ -101,10 +97,11 @@ export class ApartadosPopup extends Component {
         }
 
         this.state.cargando = true;
-        try {
+        //try {
             // Crear el apartado
+            console.log("crearapartados")
             const apartadoId = await this.orm.call(
-                "pos.reserverd",
+                "pos.reserved",
                 "create",
                 [{
                     name: `APARTADO-${new Date().getTime()}`,
@@ -119,10 +116,10 @@ export class ApartadosPopup extends Component {
             // Crear líneas del apartado
             for (let linea of ordenActual.orderlines) {
                 await this.orm.call(
-                    "pos.reserverd.line",
+                    "pos.reserved.line",
                     "create",
                     [{
-                        reserverd_id: apartadoId,
+                        reserved_id: apartadoId,
                         product_id: linea.product.id,
                         name: linea.product.display_name,
                         qty: linea.quantity,
@@ -134,11 +131,11 @@ export class ApartadosPopup extends Component {
 
             this.notification.add("Apartado creado correctamente", {type: "success"});
             this.cargarApartados(); // Recargar lista
-        } catch (error) {
-            this.notification.add("Error creando apartado: " + error, {type: "danger"});
-        } finally {
+        // } catch (error) {
+        //     this.notification.add("Error creando apartado: " + error, {type: "danger"});
+        // } finally {
             this.state.cargando = false;
-        }
+        //}
     }
 
     // Eliminar apartado
@@ -167,3 +164,4 @@ export class ApartadosPopup extends Component {
         }
     }
 }
+//registry.category("popups").add("ApartadosPopup", ApartadosPopup);

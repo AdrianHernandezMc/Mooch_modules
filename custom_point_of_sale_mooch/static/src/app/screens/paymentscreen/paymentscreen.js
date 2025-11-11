@@ -7,6 +7,7 @@ import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment
 import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup"; 
 import { useService } from "@web/core/utils/hooks";
 import { Order } from "@point_of_sale/app/store/models";
+import { TextInputPopup } from "@point_of_sale/app/utils/input_popups/text_input_popup";
 
 // Import del popup's
 import { HomeDeliveryPopup } from "../../popup/home_delivery_popup";
@@ -71,8 +72,6 @@ patch(PaymentScreen.prototype, {
     },
 
     async onMounted() {
-        //const c= null
-        //this.requiresTxId(c)
         if (this.pos.TicketScreen_onDoRefund){
             const line = this.selectedPaymentLine;
             line.transaction_id = String(this.pos.sharedtcode);
@@ -100,6 +99,20 @@ patch(PaymentScreen.prototype, {
 
     get selectedPaymentLine() {
         return this.pos.get_order()?.selected_paymentline || null;
+    },
+
+
+    async abrirPopupEfectivo() {
+        const { confirmed, payload } = await this.popup.add(TextInputPopup, {
+            title: _t("Captura el efectivo"),
+            body: _t("Ingresa el efectivo."),
+            inputProps: { type: "number", inputmode: "decimal" },
+            confirmText: _t("Aplicar"),
+            cancelText: _t("Cancelar"),
+        });
+        console.log("payload",payload)
+        if (confirmed) this.montoEfectivo = payload;
+        return payload
     },
 
     get requiresTxId() {
@@ -239,8 +252,17 @@ patch(PaymentScreen.prototype, {
         }
 
         // ✅ SOLO si el popup se confirmó o no era necesario, procesar el pago
+        
         const result = await super.validateOrder(...arguments);
+        this.clear_client()
         return result;
+    },
+
+    async clear_client() {
+    const order = this.pos.get_order();
+    if (order && order.get_partner()) {
+            order.set_partner(null);
+        }
     },
 
     async create_vale(order,loyaty_program_id){
@@ -383,7 +405,7 @@ patch(PaymentScreen.prototype, {
         return true;
     },
 
-    addNewPaymentLine(paymentMethod) {        
+    async addNewPaymentLine(paymentMethod) {               
         // Validar que el total de la venta sea mayor que 0
         const orderTotal = this.currentOrder.get_total_with_tax ? this.currentOrder.get_total_with_tax() : this.currentOrder.total;
         console.log("orderTotal",orderTotal)
@@ -394,7 +416,28 @@ patch(PaymentScreen.prototype, {
             });
             return false;
         }
+
         const result = super.addNewPaymentLine(...arguments);
+        
+        if (paymentMethod?.name === 'Efectivo'){
+            const { confirmed, payload } = await this.popup.add(TextInputPopup, {
+                title: _t("Captura el efectivo"),
+                body: _t("Ingresa el efectivo."),
+                inputProps: { type: "number", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*", className: "verde-input", },
+                confirmText: _t("Aplicar"),
+                cancelText: _t("Cancelar"),
+            });
+
+            const paymentlines = this.currentOrder?.paymentlines
+
+            const efectivoline = await this.currentOrder.paymentlines.find(
+                l => l.payment_method?.name === "Efectivo"
+            );
+            if (efectivoline) efectivoline.amount = parseFloat(payload) || 0;
+        }
         return result;
     }
 });
+
+
+

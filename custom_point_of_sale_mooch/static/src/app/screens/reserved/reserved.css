@@ -1,11 +1,21 @@
 /* static/src/css/apartados.css */
-.apartados-popup {
+/* .apartados-popup {
     width: 90%;
     max-width: 1200px;
     height: 90vh;
     background: white;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(0,0,0,0.3);
+} */
+
+.apartados-popup {
+    width: 700px !important;
+    max-width: 95vw !important;
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    overflow-y: auto;
 }
 
 .apartados-popup .header {
@@ -27,4 +37,40 @@
 .apartados-popup .list-group-item.active {
     background-color: #007bff;
     border-color: #007bff;
+}
+
+.apartados-line {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.apartados-line .line-name {
+    flex: 1;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.apartados-line .line-price {
+    flex-shrink: 0;
+    text-align: right;
+    min-width: 100px;
+}
+
+
+
+
+
+/* 📱 Ajuste automático para pantallas pequeñas */
+@media (max-width: 768px) {
+    .apartados-popup {
+        width: 95vw;           /* ocupa casi todo el ancho */
+        padding: 15px;
+        border-radius: 8px;
+    }
 }

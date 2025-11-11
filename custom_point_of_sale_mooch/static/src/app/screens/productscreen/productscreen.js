@@ -77,24 +77,28 @@ patch(ProductScreen.prototype, {
 
         // **************   para hacer pruebad en productscreen  *******************
         useHotkey("alt+x", (ev) => {
+
+            //this.clear_client()
+
             const orden = this.pos.get_order()
+            console.log(orden)
             const orderlines = orden.get_orderlines()
             console.log(orderlines)
-            const match = 'descuento';
+            // const match = 'descuento';
 
-            const discountLines = orderlines.filter(line => {
-            // intentar obtener el nombre del producto de formas comunes
-            const prodName =
-                (line.product && line.product.name) ||
-                line.product_name ||
-                line.name ||
-                line.display_name ||
-                '';
+            // const discountLines = orderlines.filter(line => {
+            // // intentar obtener el nombre del producto de formas comunes
+            // const prodName =
+            //     (line.product && line.product.name) ||
+            //     line.product_name ||
+            //     line.name ||
+            //     line.display_name ||
+            //     '';
 
-            return typeof prodName === 'string' && prodName.toLowerCase().includes(match.toLowerCase());
-            });
+            // return typeof prodName === 'string' && prodName.toLowerCase().includes(match.toLowerCase());
+            // });
 
-            console.log("discountLines",discountLines)
+            // console.log("discountLines",discountLines)
 
         });
 
@@ -110,6 +114,7 @@ patch(ProductScreen.prototype, {
         });
 
     },
+
 
     async _getProductByBarcode(code) {
         // Ejecutar la lógica original
@@ -213,6 +218,7 @@ patch(ProductScreen.prototype, {
 
     async onMounted() {
         this.getLocalCashTotal();
+        
         await this.clear_pay_method();
                     const { updated } =  this.orm.call(
                 "loyalty.card",
@@ -224,37 +230,12 @@ patch(ProductScreen.prototype, {
     },
 
     async clickReembolso(){
+
         const { confirmed, payload } = await this.popup.add(MaskedInputPopup,{
             resolve: (result) => {
                 console.log("Popup cerrado:", result);
             }
         });
-        // const { confirmed, payload } = await this.popup.add(TextInputPopup, {
-        //     title: _t("Reembolso por Ticket"),
-        //     body: _t("Ingresa el número de ticket (pos_reference)."),
-        //     placeholder: "S0001-001-0001",
-        //     confirmText: _t("Buscar"),
-        //     cancelText: _t("Cancelar"),
-        //     inputProps: {
-        //     onInput: (e) => {
-        //         let input = e.target;
-        //         let raw = input.value.replace(/[^0-9]/g, "").slice(0, 12); // Solo números
-        //         let formatted = "S";
-
-        //         if (raw.length > 0) formatted += raw.slice(0, 4);
-        //         if (raw.length >= 5) formatted += "-" + raw.slice(4, 7);
-        //         if (raw.length >= 8) formatted += "-" + raw.slice(7, 11);
-
-        //         // Evita sobrescribir si el usuario borra
-        //         input.value = formatted;
-
-        //         // Reposiciona el cursor al final
-        //         input.setSelectionRange(formatted.length, formatted.length);
-        //     },
-        //     maxlength: 17,
-        //     },
-        // });
-
         if (!confirmed || !payload) return;
 
         // Buscar la orden original
@@ -273,12 +254,13 @@ patch(ProductScreen.prototype, {
         }
 
         const order = orders[0];
-        console.log("Orden encontrada:", order);
 
         // ✅ VERIFICACIÓN 1: Evitar reembolsos de reembolsos
         const orderName = order.name || "";
         const posReference = order.pos_reference || "";
 
+        console.log("order.name",order.name)
+        console.log("order",order)
         // Si la orden original YA ES un reembolso, bloquear
         if (orderName.includes("REEMBOLSO") || 
             orderName.includes("DEVOLUCIÓN") || 
@@ -296,10 +278,12 @@ patch(ProductScreen.prototype, {
 
         // ✅ VERIFICACIÓN 2: Evitar múltiples reembolsos de la misma orden
         const refundKey = `refund_${orderNumber}`;
+
         const existingRefund = localStorage.getItem(refundKey);
 
         if (existingRefund) {
             const refundDate = new Date(parseInt(existingRefund));
+            alert("Existe orden")
             await this.popup.add(ErrorPopup, {
                 title: "Reembolso ya realizado",
                 body: `Esta orden ya fue reembolsada el ${refundDate.toLocaleString()}. No se puede reembolsar nuevamente.`,
@@ -336,7 +320,7 @@ patch(ProductScreen.prototype, {
 
         // ✅ MARCAR INMEDIATAMENTE para prevenir doble reembolso
         localStorage.setItem(refundKey, Date.now().toString());
-
+        localStorage.removeItem(refundKey);
         // Buscar líneas de la orden
         const orderLines = await this.orm.call("pos.order.line", "search_read", [
             [["order_id", "=", order.id]],
@@ -345,6 +329,21 @@ patch(ProductScreen.prototype, {
             "tax_ids", "combo_parent_id", "combo_line_ids"
             ]
         ]);
+
+        // Valida que la venta no sea un cambio.
+        console.log("order.product_changes_id",order.product_changes_id)
+        const id = order.product_changes_id;
+        const productos_with_changes = orderLines.filter(l => l.product.id === id);
+
+        console.log("productos_with_changes",productos_with_changes)
+        if (productos_with_changes){
+            await this.popup.add(ErrorPopup, {
+                    title: "Reembolso con cambios",
+                    body: `No se pueden reembolsar cambios`,
+                });
+                return;
+        }
+
 
         if (!orderLines.length) {
             this.popup.add(ErrorPopup, {
@@ -451,7 +450,7 @@ patch(ProductScreen.prototype, {
         } catch (error) {
             console.log("No se pudo marcar la orden en BD:", error);
         }
-
+return
         // Redirigir a pantalla de recibo
         this.pos.Sale_type = "Reembolso";
         this.pos.set_order(refundOrder);
@@ -627,7 +626,14 @@ patch(ProductScreen.prototype, {
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
             const advancedEmployeeIds = this.pos.config.advanced_employee_ids; // Lista de IDs
             const isAdvancedUser = advancedEmployeeIds.includes(check.id);
-            
+            if (!isAdvancedUser){
+                this.popup.add(ErrorPopup, {
+                    title: _t("Validacion supervisor"),
+                    body:  _t("No es usuario supervisor"),
+                });
+                return;
+            }
+
             if (isAdvancedUser && mode === "price")  {
                 this.change_price()
             } 
@@ -725,8 +731,6 @@ patch(ProductScreen.prototype, {
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo precio unitario"),
             body:  _t("Ingresa el precio."),
-            //startingValue: String(current*1.16),
-            // valida solo números con punto decimal (opcional)
             inputProps: { type: "number", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*", className: "verde-input", },
             confirmText: _t("Aplicar"),
             cancelText: _t("Cancelar"),

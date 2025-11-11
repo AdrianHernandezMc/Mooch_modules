@@ -80,7 +80,9 @@ patch(TicketScreen.prototype, {
                 const origin_id = refundDetails.map(d => d.orderline.orderBackendId);
                 const productId_origin =  refundDetails.map(d => d.orderline.productId);
 
-                await ProductScreen.prototype._applyCoupon.call(this, totalRefund, ordername, refund_codes);
+                console.log('partner',partner)
+
+                await ProductScreen.prototype._applyCoupon.call(this, totalRefund, ordername, refund_codes, partner);
                 this.pos.showScreen("ProductScreen");
                 this.pos.activate_changes = true            
       }
