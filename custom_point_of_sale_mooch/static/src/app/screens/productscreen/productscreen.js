@@ -224,13 +224,352 @@ patch(ProductScreen.prototype, {
         this.getLocalCashTotal();
         
         await this.clear_pay_method();
-                    const { updated } =  this.orm.call(
-                "loyalty.card",
-                "sync_source_order_by_posref",
-                [],                 // args
-                { limit: 1000 }     // kwargs opcional
-            );
+        const { updated } =  this.orm.call(
+            "loyalty.card",
+            "sync_source_order_by_posref",
+            [],                 // args
+            { limit: 1000 }     // kwargs opcional
+        );
         console.log("loyalty.cards actualizados:", updated);
+
+        /******************* APLICAR PRECIO PROPORCIONAL CON DESCUENTO GLOBAL *******************/
+        console.log("🔧 CALCULADOR PROPORCIONAL - Verificando líneas de cambios...");
+        
+        // Esperar un momento para que la orden esté completamente cargada
+        setTimeout(() => {
+            this.applyProportionalPriceToChangeLines();
+        }, 1000);
+    },
+
+    async applyProportionalPriceToChangeLines() {
+        try {
+            console.log("🟢 APLICANDO PRECIO PROPORCIONAL MEJORADO (MEMORIA)");
+            
+            const order = this.pos.get_order();
+            if (!order || !order.get_orderlines) return;
+
+            // DEBUG COMPLETO
+            console.log("=== 🎯 DEBUG PRODUCTSCREEN 🎯 ===");
+            console.log("📋 Orden actual:", order.name);
+            console.log("🔑 changes_codes:", order.changes_codes);
+            console.log("💾 POS cache disponible:", !!this.pos.originalOrderDiscountInfo);
+            if (this.pos.originalOrderDiscountInfo) {
+                console.log("🗂️ Claves en cache:", Object.keys(this.pos.originalOrderDiscountInfo));
+                console.log("📝 Contenido del cache:", this.pos.originalOrderDiscountInfo);
+            }
+            console.log("=================================");
+            
+            const allOrderLines = order.get_orderlines();
+            console.log(`🔧 ${allOrderLines.length} líneas en la orden`);
+            
+            const changeLines = this.getChangeLines(order, allOrderLines);
+            
+            if (changeLines.length > 0) {
+                console.log(`🔧 ${changeLines.length} líneas de cambios detectadas`);
+                
+                const originalOrderInfo = this.findOriginalOrderFromChanges(order);
+                
+                if (originalOrderInfo && originalOrderInfo.hasGlobalDiscount) {
+                    const discountPercentage = originalOrderInfo.globalDiscountPercentage;
+                    const discountFactor = originalOrderInfo.globalDiscountFactor;
+                    
+                    console.log(`🎯 ✅✅✅ APLICANDO DESCUENTO PROPORCIONAL DEL ${discountPercentage}% ✅✅✅`);
+                    
+                    let cambiosAplicados = 0;
+                    
+                    changeLines.forEach((changeLine, index) => {
+                        const precioOriginal = Math.abs(this.getLineUnitPrice(changeLine));
+                        const precioProporcional = precioOriginal * discountFactor;
+                        const precioFinal = -Math.round(precioProporcional * 100) / 100;
+                        
+                        console.log(`🔧 Línea ${index + 1}: ${precioOriginal} → ${precioFinal}`);
+                        
+                        const success = this.setLineUnitPrice(changeLine, precioFinal);
+                        
+                        if (success) {
+                            cambiosAplicados++;
+                            console.log(`✅ PRECIO ACTUALIZADO: ${precioOriginal} → ${this.getLineUnitPrice(changeLine)}`);
+                        }
+                    });
+                    
+                    console.log(`🔧 RESUMEN: ${cambiosAplicados} líneas actualizadas con descuento del ${discountPercentage}%`);
+                    
+                    if (cambiosAplicados > 0) {
+                        this.forceUIRefresh();
+                    }
+                } else {
+                    console.log(`🔧 Orden original NO tiene descuento global, no se aplica ajuste proporcional`);
+                }
+            }
+            
+        } catch (error) {
+            console.error("❌ ERROR:", error);
+        }
+    },
+
+    /**
+     * Encuentra la orden original basada en los cambios - VERSIÓN SIMPLIFICADA Y EFECTIVA
+     */
+    findOriginalOrderFromChanges(currentOrder) {
+        try {
+            console.log("🔧 Buscando información de descuento en cache del POS...");
+            
+            if (!currentOrder.changes_codes) {
+                console.log("🔧 ❌ No hay changes_codes en la orden actual");
+                return null;
+            }
+            
+            console.log(`🔧 changes_codes actual: '${currentOrder.changes_codes}'`);
+            
+            // VERIFICAR SI EXISTE EL CACHE EN EL POS
+            if (!this.pos.originalOrderDiscountInfo) {
+                console.log("🔧 ❌ No hay cache de descuentos en el POS");
+                return null;
+            }
+            
+            console.log("🔧 Cache disponible en POS:", Object.keys(this.pos.originalOrderDiscountInfo));
+            
+            // BUSCAR COINCIDENCIA EXACTA EN EL CACHE
+            const discountInfo = this.pos.originalOrderDiscountInfo[currentOrder.changes_codes];
+            if (discountInfo) {
+                console.log(`🔧 ✅ COINCIDENCIA EXACTA ENCONTRADA!`);
+                console.log(`🔧 Orden original: ${discountInfo.originalOrderName}`);
+                console.log(`🔧 Descuento: ${discountInfo.discountPercentage}%`);
+                
+                return {
+                    hasGlobalDiscount: discountInfo.hasGlobalDiscount,
+                    globalDiscountPercentage: discountInfo.discountPercentage,
+                    globalDiscountFactor: discountInfo.discountFactor,
+                    name: discountInfo.originalOrderName,
+                    source: "exact_cache_match"
+                };
+            }
+            
+            // BUSCAR COINCIDENCIA PARCIAL (por si hay diferencias de formato)
+            for (const [cacheKey, cacheInfo] of Object.entries(this.pos.originalOrderDiscountInfo)) {
+                if (currentOrder.changes_codes.includes(cacheKey.trim()) || 
+                    cacheKey.includes(currentOrder.changes_codes.trim())) {
+                    
+                    console.log(`🔧 ✅ COINCIDENCIA PARCIAL ENCONTRADA!`);
+                    console.log(`🔧 Clave en cache: '${cacheKey}'`);
+                    console.log(`🔧 Orden original: ${cacheInfo.originalOrderName}`);
+                    console.log(`🔧 Descuento: ${cacheInfo.discountPercentage}%`);
+                    
+                    return {
+                        hasGlobalDiscount: cacheInfo.hasGlobalDiscount,
+                        globalDiscountPercentage: cacheInfo.discountPercentage,
+                        globalDiscountFactor: cacheInfo.discountFactor,
+                        name: cacheInfo.originalOrderName,
+                        source: "partial_cache_match"
+                    };
+                }
+            }
+            
+            console.log("🔧 ❌ No se encontró coincidencia en el cache");
+            console.log("🔧 Búsquedas intentadas:");
+            console.log("🔧 - Coincidencia exacta con:", currentOrder.changes_codes);
+            console.log("🔧 - Coincidencia parcial con todas las claves del cache");
+            
+            return null;
+            
+        } catch (error) {
+            console.error("🔧 ❌ Error buscando en cache:", error);
+            return null;
+        }
+    },
+
+
+    /**
+     * Obtiene detalles completos de una orden - VERSIÓN CORREGIDA Y ROBUSTA
+     */
+    async getOrderDetails(orderId) {
+        try {
+            console.log(`🔧 getOrderDetails - Buscando orden ID: ${orderId}`);
+            
+            // PRIMERO: Obtener la orden básica con campos esenciales
+            const orders = await this.orm.call("pos.order", "search_read", [
+                [["id", "=", orderId]],
+                ["id", "name", "pos_reference", "amount_total", "amount_tax", "amount_untaxed"]
+            ]);
+
+            console.log(`🔧 Resultado búsqueda orden:`, orders);
+
+            if (!orders || orders.length === 0) {
+                console.log(`🔧 ❌ Orden ${orderId} no encontrada`);
+                return null;
+            }
+
+            const originalOrder = orders[0];
+            console.log(`🔧 ✅ Orden básica encontrada:`, {
+                id: originalOrder.id,
+                name: originalOrder.name,
+                total: originalOrder.amount_total
+            });
+
+            // SEGUNDO: Obtener las líneas de la orden con manejo de errores
+            let originalLines = [];
+            try {
+                originalLines = await this.orm.call("pos.order.line", "search_read", [
+                    [["order_id", "=", orderId]],
+                    ["id", "price_unit", "qty", "discount", "product_id", "price_subtotal", "price_subtotal_incl", "name"]
+                ]);
+                console.log(`🔧 ✅ ${originalLines.length} líneas obtenidas`);
+            } catch (lineError) {
+                console.error("🔧 ❌ Error obteniendo líneas:", lineError);
+                // Continuamos con líneas vacías en lugar de fallar completamente
+            }
+
+            // TERCERO: Log detallado de las líneas
+            if (originalLines.length > 0) {
+                console.log("🔧 Detalles de líneas:");
+                originalLines.forEach((line, index) => {
+                    console.log(`🔧 Línea ${index}: ${line.name || 'Sin nombre'} - Precio: ${line.price_unit}, Cant: ${line.qty}, Desc: ${line.discount}%`);
+                });
+            } else {
+                console.log("🔧 ⚠️ No se obtuvieron líneas de la orden");
+            }
+
+            return {
+                order: originalOrder,
+                lines: originalLines
+            };
+
+        } catch (error) {
+            console.error("🔧 ❌❌❌ ERROR CRÍTICO en getOrderDetails:", error);
+            console.error("🔧 Stack trace:", error.stack);
+            return null;
+        }
+    },
+
+    /**
+     * Obtiene el precio unitario de una línea de forma segura
+     */
+    getLineUnitPrice(line) {
+        try {
+            if (typeof line.get_unit_price === 'function') {
+                return line.get_unit_price();
+            }
+            if (line.price !== undefined) {
+                return line.price;
+            }
+            if (line.unit_price !== undefined) {
+                return line.unit_price;
+            }
+            return 0;
+        } catch (error) {
+            console.error("🔧 Error obteniendo precio de línea:", error);
+            return 0;
+        }
+    },
+
+    /**
+     * Establece el precio unitario de una línea de forma segura - MEJORADO
+     */
+    setLineUnitPrice(line, price) {
+        try {
+            console.log(`🔧 setLineUnitPrice: Intentando establecer precio ${price} en línea ${line.id}`);
+            
+            // Método 1: set_unit_price si existe
+            if (typeof line.set_unit_price === 'function') {
+                line.set_unit_price(price);
+                console.log(`✅ Precio establecido via set_unit_price`);
+                return true;
+            }
+            
+            // Método 2: Asignación directa a price
+            if (line.price !== undefined) {
+                line.price = price;
+                console.log(`✅ Precio establecido via line.price`);
+                return true;
+            }
+            
+            // Método 3: Asignación directa a unit_price
+            if (line.unit_price !== undefined) {
+                line.unit_price = price;
+                console.log(`✅ Precio establecido via line.unit_price`);
+                return true;
+            }
+            
+            // Método 4: Usar set_price si existe
+            if (typeof line.set_price === 'function') {
+                line.set_price(price);
+                console.log(`✅ Precio establecido via set_price`);
+                return true;
+            }
+            
+            console.log(`❌ No se pudo encontrar método para establecer precio`);
+            return false;
+            
+        } catch (error) {
+            console.error(`❌ Error en setLineUnitPrice:`, error);
+            return false;
+        }
+    },
+
+    /**
+     * Identifica las líneas que representan cambios
+     */
+    getChangeLines(order, orderLines) {
+        const changeLines = [];
+        
+        // Método 1: Líneas que son el producto especial de cambios
+        if (order.product_changes_id) {
+            const productChangeLines = orderLines.filter(line => 
+                line.product && line.product.id === order.product_changes_id
+            );
+            changeLines.push(...productChangeLines);
+            console.log(`🔧 ${productChangeLines.length} líneas con product_changes_id: ${order.product_changes_id}`);
+        }
+        
+        // Método 2: Líneas con changes > 0
+        const linesWithChanges = orderLines.filter(line => line.changes > 0);
+        linesWithChanges.forEach(line => {
+            if (!changeLines.includes(line)) {
+                changeLines.push(line);
+            }
+        });
+        console.log(`🔧 ${linesWithChanges.length} líneas con changes > 0`);
+        
+        // Método 3: Líneas que tienen changes_codes en su nombre
+        if (order.changes_codes && order.changes_codes.trim() !== "") {
+            const linesWithChangeCodes = orderLines.filter(line => 
+                line.full_product_name && line.full_product_name.includes(order.changes_codes)
+            );
+            linesWithChangeCodes.forEach(line => {
+                if (!changeLines.includes(line)) {
+                    changeLines.push(line);
+                }
+            });
+            console.log(`🔧 ${linesWithChangeCodes.length} líneas con changes_codes`);
+        }
+        
+        console.log(`🔧 Total de líneas de cambios identificadas: ${changeLines.length}`);
+        return changeLines;
+    },
+
+    /**
+     * Fuerza actualización de la UI
+     */
+    forceUIRefresh() {
+        try {
+            // Método 1: Intentar render del componente
+            if (this.render && typeof this.render === 'function') {
+                this.render();
+            }
+            
+            // Método 2: Disparar evento de cambio en el pos
+            if (this.pos && typeof this.pos.trigger === 'function') {
+                this.pos.trigger('change');
+            }
+            
+            // Método 3: Disparar evento global
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 100);
+            
+        } catch (error) {
+            console.error("🔧 Error forzando refresh UI:", error);
+        }
     },
 
     async clickReembolso(){
