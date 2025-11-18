@@ -32,3 +32,42 @@ class LoyaltyCard(models.Model):
                 c.write({"source_pos_order_id": oid})
                 updated += 1
         return {"updated": updated}
+
+    # ==============================
+    #   CONTROL DE CONSUMO DEL VALE
+    # ==============================
+
+    def write(self, vals):
+        """
+        Intercepta cambios en 'points':
+        - Si Odoo intenta bajar puntos (consumo parcial)
+        - Y la tarjeta está ligada a una venta POS (pos_reference)
+        => Forzamos que se consuman TODOS los puntos (0) y la marcamos como 'redeemed'.
+        """
+        for card in self:
+            local_vals = dict(vals)  # copia para este registro
+
+            if "points" in local_vals:
+                old_points = card.points
+                # convertir a número lo que viene en vals
+                try:
+                    new_points = float(local_vals["points"])
+                except (TypeError, ValueError):
+                    new_points = old_points
+
+                # Solo actuamos si:
+                #  - la tarjeta viene de POS (tiene pos_reference)
+                #  - y se está BAJANDO el saldo de puntos (consumo)
+                if card.pos_reference and new_points < old_points:
+                    # 🔥 Forzar consumo completo
+                    local_vals["points"] = 0
+
+                    # Si existe campo 'state', la marcamos como redimida
+                    if "state" in card._fields and not local_vals.get("state"):
+                        # Ajusta según tus estados: 'redeemed', 'used', etc.
+                        local_vals["state"] = "redeemed"
+
+            # Hacemos write usando los vals ajustados SOLO para este card
+            super(LoyaltyCard, card).write(local_vals)
+
+        return True
