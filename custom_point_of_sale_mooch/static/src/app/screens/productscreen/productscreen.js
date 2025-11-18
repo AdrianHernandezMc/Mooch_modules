@@ -585,7 +585,7 @@ patch(ProductScreen.prototype, {
         const orderNumber = "Orden " + payload;
         const orders = await this.orm.call("pos.order", "search_read", [
             [["pos_reference", "=", orderNumber]],
-            ["id", "pos_reference", "partner_id", "fiscal_position_id", "name"]
+            ["id", "pos_reference", "partner_id", "fiscal_position_id", "name", "changes_codes"]
         ], { limit: 1 });
 
         if (!orders || orders.length === 0) {
@@ -597,6 +597,19 @@ patch(ProductScreen.prototype, {
         }
 
         const order = orders[0];
+
+        /******************* 🚫 VERIFICAR SI LA ORDEN YA TIENE CAMBIOS 🚫 *******************/
+        const hasExistingChanges = order.changes_codes && 
+                                order.changes_codes.trim() !== "" && 
+                                order.changes_codes !== " ";
+        
+        if (hasExistingChanges) {
+            await this.popup.add(ErrorPopup, {
+                title: "Cambios no permitidos",
+                body: "Esta orden ya tiene cambios realizados. No se pueden realizar reembolsos sobre órdenes con cambios previos.",
+            });
+            return;
+        }
 
         // ✅ VERIFICACIÓN 1: Evitar reembolsos de reembolsos
         const orderName = order.name || "";

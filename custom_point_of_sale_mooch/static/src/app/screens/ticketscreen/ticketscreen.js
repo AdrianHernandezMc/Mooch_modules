@@ -9,7 +9,8 @@ import { Order } from "@point_of_sale/app/store/models";
 
 const _superOnClickOrder = TicketScreen.prototype.onClickOrder;
 const _superSetup = TicketScreen.prototype.setup;
-const _superOnDoRefund = TicketScreen.prototype.onDoRefund;
+// 🔴 NUEVO: guardamos el super de "Cambiar Articulos"
+const _superOnClickTicketExchange = TicketScreen.prototype.onClickTicketExchange;
 
 patch(TicketScreen.prototype, {
     setup() {
@@ -21,59 +22,127 @@ patch(TicketScreen.prototype, {
         }
         _superSetup.apply(this, arguments);
         
-        onMounted(() => {
-        (async () => {
-            let searchOrder;
-            while (!searchOrder) {
-                const { confirmed, payload } = await this.popup.add(MaskedInputPopup, {
-                    title: "Buscar orden",
-                    body: "Ingresa el número de orden",
-                });
-
-                if (!confirmed) {
-                    console.log("Popup cancelado");
-                    return; 
-                }
-
-                const receiptNumber = "Orden " + payload?.trim();
-                if (!receiptNumber) continue; // si no escribe nada, vuelve a mostrar el popup
-                //obtengo la lista de las ordenes
-                const result = await this.get_all_synced_orders();
-                //filtro mi orden capturada
-                searchOrder  = result.find(order => order.name === receiptNumber);
-                //ubico la pagina de la orden
-                const index = result.findIndex(order => order.name === receiptNumber);    
-                const nPerPage = this._state.syncedOrders.nPerPage;
-                const page = Math.floor(index / nPerPage) + 1;
-
-                this._state.syncedOrders.currentPage = page;
-                
-                await this._fetchSyncedOrders();
-                //***************************************** */    
-                if (!searchOrder ) {
-                    await this.popup.add(ErrorPopup, {
-                        title: "No encontrada",
-                        body: `No existe una orden con el número ${receiptNumber}`,
-                    });
-                }
-            }
-
-            console.log("oncilck")
-            this.onClickOrder(searchOrder);
-            this.clearRefundlines();
-            this.render?.();
-        })();
+        // ✅ AGREGAR ESTADO PARA CONTROLAR EL BOTÓN
+        this.state = useState({
+            blockChangesForCurrentOrder: false
         });
+
+        // 🔴 NUEVO: inicializar referencia a la orden seleccionada en TicketScreen
+        this.selectedSyncedOrderForChange = null;
+        
+        onMounted(() => {
+            (async () => {
+                let searchOrder;
+                while (!searchOrder) {
+                    const { confirmed, payload } = await this.popup.add(MaskedInputPopup, {
+                        title: "Buscar orden",
+                        body: "Ingresa el número de orden",
+                    });
+
+                    if (!confirmed) {
+                        console.log("Popup cancelado");
+                        return; 
+                    }
+
+                    const receiptNumber = "Orden " + payload?.trim();
+                    if (!receiptNumber) continue;
+                    
+                    const result = await this.get_all_synced_orders();
+                    searchOrder  = result.find(order => order.name === receiptNumber);
+                    const index = result.findIndex(order => order.name === receiptNumber);    
+                    const nPerPage = this._state.syncedOrders.nPerPage;
+                    const page = Math.floor(index / nPerPage) + 1;
+
+                    this._state.syncedOrders.currentPage = page;
+                    
+                    await this._fetchSyncedOrders();
+                    
+                    if (!searchOrder ) {
+                        await this.popup.add(ErrorPopup, {
+                            title: "No encontrada",
+                            body: `No existe una orden con el número ${receiptNumber}`,
+                        });
+                    }
+                }
+
+                console.log("oncilck")
+                this.onClickOrder.call(this, searchOrder);
+                this.clearRefundlines();
+                this.render?.();
+            })();
+        });
+    },
+
+    /**
+     * Verifica si la orden actual permite cambios
+     * 🟢 AJUSTE: aceptamos opcionalmente una orden (por ejemplo, la seleccionada en TicketScreen)
+     */
+    canChangeProducts(orderFromTicket) {
+        // Orden prioritaria: la que viene del TicketScreen, luego la que guardamos, luego la actual del POS
+        const order = orderFromTicket || this.selectedSyncedOrderForChange || this.pos.get_order?.();
+        
+        if (!order) {
+            console.log("🔧 canChangeProducts: sin orden, PERMITIENDO por defecto");
+            return true;
+        }
+        
+        // ✅ VERIFICAR MÚLTIPLES INDICADORES DE BLOQUEO
+        const hasChangeCodes =
+            order.changes_codes &&
+            String(order.changes_codes).trim() !== "" &&
+            String(order.changes_codes).trim() !== " ";
+
+        const isBlocked = 
+            order.isReadOnly ||
+            order.blockProductChanges ||
+            this.pos.blockChangesForCurrentOrder ||
+            hasChangeCodes;
+        
+        console.log(`🔧 Verificación cambios productos: ${isBlocked ? 'BLOQUEADO' : 'PERMITIDO'}`, {
+            name: order.name,
+            isReadOnly: order.isReadOnly,
+            blockProductChanges: order.blockProductChanges,
+            blockChangesForCurrentOrder: this.pos.blockChangesForCurrentOrder,
+            changes_codes: order.changes_codes
+        });
+        
+        return !isBlocked;
+    },
+
+    // 🔴 NUEVO: interceptar click en "Cambiar Articulos"
+    async onClickTicketExchange(...args) {
+        const order = this.selectedSyncedOrderForChange || this.pos.get_order?.();
+
+        console.log(
+            "🔧 onClickTicketExchange interceptado para:",
+            order?.name,
+            "changes_codes:",
+            order?.changes_codes
+        );
+
+        const canChange = this.canChangeProducts(order);
+
+        console.log("🔧 Resultado canChangeProducts en click:", canChange);
+
+        if (!canChange) {
+            await this.popup.add(ErrorPopup, {
+                title: "Orden en modo consulta",
+                body: "Esta orden ya tiene cambios registrados. Solo se permite consulta, no se pueden generar nuevos cambios.",
+            });
+            return; // 👈 NO llamamos al super → NO va al ProductScreen
+        }
+
+        // Si se permiten cambios, ejecutamos el comportamiento nativo
+        return _superOnClickTicketExchange.apply(this, args);
     },
 
     async get_all_synced_orders() {
         const domain = this._computeSyncedOrdersDomain();
         const config_id = this.pos.config.id;
 
-        this._state.syncedOrders.currentPage = 1
+        this._state.syncedOrders.currentPage = 1;
         const offset = (this._state.syncedOrders.currentPage - 1) * this._state.syncedOrders.nPerPage;
 
-        // Llamamos sin limit ni offset para traer todas las órdenes
         const { ordersInfo } = await this.orm.call(
             "pos.order",
             "search_paid_order_ids",
@@ -90,7 +159,7 @@ patch(TicketScreen.prototype, {
         await this.pos._loadMissingPartners(fetchedOrders);
 
         fetchedOrders = fetchedOrders.map(o => new Order({ env: this.env }, { pos: this.pos, json: o }));
-        return fetchedOrders; // 🔹 Devuelve todas las órdenes completas
+        return fetchedOrders;
     },
 
     async clearRefundlines() {
@@ -108,10 +177,107 @@ patch(TicketScreen.prototype, {
         }
     },
 
+    /**
+     * Verifica si la orden ya tiene cambios previos EN LA BASE DE DATOS
+     */
+    async hasExistingChanges(order) {
+        try {
+            console.log("🔧 Ejecutando hasExistingChanges...");
+            
+            const orderBackendId = order.backendId;
+            
+            // ✅ VERIFICACIÓN 1: Buscar en pos.changes si ya hay registros para esta orden
+            let pos_changes = await this.orm.call(
+                "pos.changes",          
+                "search_count",          // ✅ USAR search_count EN LUGAR DE search_read - MÁS RÁPIDO
+                [[["dest_id", "=", orderBackendId]]]
+            );
+            
+            const hasChangesInDB = pos_changes > 0;
+            
+            console.log(`🔧 Verificación BD: ${hasChangesInDB ? pos_changes + ' registros' : 'Sin cambios'}`);
+            
+            return hasChangesInDB;
+            
+        } catch (error) {
+            console.error("🔧 Error verificando cambios existentes:", error);
+            return false;
+        }
+    },
+
     async onClickOrder(order) {
+        /******************* 🚫 VERIFICAR SI LA ORDEN YA TIENE CAMBIOS 🚫 *******************/
+        console.log("🔧 Verificando si la orden ya tiene cambios previos...");
+        
+        // 🔴 NUEVO: guardar la orden seleccionada en TicketScreen
+        this.selectedSyncedOrderForChange = order;
+
+        // ✅ VERIFICAR SI LA ORDEN YA TIENE CAMBIOS
+        const hasChanges = await this.hasExistingChanges(order);
+        console.log(`🔧 Resultado verificación cambios: ${hasChanges}`);
+        
+        if (hasChanges) {
+            console.log("🚫 Orden ya tiene cambios previos, PERMITIENDO SOLO CONSULTA...");
+            
+            // ✅ OBTENER MÁS INFORMACIÓN SOBRE LOS CAMBIOS PARA EL MENSAJE
+            let changeDetails = "";
+            try {
+                const orderBackendId = order.backendId;
+                let pos_changes = await this.orm.call(
+                    "pos.changes",          
+                    "search_read",          
+                    [[["dest_id", "=", orderBackendId]]], 
+                    { fields: ["default_code", "origin_reference", "create_date"] }
+                );
+                
+                if (pos_changes && pos_changes.length > 0) {
+                    changeDetails = `\n\nSe encontraron ${pos_changes.length} cambio(s) realizados.`;
+                    if (pos_changes[0].create_date) {
+                        const changeDate = new Date(pos_changes[0].create_date).toLocaleDateString();
+                        changeDetails += `\nÚltimo cambio: ${changeDate}`;
+                    }
+                }
+            } catch (error) {
+                console.error("Error obteniendo detalles de cambios:", error);
+            }
+            
+            await this.popup.add(ErrorPopup, {
+                title: "📋 Orden con cambios existentes - MODO CONSULTA",
+                body: `La orden ${order.name} ya tiene cambios realizados. Puedes VER los productos pero NO realizar cambios adicionales.${changeDetails}`,
+            });
+            
+            // ✅ PERMITIR VER LA ORDEN PERO BLOQUEAR CAMBIOS
+            this.clearRefundlines();
+            
+            // ✅ CARGAR LA ORDEN EN MODO SOLO LECTURA
+            _superOnClickOrder.apply(this, arguments);
+            await this.processOrderDetails(order, true); // true = modo solo lectura
+            
+            // ✅ MARCAR LA ORDEN COMO SOLO LECTURA EN EL POS
+            if (this.pos.get_order()) {
+                this.pos.get_order().isReadOnly = true;
+            }
+            
+            return;
+        }
+        
+        /******************* CONTINUAR CON EL PROCESO NORMAL *******************/
         _superOnClickOrder.apply(this, arguments);
-        this.clearRefundlines()
-        const orderBackendId = order.backendId
+        this.clearRefundlines();
+        await this.processOrderDetails(order, false); // false = modo normal (permite cambios)
+    },
+
+    /**
+     * Procesa los detalles de la orden (compartido entre modo normal y solo lectura)
+     */
+    async processOrderDetails(order, isReadOnly = false) {
+        const orderBackendId = order.backendId;
+
+        // ✅ MARCAR EXPLÍCITAMENTE LA ORDEN COMO SOLO LECTURA
+        if (isReadOnly) {
+            order.isReadOnly = true;
+            console.log("🔧 🚫 ORDEN EN MODO SOLO LECTURA - NO SE PERMITEN CAMBIOS");
+        }
 
         /******************* PRIMERO OBTENER Y DEBUGGEAR LOS CHANGES_CODES *******************/
         let pos_changes = await this.orm.call(
@@ -166,6 +332,7 @@ patch(TicketScreen.prototype, {
             discountPercentage: discountAnalysis.discountPercentage,
             discountFactor: discountAnalysis.discountFactor,
             originalOrderName: order.name,
+            isReadOnly: isReadOnly, // ✅ GUARDAR SI ES SOLO LECTURA
             analyzedAt: new Date().toISOString()
         };
 
@@ -195,8 +362,8 @@ patch(TicketScreen.prototype, {
 
         console.log(`🔧 💾 INFORMACIÓN DE DESCUENTO GUARDADA EN CACHE`);
         console.log(`🔧 💾 Descuento: ${discountAnalysis.discountPercentage}%`);
+        console.log(`🔧 💾 Modo solo lectura: ${isReadOnly}`);
         console.log(`🔧 💾 Total de claves guardadas:`, Object.keys(this.pos.originalOrderDiscountInfo).length);
-        console.log(`🔧 💾 Cache completo:`, this.pos.originalOrderDiscountInfo);
         
         /** agreamos el codigo del vale al producto */
         let pos_voucher_code = await this.orm.call(
@@ -206,20 +373,20 @@ patch(TicketScreen.prototype, {
             { fields: ["code"] }
         ); 
 
-        order.voucher_code = pos_voucher_code[0]?.code
-        const addcode_to_orderline =  order.get_orderlines()
+        order.voucher_code = pos_voucher_code[0]?.code;
+        const addcode_to_orderline =  order.get_orderlines();
         addcode_to_orderline.forEach(l => {    
             if (!l.full_product_name.includes(l.product.barcode) && l.product.id !== order.product_changes_id && l.product.id !== order.product_voucher_id) {
-                l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";   // refleja el cambio en memoria
+                l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";
             }
 
             if (!l.full_product_name.includes(change_codes) && l.product.id == order.product_changes_id){
-                l.full_product_name = l.full_product_name + change_codes
+                l.full_product_name = l.full_product_name + change_codes;
             }
 
             if (pos_voucher_code.length > 0){
                 if (!l.full_product_name.includes(pos_voucher_code[0].code) && l.product.id == order.product_voucher_id){
-                    l.full_product_name = l.full_product_name + " - " + pos_voucher_code[0].code
+                    l.full_product_name = l.full_product_name + " - " + pos_voucher_code[0].code;
                 } 
             }
         });
@@ -233,18 +400,31 @@ patch(TicketScreen.prototype, {
             this.pos.Sale_type = null;   
         }
 
-    /// **** Echo para los camios de producto ********
-        const refundLines = order.get_orderlines().filter(l => l.changes > 0);
-        if (!refundLines.length) {
-            this.render();
-            return;
-        } 
+        // ✅ EN MODO SOLO LECTURA, LIMPIAR CUALQUIER LÍNEA DE CAMBIO
+        if (isReadOnly) {
+            console.log("🔧 🚫 Modo solo lectura - Limpiando líneas de cambio");
+            const refundLines = order.get_orderlines().filter(l => l.changes > 0);
+            refundLines.forEach(l => {
+                l.changes = 0;
+                delete this.pos.toRefundLines?.[l.id];
+            });
+            
+            // ✅ LIMPIAR toRefundLines COMPLETAMENTE
+            this.pos.toRefundLines = {};
+        } else {
+            /// **** Procesar cambios de producto (solo en modo normal) ********
+            const refundLines = order.get_orderlines().filter(l => l.changes > 0);
+            if (!refundLines.length) {
+                this.render();
+                return;
+            } 
 
-        refundLines.forEach(l => {
-            l.refunded_qty += l.changes;   // refleja el cambio en memoria
-            l.changes = 0;
-            delete this.pos.toRefundLines?.[l.id];
-        });
+            refundLines.forEach(l => {
+                l.refunded_qty += l.changes;
+                l.changes = 0;
+                delete this.pos.toRefundLines?.[l.id];
+            });
+        }
 
         this.render();
     },
@@ -340,4 +520,4 @@ patch(TicketScreen.prototype, {
             productName.includes('voucher') ||
             productName.includes('vale');
     },
-})
+});
