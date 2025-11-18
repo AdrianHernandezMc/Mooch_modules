@@ -49,17 +49,28 @@
     <!-- CÓDIGO DE BARRAS CON CENTRADO Y ESPACIADO CORREGIDOS -->
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')][div[@id='order-date']]" position="before">
         <t t-if="props.data.order_barcode">
-            <div class="barcode-container" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+
+            <!-- 🔹 CONTENEDOR 1: Código de barras -->
+            <div class="barcode-container"
+                style="text-align: center; margin-top: 20px; margin-bottom: 10px; padding: 8px 5px;
+                        background: white;">
+                
                 <div style="display: flex; justify-content: center;">
                     <img t-att-src="'/report/barcode/Code128/' + props.data.order_barcode + '?width=800&amp;height=150&amp;humanreadable=0'"
                         t-att-alt="props.data.order_barcode"
                         class="thermal-barcode"
                         style="width: 95%; max-width: 200px; height: 80px;"/>
                 </div>
-                <div class="barcode-number" style="margin-top: 10px; font-family: 'monospace'; font-size: 14pt; font-weight: bold; letter-spacing: 2px;">
-                    <t t-esc="props.data.order_barcode"/>
-                </div>
+
             </div>
+
+            <!-- 🔹 CONTENEDOR 2: Número del código -->
+            <div class="barcode-number"
+                style="text-align: center; margin-top: 5px; margin-bottom: 20px;
+                        font-family: monospace; font-size: 14pt; font-weight: bold; letter-spacing: 2px;">
+                <t t-esc="props.data.order_barcode"/>
+            </div>
+
         </t>
     </xpath>
   </t>
