@@ -10,6 +10,5 @@ class Department(models.Model):
     )
     budget_password = fields.Char(
         string='Contraseña de Presupuesto',
-        help='Contraseña para acceder al presupuesto de este departamento',
-        groups='base.group_system'
+        help='Contraseña para acceder al presupuesto de este departamento'
     )
