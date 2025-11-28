@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
   <data>
+    <!-- <record id="view_purchase_order_tree_budget_button" model="ir.ui.view">
+      <field name="name">purchase.order.tree.budget.button</field>
+      <field name="model">purchase.order</field>
+      <field name="inherit_id" ref="purchase.purchase_order_tree"/>
+      <field name="arch" type="xml">
+        <field name="name" position="after">
+          <button name="action_rfq_send"
+                  type="object"
+                  string="Presupuesto"
+                  class="btn-primary"
+                  modifiers="{'invisible': [('state', 'in', ['cancel', 'done'])]}"/>
+        </field>
+      </field>
+    </record> -->
+
     <record id="view_purchase_order_form_inherit_extra_fields" model="ir.ui.view">
       <field name="name">purchase.order.form.inherit.extra.fields</field>
       <field name="model">purchase.order</field>
@@ -191,5 +206,47 @@
         </xpath>
       </field>
     </record>
+
+    <record id="view_purchase_order_form_inherit_department" model="ir.ui.view">
+        <field name="name">purchase.order.form.inherit.department</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <!-- Agregar después del campo partner_ref -->
+            <field name="partner_ref" position="after">
+                <field name="department_id" 
+                      string="Departamento"
+                      placeholder="Seleccionar departamento..."
+                      options="{'no_create': True}"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Vista para mostrar departamento en KPI tree -->
+    <record id="view_purchase_order_kpis_tree_inherit_department" model="ir.ui.view">
+        <field name="name">purchase.order.kpis.tree.inherit.department</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_kpis_tree"/>
+        <field name="arch" type="xml">
+            <!-- Agregar campo department_id en la vista KPI -->
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="department_id" string="Departamento"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_purchase_budget_wizard" model="ir.actions.act_window">
+      <field name="name">Presupuesto</field>
+      <field name="res_model">purchase.budget.wizard</field>
+      <field name="view_mode">form</field>
+      <field name="target">new</field>
+    </record>
+
+    <!-- Agregar al menú de Compras -->
+    <menuitem id="menu_purchase_budget" 
+              name="Presupuesto" 
+              action="action_purchase_budget_wizard"
+              parent="purchase.menu_purchase_root"
+              sequence="10"/>
   </data>
 </odoo>

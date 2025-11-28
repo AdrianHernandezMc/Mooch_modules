@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="view_purchase_budget_wizard_form" model="ir.ui.view">
+      <field name="name">purchase.budget.wizard.form</field>
+      <field name="model">purchase.budget.wizard</field>
+      <field name="arch" type="xml">
+        <form string="Consulta de Presupuesto por Departamento">
+          <sheet>
+            <group>
+              <group>
+                <field name="department_id" required="1" options="{'no_open': True, 'no_create': True}"/>
+                <field name="quarter" required="1"/>
+                <field name="password" password="True" required="1"/>
+              </group>
+              <group>
+                <field name="total_budget" readonly="1" widget="monetary" invisible= "1"/>
+                <field name="total_invoiced" readonly="1" widget="monetary" string="Total Facturado" invisible= "1"/>
+                <field name="total_purchase_orders" readonly="1" widget="monetary" string="Total Órdenes de Compra" invisible= "1"/>
+                <field name="total_available" readonly="1" widget="monetary" invisible= "1"/>
+                <field name="percentage_used" readonly="1" string="% Utilizado" invisible= "1"/>
+              </group>
+
+              <separator string="Detalle del Presupuesto"/>
+
+              <field name="budget_lines" readonly="1" nolabel="1" widget="html"
+                    style="width: 100%; height: 450px; min-height: 450px;"
+                    class="oe_inline"/>
+            </group>
+          </sheet>
+          <footer>
+            <button name="action_process"
+                    string="Consultar Presupuesto"
+                    type="object"
+                    class="btn-primary"/>
+            <button name="action_cancel"
+                    string="Cancelar"
+                    type="object"
+                    class="btn-secondary"/>
+          </footer>
+        </form>
+      </field>
+    </record>
+  </data>
+</odoo>

@@ -41,6 +41,9 @@ class PurchaseOrder(models.Model):
     department_id = fields.Many2one(
         'hr.department',
         string='Departamento',
+        store=True,
+        readonly=True,
+        compute='_compute_department_from_budget',
         help='Departamento responsable de este pedido',
     )
 
@@ -458,3 +461,97 @@ class PurchaseOrder(models.Model):
             })
 
         return result
+
+    @api.depends('order_line.analytic_distribution')
+    def _compute_department_from_budget(self):
+        """Calcular departamento automáticamente desde las líneas de presupuesto"""
+        for order in self:
+            department_totals = {}
+            
+            for line in order.order_line:
+                if not line.analytic_distribution:
+                    continue
+                    
+                analytic_dist = line.analytic_distribution
+                
+                # Convertir si es string
+                if isinstance(analytic_dist, str):
+                    try:
+                        analytic_dist = json.loads(analytic_dist)
+                    except:
+                        continue
+                
+                if not isinstance(analytic_dist, dict):
+                    continue
+                
+                for account_id_str, percentage in analytic_dist.items():
+                    try:
+                        account_id = int(account_id_str)
+                        percentage_val = float(percentage)
+                        
+                        # Buscar líneas de presupuesto con esta cuenta analítica
+                        budget_lines = self.env['crossovered.budget.lines'].search([
+                            ('analytic_account_id', '=', account_id)
+                        ])
+                        
+                        for budget_line in budget_lines:
+                            if budget_line.department_id:
+                                dept = budget_line.department_id
+                                line_amount = line.price_total * (percentage_val / 100.0)
+                                department_totals[dept.id] = department_totals.get(dept.id, 0.0) + line_amount
+                                
+                    except:
+                        continue
+            
+            # Asignar departamento con mayor monto
+            if department_totals:
+                main_dept_id = max(department_totals, key=department_totals.get)
+                order.department_id = main_dept_id
+            else:
+                order.department_id = False
+
+    def action_recompute_all_departments(self):
+        """Forzar recálculo de departamentos para todas las órdenes"""
+        all_orders = self.search([])
+        updated_count = 0
+        
+        for order in all_orders:
+            old_dept = order.department_id
+            order._compute_department_from_budget()
+            
+            if order.department_id != old_dept:
+                updated_count += 1
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Recálculo Completado',
+                'message': f'Se actualizaron {updated_count} de {len(all_orders)} órdenes',
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+    @api.model
+    def cron_actualizar_departamentos(self):
+        """Cron job para actualizar departamentos automáticamente"""
+        try:
+            # Buscar órdenes con distribución analítica
+            orders_con_analitica = self.search([
+                ('order_line.analytic_distribution', '!=', False)
+            ])
+            
+            # Procesar órdenes
+            actualizadas = 0
+            for order in orders_con_analitica:
+                depto_anterior = order.department_id
+                order._compute_department_from_budget()
+                
+                if order.department_id != depto_anterior:
+                    actualizadas += 1
+            
+            _logger.info(f"Cron departamentos: {actualizadas} órdenes actualizadas")
+            
+        except Exception as e:
+            _logger.error(f"Error en cron de departamentos: {e}")
