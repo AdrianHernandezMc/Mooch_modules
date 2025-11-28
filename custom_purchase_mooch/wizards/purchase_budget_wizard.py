@@ -95,7 +95,7 @@ class PurchaseBudgetWizard(models.TransientModel):
             total_available = total_budget - total_committed
             
             # % Utilizado = Solo lo facturado actualmente / presupuesto total
-            percentage_used = (total_invoiced / total_budget * 100) if total_budget > 0 else 0  # CAMBIADO
+            percentage_used = (total_invoiced / total_budget * 100) if total_budget > 0 else 0
             
             # Actualizar campos
             self.write({
@@ -104,7 +104,7 @@ class PurchaseBudgetWizard(models.TransientModel):
                 'total_invoiced': total_invoiced,
                 'total_purchase_orders': total_purchase_orders,
                 'total_available': total_available,
-                'percentage_used': percentage_used,  # CAMBIADO: usar solo facturado
+                'percentage_used': percentage_used,
             })
             
             # Recargar el wizard
@@ -155,10 +155,10 @@ class PurchaseBudgetWizard(models.TransientModel):
             # Monto ya facturado (usar valor absoluto)
             total_invoiced = abs(bline.practical_amount or 0)
             
-            # Total de Órdenes de Compra (incluyendo RFQ y por aprobar)
-            total_purchase_orders = self._get_total_purchase_orders(bline.analytic_account_id, date_from, date_to)
+            # Total de Órdenes de Compra NO FACTURADAS (solo pendientes)
+            total_purchase_orders = self._get_total_purchase_orders_pending(bline.analytic_account_id, date_from, date_to)
             
-            # Total comprometido = facturado + órdenes de compra
+            # Total comprometido = facturado + órdenes de compra pendientes
             total_committed = total_invoiced + total_purchase_orders
             
             # Órdenes pendientes por facturar (para el detalle)
@@ -168,7 +168,7 @@ class PurchaseBudgetWizard(models.TransientModel):
             available = bline.planned_amount - total_committed
             
             # % Utilizado = Solo lo facturado actualmente / presupuesto
-            percentage_used = (total_invoiced / bline.planned_amount * 100) if bline.planned_amount > 0 else 0  # CAMBIADO
+            percentage_used = (total_invoiced / bline.planned_amount * 100) if bline.planned_amount > 0 else 0
             
             result.append({
                 'account': bline.analytic_account_id.name,
@@ -177,24 +177,27 @@ class PurchaseBudgetWizard(models.TransientModel):
                 'purchase_orders': total_purchase_orders,
                 'total_committed': total_committed,
                 'available': available,
-                'percentage_used': percentage_used,  # CAMBIADO: usar solo facturado
+                'percentage_used': percentage_used,
                 'pending_orders': pending_orders,
             })
         
         return result
 
-    def _get_total_purchase_orders(self, analytic_account, date_from, date_to):
-        """Obtener total de todas las Órdenes de Compra (incluyendo RFQ y por aprobar)"""
+    def _get_total_purchase_orders_pending(self, analytic_account, date_from, date_to):
+        """Obtener total de Órdenes de Compra NO FACTURADAS COMPLETAMENTE (CON IVA)"""
         PurchaseOrder = self.env['purchase.order']
         
-        # Buscar TODAS las Órdenes de Compra (incluyendo RFQ - estados 'draft', 'sent', 'to approve', 'purchase')
+        # Buscar Órdenes de Compra que NO estén COMPLETAMENTE facturadas
         domain = [
-            ('state', 'in', ['draft', 'sent', 'to approve', 'purchase']),  # Incluir RFQ y OCs confirmadas
+            ('state', 'in', ['draft', 'sent', 'to approve', 'purchase', 'done']),
+            ('invoice_status', 'in', ['no', 'to invoice']),  # No facturadas o parcialmente facturadas
             ('date_order', '>=', date_from),
             ('date_order', '<=', date_to),
         ]
         
         pos = PurchaseOrder.search(domain)
+        _logger.info(f"Órdenes no completamente facturadas: {len(pos)}")
+        
         total_po_amount = 0
         
         for po in pos:
@@ -211,18 +214,32 @@ class PurchaseBudgetWizard(models.TransientModel):
                     
                     if str(analytic_account.id) in analytic_dist:
                         percentage = float(analytic_dist[str(analytic_account.id)]) / 100.0
-                        po_amount += abs(line.price_total) * percentage
+                        
+                        # Si la línea NO está completamente facturada, incluirla
+                        if line.qty_invoiced < line.product_qty:
+                            # Calcular monto pendiente por facturar CON IVA
+                            # Usamos price_total que ya incluye IVA y lo prorrateamos por cantidad pendiente
+                            unit_price_with_tax = line.price_total / line.product_qty if line.product_qty > 0 else 0
+                            pending_qty = line.product_qty - line.qty_invoiced
+                            pending_amount = unit_price_with_tax * pending_qty * percentage
+                            po_amount += abs(pending_amount)
             
-            total_po_amount += po_amount
+            if po_amount > 0:
+                total_po_amount += po_amount
+                _logger.info(f"PO {po.name} (Estado: {po.state}, Facturación: {po.invoice_status}): ${po_amount:,.2f} pendiente CON IVA")
+        
+        _logger.info(f"Total pendiente por facturar CON IVA para {analytic_account.name}: ${total_po_amount:,.2f}")
         
         return total_po_amount
 
     def _get_pending_purchase_orders_detail(self, analytic_account, date_from, date_to):
-        """Obtener detalle de órdenes de compra (incluyendo por aprobar)"""
+        """Obtener detalle de órdenes de compra con montos PENDIENTES por facturar (CON IVA)"""
         PurchaseOrder = self.env['purchase.order']
         
+        # Buscar Órdenes de Compra NO COMPLETAMENTE facturadas
         domain = [
-            ('state', 'in', ['draft', 'sent', 'to approve', 'purchase']),  # Incluir todos los estados pendientes
+            ('state', 'in', ['draft', 'sent', 'to approve', 'purchase', 'done']),
+            ('invoice_status', 'in', ['no', 'to invoice']),
             ('date_order', '>=', date_from),
             ('date_order', '<=', date_to),
         ]
@@ -232,6 +249,9 @@ class PurchaseBudgetWizard(models.TransientModel):
         
         for po in pos:
             po_amount = 0
+            total_invoiced = 0
+            has_analytic = False
+            
             for line in po.order_line:
                 if line.analytic_distribution:
                     analytic_dist = line.analytic_distribution
@@ -244,28 +264,63 @@ class PurchaseBudgetWizard(models.TransientModel):
                     
                     if str(analytic_account.id) in analytic_dist:
                         percentage = float(analytic_dist[str(analytic_account.id)]) / 100.0
-                        po_amount += abs(line.price_total) * percentage
+                        
+                        # Calcular monto pendiente por facturar CON IVA
+                        if line.qty_invoiced < line.product_qty:
+                            # Precio unitario CON IVA
+                            unit_price_with_tax = line.price_total / line.product_qty if line.product_qty > 0 else 0
+                            pending_qty = line.product_qty - line.qty_invoiced
+                            pending_amount = unit_price_with_tax * pending_qty * percentage
+                            line_pending = abs(pending_amount)
+                            po_amount += line_pending
+                            has_analytic = True
+                        
+                        # Calcular monto ya facturado CON IVA (para información)
+                        if line.qty_invoiced > 0:
+                            unit_price_with_tax = line.price_total / line.product_qty if line.product_qty > 0 else 0
+                            invoiced_amount = unit_price_with_tax * line.qty_invoiced * percentage
+                            total_invoiced += abs(invoiced_amount)
             
-            if po_amount > 0:
-                # Determinar el concepto según el estado
-                if po.state == 'draft':
-                    concept = 'Solicitud de Cotización (Borrador)'
-                elif po.state == 'sent':
-                    concept = 'Solicitud de Cotización (Enviada)'
-                elif po.state == 'to approve':
-                    concept = 'Pendiente por Aprobar'
-                elif po.state == 'purchase':
-                    concept = 'Confirmada - Pendiente por Facturar'
+            if has_analytic and po_amount > 0:
+                # Determinar el concepto según el estado y nivel de facturación
+                if po.invoice_status == 'no':
+                    facturacion_concept = 'Sin facturar'
+                elif po.invoice_status == 'to invoice':
+                    if total_invoiced > 0:
+                        facturacion_concept = f'Parcialmente facturada (${total_invoiced:,.2f})'
+                    else:
+                        facturacion_concept = 'Pendiente por facturar'
                 else:
-                    concept = 'Previo Presupuestado'
+                    facturacion_concept = f'Estado facturación: {po.invoice_status}'
+                
+                # Conceptos mejorados - "Pendiente" para estado done no facturado completamente
+                if po.state == 'draft':
+                    concept = f'Borrador - {facturacion_concept}'
+                elif po.state == 'sent':
+                    concept = f'Cotización Enviada - {facturacion_concept}'
+                elif po.state == 'to approve':
+                    concept = f'Por Aprobar - {facturacion_concept}'
+                elif po.state == 'purchase':
+                    concept = f'Aprobada - {facturacion_concept}'
+                elif po.state == 'done':
+                    concept = f'Pendiente - {facturacion_concept}'  # CAMBIADO: "Pendiente" en lugar de "Cerrada"
+                else:
+                    concept = f'Estado: {po.state} - {facturacion_concept}'
                 
                 pending_orders.append({
                     'name': po.name,
                     'partner': po.partner_id.name,
                     'amount': po_amount,
                     'state': po.state,
+                    'invoice_status': po.invoice_status,
+                    'amount_invoiced': total_invoiced,
                     'concept': concept
                 })
+        
+        # DEBUG: Mostrar órdenes encontradas
+        _logger.info(f"Órdenes con montos pendientes CON IVA: {len(pending_orders)}")
+        for order in pending_orders:
+            _logger.info(f"  - {order['name']}: ${order['amount']:,.2f} pendiente de ${order['amount_invoiced']:,.2f} facturado ({order['concept']})")
         
         return pending_orders
 
@@ -287,8 +342,8 @@ class PurchaseBudgetWizard(models.TransientModel):
                 <div><strong>Presupuesto Total:</strong><br>${:,.2f}</div>
                 <div><strong>Facturado Total:</strong><br>${:,.2f}</div>
                 <div><strong>Órdenes Pendientes:</strong><br>${:,.2f}</div>
-                <div><strong>Comprometido Con Ordenes:</strong><br>${:,.2f}</div>
-                <div><strong>Disponible Total:</strong><br>${:,.2f}</div>
+                <div><strong>Total Comprometido:</strong><br>${:,.2f}</div>
+                <div><strong>Disponible:</strong><br>${:,.2f}</div>
                 <div><strong>% Utilizado:</strong><br>{:.1f}%</div>
             </div>
             """.format(
@@ -302,15 +357,15 @@ class PurchaseBudgetWizard(models.TransientModel):
             
             # Tabla de órdenes pendientes
             if item['pending_orders']:
-                html_parts.append("<h5 style='margin: 15px 0 8px 0; font-size: 14px;'>Órdenes de Compra Pendientes:</h5>")
+                html_parts.append("<h5 style='margin: 15px 0 8px 0; font-size: 14px;'>Detalle de Órdenes Pendientes por Facturar:</h5>")
                 html_parts.append("""
                 <div style='overflow-x: auto;'>
                 <table style='width: 100%; border-collapse: collapse; font-size: 16px; min-width: 600px;'>
                     <thead>
                         <tr style='background-color: #e9ecef;'>
-                            <th style='border: 1px solid #dee2e6; padding: 6px; text-align: left;'>Referencia De Orden</th>
+                            <th style='border: 1px solid #dee2e6; padding: 6px; text-align: left;'>Referencia</th>
                             <th style='border: 1px solid #dee2e6; padding: 6px; text-align: left;'>Proveedor</th>
-                            <th style='border: 1px solid #dee2e6; padding: 6px; text-align: right;'>Monto</th>
+                            <th style='border: 1px solid #dee2e6; padding: 6px; text-align: right;'>Monto Pendiente</th>
                             <th style='border: 1px solid #dee2e6; padding: 6px; text-align: left;'>Estado</th>
                         </tr>
                     </thead>
@@ -333,6 +388,8 @@ class PurchaseBudgetWizard(models.TransientModel):
                     ))
                 
                 html_parts.append("</tbody></table></div>")
+            else:
+                html_parts.append("<p style='color: #6c757d; font-style: italic;'>No hay órdenes de compra con montos pendientes por facturar.</p>")
             
             html_parts.append("</div>")
         

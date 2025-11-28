@@ -286,7 +286,7 @@ class PurchaseOrder(models.Model):
         if not totals:
             raise UserError(_("No se encontraron distribuciones analíticas válidas en las líneas del pedido."))
 
-        # 4) Validación contra presupuestos (con periodo por fecha de la PO y comprometido por facturas posteadas)
+        # 4) Validación contra presupuestos (con periodo por fecha de la PO)
         for acct, po_amt in totals.items():
             # Línea del presupuesto que cubre la fecha de esta PO
             bline = self._get_budget_line_for_date(acct, ref_date)
@@ -300,13 +300,16 @@ class PurchaseOrder(models.Model):
                 has_errors = True
                 continue
 
-            # Comprometido actual SOLO por facturas posteadas del periodo (trimestre presupuestal)
-            total_comprometido = self._get_committed_from_invoices_period(
-                analytic_account=acct,
-                date_from=bline.date_from,
-                date_to=bline.date_to,
-            )
-
+            # CALCULAR SEGÚN LA LÓGICA DEL WIZARD
+            # Monto ya facturado (usar valor absoluto)
+            total_invoiced = abs(bline.practical_amount or 0)
+            
+            # Total de Órdenes de Compra NO FACTURADAS (solo pendientes)
+            total_purchase_orders = self._get_total_purchase_orders_wizard_style(acct, bline.date_from, bline.date_to)
+            
+            # Total comprometido = facturado + órdenes de compra pendientes
+            total_committed = total_invoiced + total_purchase_orders
+            
             # Descuentos de ESTA ORDEN prorrateados a esta cuenta
             account_discount = 0.0
             for d_line in discount_lines:
@@ -324,21 +327,31 @@ class PurchaseOrder(models.Model):
             # Montos ajustados de ESTA ORDEN
             monto_bruto = abs(po_amt)
             monto_neto = max(0, monto_bruto - account_discount)
-            nuevo_compromiso = total_comprometido + monto_neto
+            
+            # Nuevo total comprometido incluyendo ESTA orden
+            nuevo_compromiso = total_committed + monto_neto
+            
+            # % Utilizado = Solo lo facturado actualmente / presupuesto (como en el wizard)
+            percentage_used = (total_invoiced / bline.planned_amount * 100) if bline.planned_amount > 0 else 0
+            
+            # Diferencia disponible
             diferencia = bline.planned_amount - nuevo_compromiso
 
-            # Render de resultados por cuenta
+            # Render de resultados por cuenta (CONCEPTOS ACTUALIZADOS)
             if nuevo_compromiso > bline.planned_amount:
                 exceso = nuevo_compromiso - bline.planned_amount
                 message_lines.append(f"""
                 <div style="margin-bottom: 15px; color: #f44336;">
                     <h3>❌ {acct.name}</h3>
                     <table style="width: 100%;">
-                        <tr><td style="width: 40%;">• Presupuesto total:</td><td style="font-weight: bold;">{format_amount(self.env, bline.planned_amount, self.currency_id)}</td></tr>
-                        <tr><td>• Total comprometido actual:</td><td style="font-weight: bold;">{format_amount(self.env, total_comprometido, self.currency_id)}</td></tr>
+                        <tr><td style="width: 40%;">• Presupuesto Total:</td><td style="font-weight: bold;">{format_amount(self.env, bline.planned_amount, self.currency_id)}</td></tr>
+                        <tr><td>• Total Facturado:</td><td style="font-weight: bold;">{format_amount(self.env, total_invoiced, self.currency_id)}</td></tr>
+                        <tr><td>• Órdenes Pendientes:</td><td style="font-weight: bold;">{format_amount(self.env, total_purchase_orders, self.currency_id)}</td></tr>
+                        <tr><td>• Total Comprometido:</td><td style="font-weight: bold;">{format_amount(self.env, total_committed, self.currency_id)}</td></tr>
                         <tr><td>• Este pedido compromete:</td><td style="font-weight: bold;">{format_amount(self.env, monto_neto, self.currency_id)}</td></tr>
                         <tr><td>• Descuento aplicado:</td><td style="font-weight: bold; color: #4CAF50;">-{format_amount(self.env, account_discount, self.currency_id)}</td></tr>
-                        <tr><td>• Nuevo total comprometido:</td><td style="font-weight: bold;">{format_amount(self.env, nuevo_compromiso, self.currency_id)}</td></tr>
+                        <tr><td>• Nuevo Total Comprometido:</td><td style="font-weight: bold;">{format_amount(self.env, nuevo_compromiso, self.currency_id)}</td></tr>
+                        <tr><td>• % Utilizado:</td><td style="font-weight: bold;">{percentage_used:.1f}%</td></tr>
                         <tr><td>• Exceso:</td><td style="font-weight: bold;">{format_amount(self.env, exceso, self.currency_id)}</td></tr>
                     </table>
                 </div>
@@ -349,12 +362,15 @@ class PurchaseOrder(models.Model):
                 <div style="margin-bottom: 15px;">
                     <h3 style="color: #4CAF50;">✓ {acct.name}</h3>
                     <table style="width: 100%;">
-                        <tr><td style="width: 40%;">• Presupuesto total:</td><td style="font-weight: bold;">{format_amount(self.env, bline.planned_amount, self.currency_id)}</td></tr>
-                        <tr><td>• Total comprometido actual:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, total_comprometido, self.currency_id)}</td></tr>
+                        <tr><td style="width: 40%;">• Presupuesto Total:</td><td style="font-weight: bold;">{format_amount(self.env, bline.planned_amount, self.currency_id)}</td></tr>
+                        <tr><td>• Total Facturado:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, total_invoiced, self.currency_id)}</td></tr>
+                        <tr><td>• Órdenes Pendientes:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, total_purchase_orders, self.currency_id)}</td></tr>
+                        <tr><td>• Total Comprometido:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, total_committed, self.currency_id)}</td></tr>
                         <tr><td>• Este pedido compromete:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, monto_neto, self.currency_id)}</td></tr>
                         <tr><td>• Descuento aplicado:</td><td style="font-weight: bold; color: #4CAF50;">-{format_amount(self.env, account_discount, self.currency_id)}</td></tr>
-                        <tr><td>• Nuevo total comprometido:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, nuevo_compromiso, self.currency_id)}</td></tr>
-                        <tr><td>• Diferencia disponible:</td><td style="font-weight: bold; color: {'#f44336' if diferencia < 0 else '#4CAF50'}">
+                        <tr><td>• Nuevo Total Comprometido:</td><td style="font-weight: bold; color: #f44336;">{format_amount(self.env, nuevo_compromiso, self.currency_id)}</td></tr>
+                        <tr><td>• % Utilizado:</td><td style="font-weight: bold; color: {'#f44336' if percentage_used > 80 else '#4CAF50'}">{percentage_used:.1f}%</td></tr>
+                        <tr><td>• Diferencia Disponible:</td><td style="font-weight: bold; color: {'#f44336' if diferencia < 0 else '#4CAF50'}">
                             {format_amount(self.env, diferencia, self.currency_id)}
                         </td></tr>
                     </table>
@@ -397,7 +413,6 @@ class PurchaseOrder(models.Model):
             'views': [(False, 'form')],
             'context': self.env.context,
         }
-
     # =========================
     #       CONFIRMACIÓN
     # =========================
@@ -541,17 +556,63 @@ class PurchaseOrder(models.Model):
             orders_con_analitica = self.search([
                 ('order_line.analytic_distribution', '!=', False)
             ])
-            
+
             # Procesar órdenes
             actualizadas = 0
             for order in orders_con_analitica:
                 depto_anterior = order.department_id
                 order._compute_department_from_budget()
-                
+
                 if order.department_id != depto_anterior:
                     actualizadas += 1
-            
+
             _logger.info(f"Cron departamentos: {actualizadas} órdenes actualizadas")
-            
+
         except Exception as e:
             _logger.error(f"Error en cron de departamentos: {e}")
+
+    # =========================
+    #   MÉTODO AUXILIAR PARA CÁLCULO ESTILO WIZARD
+    # =========================
+    def _get_total_purchase_orders_wizard_style(self, analytic_account, date_from, date_to):
+        """Obtener total de Órdenes de Compra NO FACTURADAS (solo pendientes) - Estilo Wizard"""
+        PurchaseOrder = self.env['purchase.order']
+
+        # Buscar Órdenes de Compra NO FACTURADAS - INCLUIR estado 'done' también
+        domain = [
+            ('state', 'in', ['draft', 'sent', 'to approve', 'purchase', 'done']),
+            ('invoice_status', 'in', ['no', 'to invoice']),  # No facturadas o parcialmente facturadas
+            ('date_order', '>=', date_from),
+            ('date_order', '<=', date_to),
+            ('id', '!=', self.id),  # Excluir la orden actual
+        ]
+
+        pos = PurchaseOrder.search(domain)
+        total_po_amount = 0
+
+        for po in pos:
+            po_amount = 0
+            for line in po.order_line:
+                if line.analytic_distribution:
+                    analytic_dist = line.analytic_distribution
+                    if isinstance(analytic_dist, str):
+                        import json
+                        try:
+                            analytic_dist = json.loads(analytic_dist)
+                        except json.JSONDecodeError:
+                            continue
+
+                    if str(analytic_account.id) in analytic_dist:
+                        percentage = float(analytic_dist[str(analytic_account.id)]) / 100.0
+
+                        # Si la línea NO está completamente facturada, incluirla CON IVA
+                        if line.qty_invoiced < line.product_qty:
+                            # Precio unitario CON IVA
+                            unit_price_with_tax = line.price_total / line.product_qty if line.product_qty > 0 else 0
+                            pending_qty = line.product_qty - line.qty_invoiced
+                            pending_amount = unit_price_with_tax * pending_qty * percentage
+                            po_amount += abs(pending_amount)
+
+            total_po_amount += po_amount
+
+        return total_po_amount
