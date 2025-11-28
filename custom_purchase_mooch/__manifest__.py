@@ -9,6 +9,7 @@
     'depends': ['purchase','account_budget','analytic','hr','product','product_mooch',],
     'data': [
         'security/ir.model.access.csv',
+        'data/cron_data.xml',
         'views/purchase_views.xml',
         'views/product_selector_views.xml',
         'views/account_budget_views.xml',
@@ -16,6 +17,8 @@
         'views/product_template_views.xml',
         'views/budget_validation_views.xml',
         'views/discount_wizard_views.xml',
+        'views/purchase_budget_wizard_views.xml',
+        'views/hr_department_views.xml',
     ],
     'assets': {
     },
