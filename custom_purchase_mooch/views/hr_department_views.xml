@@ -8,7 +8,7 @@
       <field name="groups_id" eval="[(4, ref('base.group_system'))]"/>  <!-- Solo para administradores -->
       <field name="arch" type="xml">
         <field name="name" position="after">
-          <field name="budget_password" password="True"/>
+          <field name="budget_password" password="True" groups="base.group_system"/>
         </field>
       </field>
     </record>
