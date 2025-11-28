@@ -9,15 +9,14 @@ class PurchaseBudgetWizard(models.TransientModel):
     _description = 'Wizard de Presupuesto para Órdenes de Compra'
 
     department_id = fields.Many2one(
-        'hr.department', 
-        string='Departamento', 
+        'hr.department',
+        string='Departamento',
         required=True
     )
     password = fields.Char(
-        string='Contraseña', 
+        string='Contraseña',
         required=True,
-        help='Contraseña para acceder al presupuesto del departamento',
-        groups='base.group_system'
+        help='Contraseña para acceder al presupuesto del departamento'
     )
     quarter = fields.Selection([
         ('Q1', 'Primer Trimestre (Ene-Mar)'),
