@@ -7,7 +7,7 @@
       <field name="inherit_id" ref="hr.view_department_form"/>
       <field name="arch" type="xml">
         <field name="name" position="after">
-          <field name="budget_password" password="True" groups="base.group_system"/>
+          <field name="budget_password" password="True"/>
         </field>
       </field>
     </record>
