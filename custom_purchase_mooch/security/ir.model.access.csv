@@ -8,3 +8,7 @@ access_product_product_selector,access_product_product_selector,model_product_pr
 access_budget_validation_wizard,budget.validation.wizard,model_budget_validation_wizard,base.group_user,1,1,1,1
 access_purchase_discount_wizard,purchase.discount.wizard.access,model_purchase_discount_wizard,base.group_user,1,1,1,1
 access_purchase_budget_wizard_user,purchase.budget.wizard.user,model_purchase_budget_wizard,base.group_user,1,1,1,1
+access_account_budget_post_user,account.budget.post.user,account_budget.model_account_budget_post,base.group_user,1,0,0,0
+access_crossovered_budget_lines_user,crossovered.budget.lines.user,account_budget.model_crossovered_budget_lines,base.group_user,1,0,0,0
+access_account_analytic_account_user,account.analytic.account.user,account.model_account_analytic_account,base.group_user,1,0,0,0
+access_hr_department_user,hr.department.user,hr.model_hr_department,base.group_user,1,0,0,0
