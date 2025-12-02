@@ -4,13 +4,16 @@
         <div class="maskedpopup">
             <h3><t t-esc="title" /></h3>
             <p><t t-esc="'Ingresa el numero de ticket'" /></p>
+
             <input
+                t-ref="myInput"
                 t-model="state.value"
                 t-on-input="formatInput"
                 t-on-keydown="trackKey"
                 placeholder="S0001-001-0001"
                 maxlength="17"
             />
+
             <div class="buttons">
                 <button t-on-click="confirm">Buscar</button>
                 <button t-on-click="cancel">Cancelar</button>

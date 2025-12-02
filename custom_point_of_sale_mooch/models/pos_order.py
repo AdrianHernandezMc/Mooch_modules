@@ -29,6 +29,9 @@ class PosOrder(models.Model):
 #####################Campos nuevos para valdiacion rembolso#############
     refund_order_id = fields.Many2one('pos.order', string='Orden de Reembolso', readonly=True)
     is_return = fields.Boolean(string='Es Reembolso', default=False)
+    changes_codes = fields.Char(string='Códigos de Cambios', help='Códigos que identifican los productos cambiados en la orden')
+    product_changes_id = fields.Many2one('product.product', string='Producto para Cambios',help='Producto especial para registrar cambios en el POS')
+    refund_cancel_reason = fields.Text(string='Motivo de Devolución/Cancelación', help='Explicación del motivo por el cual se realiza la devolución o cancelación')
 #####################Fin de campos######################################
 #####################CAMPOS NUEVOS PARA EL APARTADO DE INVENTARIO#######
         # Campo para mostrar picking relacionado
