@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component } from "@odoo/owl";
+import { Component, onMounted, useRef } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
 
@@ -11,17 +11,33 @@ export class MaskedInputPopup extends Component {
         this.title = "Reembolso por Ticket";
         this.lastKey = null;
 
+        // 2. Referencia al input
+        this.inputRef = useRef("myInput");
+
+        // 3. Poner foco al montar el componente
+        onMounted(() => {
+            // Usamos un pequeño retraso para asegurar que el popup terminó de renderizarse
+            setTimeout(() => {
+                if (this.inputRef.el) {
+                    this.inputRef.el.focus();
+                }
+            }, 100);
+        });
     }
-    
+
     trackKey(ev) {
         this.lastKey = ev.key;
+
+        // Opcional: Permitir confirmar con Enter
+        if (ev.key === "Enter") {
+            this.confirm();
+        }
     }
 
     formatInput(ev) {
         let raw = ev.target.value.replace(/[^0-9]/g, "").slice(0, 12);
-        //let raw = ev.target.value.replace("s","").slice(0, 12);
         console.log("raw",raw)
-        let formatted = "" 
+        let formatted = ""
         if (raw.length > 0) formatted += raw.slice(0, 5);
         if (raw.length >= 6 && this.lastKey !== "Backspace") {
             formatted += "-" + raw.slice(5, 8);
@@ -34,16 +50,21 @@ export class MaskedInputPopup extends Component {
             formatted += raw.slice(8, 12);
         }
         this.state.value = formatted;
-        ev.target.value = formatted; // ← fuerza el valor en el input
+        ev.target.value = formatted;
     }
 
     async confirm() {
-        this.props.resolve({ confirmed: true, payload: this.state.value });
+        // Aseguramos que props.resolve exista antes de llamar
+        if (this.props.resolve) {
+            this.props.resolve({ confirmed: true, payload: this.state.value });
+        }
         this.props.close?.();
     }
 
     cancel() {
-        this.props.resolve({ confirmed: false });
+        if (this.props.resolve) {
+            this.props.resolve({ confirmed: false });
+        }
         this.props.close?.();
     }
 }
