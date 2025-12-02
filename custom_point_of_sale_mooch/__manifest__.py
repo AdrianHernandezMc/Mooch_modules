@@ -12,6 +12,9 @@
         'views/stock_picking_views.xml',
         'views/pos_order_views.xml',
         'views/product_views.xml',
+
+        # Documentos
+        'views/report_saledetails_inherit.xml'
     ],
     'assets': {
       'point_of_sale._assets_pos': [

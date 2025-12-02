@@ -12,6 +12,7 @@ import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_pop
 import { PasswordInputPopup } from "@custom_point_of_sale_mooch/app/popup/hide_passwordpopup";
 import { MaskedInputPopup } from "@custom_point_of_sale_mooch/app/popup/masked_input_popup"
 import { TicketScreen } from "@point_of_sale/app/screens/ticket_screen/ticket_screen";
+import { SelectionPopup } from "@point_of_sale/app/utils/input_popups/selection_popup";
 
 const _superSetNumpadMode = ProductScreen.prototype.onNumpadClick;
 const _super_getRefundableDetails = TicketScreen.prototype._getRefundableDetails;
@@ -119,6 +120,30 @@ patch(ProductScreen.prototype, {
         });
     },
 
+    async debugOrderSearch(orderNumber) {
+        console.log("🔍 DEBUG: Buscando orden:", orderNumber);
+        
+        // Probar diferentes métodos de búsqueda
+        const searchMethods = [
+            { name: "Por name exacto", domain: [["name", "=", orderNumber]] },
+            { name: "Por pos_reference exacto", domain: [["pos_reference", "=", `Orden ${orderNumber}`]] },
+            { name: "Por pos_reference con ilike", domain: [["pos_reference", "ilike", orderNumber]] },
+            { name: "Por ID", domain: [["id", "=", parseInt(orderNumber)]] }
+        ];
+        
+        for (const method of searchMethods) {
+            try {
+                const result = await this.orm.call("pos.order", "search_read", [
+                    method.domain,
+                    ["id", "name", "pos_reference", "state"]
+                ], { limit: 5 });
+                
+                console.log(`${method.name}:`, result);
+            } catch (error) {
+                console.error(`Error en ${method.name}:`, error);
+            }
+        }
+    },
 
     async _getProductByBarcode(code) {
         // Ejecutar la lógica original
@@ -511,7 +536,7 @@ patch(ProductScreen.prototype, {
      */
     getChangeLines(order, orderLines) {
         const changeLines = [];
-        
+
         // Método 1: Líneas que son el producto especial de cambios
         if (order.product_changes_id) {
             const productChangeLines = orderLines.filter(line => 
@@ -520,7 +545,7 @@ patch(ProductScreen.prototype, {
             changeLines.push(...productChangeLines);
             console.log(`🔧 ${productChangeLines.length} líneas con product_changes_id: ${order.product_changes_id}`);
         }
-        
+
         // Método 2: Líneas con changes > 0
         const linesWithChanges = orderLines.filter(line => line.changes > 0);
         linesWithChanges.forEach(line => {
@@ -529,11 +554,14 @@ patch(ProductScreen.prototype, {
             }
         });
         console.log(`🔧 ${linesWithChanges.length} líneas con changes > 0`);
-        
+
         // Método 3: Líneas que tienen changes_codes en su nombre
-        if (order.changes_codes && order.changes_codes.trim() !== "") {
-            const linesWithChangeCodes = orderLines.filter(line => 
-                line.full_product_name && line.full_product_name.includes(order.changes_codes)
+        const codes = order.changes_codes ? String(order.changes_codes) : "";
+
+        if (codes.trim() !== "") {
+            const linesWithChangeCodes = orderLines.filter(line =>
+                // Usamos la variable segura 'codes' en lugar de order.changes_codes
+                line.full_product_name && line.full_product_name.includes(codes)
             );
             linesWithChangeCodes.forEach(line => {
                 if (!changeLines.includes(line)) {
@@ -542,11 +570,10 @@ patch(ProductScreen.prototype, {
             });
             console.log(`🔧 ${linesWithChangeCodes.length} líneas con changes_codes`);
         }
-        
+
         console.log(`🔧 Total de líneas de cambios identificadas: ${changeLines.length}`);
         return changeLines;
     },
-
     /**
      * Fuerza actualización de la UI
      */
@@ -572,251 +599,327 @@ patch(ProductScreen.prototype, {
         }
     },
 
-    async clickReembolso(){
-
+async clickReembolso(){
         const { confirmed, payload } = await this.popup.add(MaskedInputPopup,{
+            title: "Devoluciones y Cancelaciones",
+            body: "Ingresa el número de orden:",
+            placeholder: "Ej: 00001",
             resolve: (result) => {
                 console.log("Popup cerrado:", result);
             }
         });
+
         if (!confirmed || !payload) return;
 
-        // Buscar la orden original
-        const orderNumber = "Orden " + payload;
-        const orders = await this.orm.call("pos.order", "search_read", [
-            [["pos_reference", "=", orderNumber]],
-            ["id", "pos_reference", "partner_id", "fiscal_position_id", "name", "changes_codes"]
-        ], { limit: 1 });
-
-        if (!orders || orders.length === 0) {
-            this.popup.add(ErrorPopup, {
-            title: "Orden no encontrada",
-            body: `No se encontró la orden ${orderNumber}`,
-            });
-            return;
-        }
-
-        const order = orders[0];
-
-        /******************* 🚫 VERIFICAR SI LA ORDEN YA TIENE CAMBIOS 🚫 *******************/
-        const hasExistingChanges = order.changes_codes && 
-                                order.changes_codes.trim() !== "" && 
-                                order.changes_codes !== " ";
-        
-        if (hasExistingChanges) {
-            await this.popup.add(ErrorPopup, {
-                title: "Cambios no permitidos",
-                body: "Esta orden ya tiene cambios realizados. No se pueden realizar reembolsos sobre órdenes con cambios previos.",
-            });
-            return;
-        }
-
-        // ✅ VERIFICACIÓN 1: Evitar reembolsos de reembolsos
-        const orderName = order.name || "";
-        const posReference = order.pos_reference || "";
-
-        console.log("order.name",order.name)
-        console.log("order",order)
-        // Si la orden original YA ES un reembolso, bloquear
-        if (orderName.includes("REEMBOLSO") || 
-            orderName.includes("DEVOLUCIÓN") || 
-            orderName.includes("REFUND") ||
-            posReference.includes("REEMBOLSO") ||
-            posReference.includes("DEV") ||
-            posReference.includes("REFUND")) {
-
-            await this.popup.add(ErrorPopup, {
-                title: "No se puede reembolsar un reembolso",
-                body: "Esta orden ya es un reembolso. No se puede reembolsar un reembolso existente.",
-            });
-            return;
-        }
-
-        // ✅ VERIFICACIÓN 2: Evitar múltiples reembolsos de la misma orden
-        const refundKey = `refund_${orderNumber}`;
-
-        const existingRefund = localStorage.getItem(refundKey);
-
-        if (existingRefund) {
-            const refundDate = new Date(parseInt(existingRefund));
-            alert("Existe orden")
-            await this.popup.add(ErrorPopup, {
-                title: "Reembolso ya realizado",
-                body: `Esta orden ya fue reembolsada el ${refundDate.toLocaleString()}. No se puede reembolsar nuevamente.`,
-            });
-            return;
-        }
-
-        // ✅ VERIFICACIÓN 3: Buscar en base de datos si ya hay reembolsos
         try {
-            // Buscar órdenes que referencien esta orden original
-            const existingRefunds = await this.orm.call("pos.order", "search_read", [
-                [
-                    ["name", "ilike", order.pos_reference],
-                    "|",
-                    ["name", "ilike", "REEMBOLSO"],
-                    ["name", "ilike", "DEVOLUCIÓN"],
-                    ["state", "in", ["paid", "done", "invoiced"]]
-                ],
-                ["id", "name", "pos_reference", "date_order"]
-            ]);
+            // Limpiar y formatear el número de orden
+            const orderNumber = String(payload).trim();
+            console.log("🔍 Buscando orden:", orderNumber);
 
-            console.log("Reembolsos existentes en BD:", existingRefunds);
+            // ✅ PASO 1: Pedir el motivo ANTES de buscar la orden
+            console.log("📝 Solicitando motivo de la operación...");
+            const refundReason = await this.getRefundReason();
 
-            if (existingRefunds && existingRefunds.length > 0) {
+            if (!refundReason || refundReason.trim() === '') {
+                await this.popup.add(ErrorPopup, {
+                    title: "Motivo requerido",
+                    body: "Debes especificar el motivo para continuar con la operación.",
+                });
+                return;
+            }
+
+            console.log("✅ Motivo capturado:", refundReason);
+            // Guardar el motivo temporalmente
+            this.pos.currentRefundReason = refundReason;
+
+            // Buscar la orden ORIGINAL usando varios métodos
+            let originalOrder = null;
+
+            // Método 1: Buscar por nombre exacto
+            const ordersByName = await this.orm.call("pos.order", "search_read", [
+                [["name", "=", orderNumber]],
+                ["id", "pos_reference", "partner_id", "fiscal_position_id", "name", "changes_codes", "state", "amount_total"]
+            ], { limit: 1 });
+
+            if (ordersByName && ordersByName.length > 0) {
+                originalOrder = ordersByName[0];
+            } else {
+                // Método 2: Buscar por pos_reference
+                const ordersByRef = await this.orm.call("pos.order", "search_read", [
+                    [["pos_reference", "ilike", orderNumber]],
+                    ["id", "pos_reference", "partner_id", "fiscal_position_id", "name", "changes_codes", "state", "amount_total"]
+                ], { limit: 1 });
+
+                if (ordersByRef && ordersByRef.length > 0) {
+                    originalOrder = ordersByRef[0];
+                } else {
+                    // Método 3: Buscar por ID numérico
+                    const orderId = parseInt(orderNumber);
+                    if (!isNaN(orderId)) {
+                        const ordersById = await this.orm.call("pos.order", "search_read", [
+                            [["id", "=", orderId]],
+                            ["id", "pos_reference", "partner_id", "fiscal_position_id", "name", "changes_codes", "state", "amount_total"]
+                        ], { limit: 1 });
+
+                        if (ordersById && ordersById.length > 0) {
+                            originalOrder = ordersById[0];
+                        }
+                    }
+                }
+            }
+
+            if (!originalOrder) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Orden no encontrada",
+                    body: `No se encontró la orden "${orderNumber}". Verifica el número e intenta nuevamente.`,
+                });
+                delete this.pos.currentRefundReason;
+                return;
+            }
+
+            // Verificar estado válido
+            const validStates = ["paid", "done", "invoiced"];
+            if (!validStates.includes(originalOrder.state)) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Orden no válida",
+                    body: `La orden ${originalOrder.name} está en estado "${originalOrder.state}". Solo se pueden reembolsar órdenes pagadas.`,
+                });
+                delete this.pos.currentRefundReason;
+                return;
+            }
+
+            // Validar cambios existentes
+            const hasExistingChanges = originalOrder.changes_codes &&
+                                    originalOrder.changes_codes.trim() !== "" &&
+                                    originalOrder.changes_codes !== " ";
+
+            if (hasExistingChanges) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Cambios no permitidos",
+                    body: "Esta orden ya tiene cambios realizados. No se pueden realizar reembolsos sobre órdenes con cambios previos.",
+                });
+                delete this.pos.currentRefundReason;
+                return;
+            }
+
+            // Validar si es un reembolso
+            const orderName = originalOrder.name || "";
+            const posReference = originalOrder.pos_reference || "";
+
+            if (orderName.includes("REEMBOLSO") ||
+                orderName.includes("DEVOLUCIÓN") ||
+                orderName.includes("REFUND") ||
+                posReference.includes("REEMBOLSO") ||
+                posReference.includes("DEV") ||
+                posReference.includes("REFUND")) {
+
+                await this.popup.add(ErrorPopup, {
+                    title: "Operación no válida",
+                    body: "No se puede reembolsar una orden que ya es un reembolso.",
+                });
+                delete this.pos.currentRefundReason;
+                return;
+            }
+
+            // Validar caché local
+            const refundKey = `refund_${originalOrder.id}`;
+            const existingRefund = localStorage.getItem(refundKey);
+
+            if (existingRefund) {
+                const refundDate = new Date(parseInt(existingRefund));
                 await this.popup.add(ErrorPopup, {
                     title: "Reembolso ya realizado",
-                    body: `Esta orden ya tiene ${existingRefunds.length} reembolso(s) en el sistema.`,
+                    body: `Esta orden ya fue reembolsada localmente el ${refundDate.toLocaleString()}.`,
                 });
+                delete this.pos.currentRefundReason;
                 return;
             }
-        } catch (error) {
-            console.log("Error verificando reembolsos en BD:", error);
-        }
 
-        // ✅ MARCAR INMEDIATAMENTE para prevenir doble reembolso
-        localStorage.setItem(refundKey, Date.now().toString());
-        localStorage.removeItem(refundKey);
-        // Buscar líneas de la orden
-        const orderLines = await this.orm.call("pos.order.line", "search_read", [
-            [["order_id", "=", order.id]],
-            [
-            "id", "product_id", "qty", "price_unit", "discount",
-            "tax_ids", "combo_parent_id", "combo_line_ids"
-            ]
-        ]);
+            // ✅ AQUÍ ESTÁ EL CAMBIO CLAVE: ConfirmPopup SIN HTML ✅
+            // Usamos template literals (``) y \n para los saltos de línea.
+            const { confirmed: finalConfirm } = await this.popup.add(ConfirmPopup, {
+                title: _t("Confirmar Devolución"),
+                body: `Orden: ${originalOrder.name}
+                Total: $${Math.abs(originalOrder.amount_total).toFixed(2)}
 
-        // Valida que la venta no sea un cambio.
-        console.log("order.product_changes_id",order.product_changes_id)
-        const id = order.product_changes_id;
-        const productos_with_changes = orderLines.filter(l => l.product.id === id);
+                Motivo: ${refundReason}
 
-        console.log("productos_with_changes",productos_with_changes)
-        if (productos_with_changes){
-            await this.popup.add(ErrorPopup, {
-                    title: "Reembolso con cambios",
-                    body: `No se pueden reembolsar cambios`,
-                });
+                ¿Estás seguro de continuar con la devolución?`,
+                confirmText: _t("Sí, devolver"),
+                cancelText: _t("Cancelar")
+            });
+
+            if (!finalConfirm) {
+                delete this.pos.currentRefundReason;
                 return;
-        }
+            }
 
+            // Buscar líneas de la orden
+            console.log("🔍 Buscando líneas de la orden ID:", originalOrder.id);
+            const orderLines = await this.orm.call("pos.order.line", "search_read", [
+                [["order_id", "=", originalOrder.id]],
+                [
+                    "id", "product_id", "qty", "price_unit", "discount", "price_subtotal",
+                    "tax_ids", "combo_parent_id", "combo_line_ids", "full_product_name"
+                ]
+            ]);
 
-        if (!orderLines.length) {
-            this.popup.add(ErrorPopup, {
-            title: "Sin líneas para reembolsar",
-            body: "La orden no tiene líneas disponibles para reembolso.",
-            });
-            // Limpiar la marca si no hay líneas
-            localStorage.removeItem(refundKey);
-            return;
-        }
+            console.log("Líneas encontradas:", orderLines);
 
-        // Cargar líneas en toRefundLines
-        this.pos.toRefundLines = {};
-        for (const line of orderLines) {
-            this.pos.toRefundLines[line.id] = {
-            qty: line.qty,
-            orderline: line,
-            destinationOrderUid: null,
-            };
-        }
+            if (!orderLines || orderLines.length === 0) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Sin líneas para reembolsar",
+                    body: "La orden no tiene líneas disponibles para reembolso.",
+                });
+                localStorage.removeItem(refundKey);
+                delete this.pos.currentRefundReason;
+                return;
+            }
 
-        // Obtener partner
-        const partner = order.partner_id?.[0]
-            ? this.pos.db.get_partner_by_id(order.partner_id[0])
-            : null;
+            // MARCAR INMEDIATAMENTE para prevenir doble reembolso
+            localStorage.setItem(refundKey, Date.now().toString());
 
-        // Obtener detalles reembolsables usando la lógica original
-        const refundableDetails = _super_getRefundableDetails.call(this, partner); 
+            // Cargar líneas en toRefundLines
+            this.pos.toRefundLines = {};
+            for (const line of orderLines) {
+                this.pos.toRefundLines[line.id] = {
+                    qty: line.qty,
+                    orderline: line,
+                    destinationOrderUid: null,
+                };
+            }
 
-        if (!refundableDetails.length) {
-            this.popup.add(ErrorPopup, {
-            title: "Nada que reembolsar",
-            body: "No se encontraron líneas válidas para reembolso.",
-            });
-            // Limpiar la marca si no hay detalles reembolsables
-            localStorage.removeItem(refundKey);
-            return;
-        }
+            // Obtener partner
+            const partner = originalOrder.partner_id && originalOrder.partner_id[0]
+                ? this.pos.db.get_partner_by_id(originalOrder.partner_id[0])
+                : null;
 
-        // orden de destino
-        const refundOrder = this.pos.get_order()
-        refundOrder.is_return = true;
+            console.log("Partner para reembolso:", partner);
 
-        if (partner) refundOrder.set_partner(partner);
+            // Obtener detalles reembolsables usando la lógica original
+            const refundableDetails = _super_getRefundableDetails.call(this, partner); 
 
-        const originalToRefundLineMap = new Map();
+            if (!refundableDetails || refundableDetails.length === 0) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Nada que reembolsar",
+                    body: "No se encontraron líneas válidas para reembolso.",
+                });
+                localStorage.removeItem(refundKey);
+                delete this.pos.currentRefundReason;
+                return;
+            }
 
-        // ✅ SOLUCIÓN para pack_lot_lines
-        for (const detail of refundableDetails) {
-            try {
-                const product = this.pos.db.get_product_by_id(detail.orderline.product_id[0]);
-                const options = _super_prepareRefundOrderlineOptions(detail);
+            console.log("Detalles reembolsables:", refundableDetails);
 
-                // ✅ FORZAR pack_lot_lines a array vacío SIEMPRE
-                if (options) {
-                    options.pack_lot_lines = [];
-                } else {
-                    options = { pack_lot_lines: [] };
+            // Crear orden de destino
+            const refundOrder = this.pos.get_order();
+            refundOrder.is_return = true;
+            
+            // ✅ GUARDAR EL MOTIVO EN LA NUEVA ORDEN
+            refundOrder.refund_cancel_reason = refundReason;
+
+            if (partner) {
+                refundOrder.set_partner(partner);
+            }
+
+            const originalToRefundLineMap = new Map();
+
+            // ✅ Agregar productos a la orden de reembolso
+            for (const detail of refundableDetails) {
+                try {
+                    const product = this.pos.db.get_product_by_id(detail.orderline.product_id[0]);
+                    const options = _super_prepareRefundOrderlineOptions(detail);
+
+                    // ✅ FORZAR pack_lot_lines a array vacío SIEMPRE
+                    if (options) {
+                        options.pack_lot_lines = [];
+                    } else {
+                        options = { pack_lot_lines: [] };
+                    }
+
+                    const refundLine = await refundOrder.add_product(product, options);
+                    originalToRefundLineMap.set(detail.orderline.id, refundLine);
+                    detail.destinationOrderUid = refundOrder.uid;
+                    
+                    console.log("✅ Producto agregado a reembolso:", product.display_name);
+                } catch (error) {
+                    console.error("❌ Error agregando producto:", error, detail);
+                }
+            }
+
+            // Manejo de combos
+            for (const detail of refundableDetails) {
+                const originalLine = detail.orderline;
+                const refundLine = originalToRefundLineMap.get(originalLine.id);
+
+                if (originalLine.combo_parent_id && originalLine.combo_parent_id[0]) {
+                    const parentLine = originalToRefundLineMap.get(originalLine.combo_parent_id[0]);
+                    if (parentLine) refundLine.comboParent = parentLine;
                 }
 
-                const refundLine = await refundOrder.add_product(product, options);
-                originalToRefundLineMap.set(detail.orderline.id, refundLine);
-                detail.destinationOrderUid = refundOrder.uid;
+                if (originalLine.combo_line_ids?.length) {
+                    refundLine.comboLines = originalLine.combo_line_ids
+                        .map(id => originalToRefundLineMap.get(id))
+                        .filter(Boolean);
+                }
+            }
+
+            // Buscar pagos de la orden original
+            const payments = await this.orm.call("pos.payment", "search_read", [
+                [["pos_order_id", "=", originalOrder.id]],
+                ["amount", "payment_method_id", "payment_date"]
+            ]);
+
+            console.log("Pagos encontrados:", payments);
+
+            // Agregar pagos negativos a la orden de reembolso
+            for (const payment of payments) {
+                const method = this.pos.payment_methods.find(pm => pm.id === payment.payment_method_id[0]);
+                if (method) {
+                    const paymentLine = refundOrder.add_paymentline(method);
+                    paymentLine.set_amount(payment.amount * -1); // Negativo para reembolso
+                    console.log("✅ Pago agregado:", payment.amount * -1, method.name);
+                }
+            }
+
+            // ✅ MARCAR LA ORDEN ORIGINAL COMO REEMBOLSADA EN EL SISTEMA CON EL MOTIVO
+            try {
+                await this.orm.call("pos.order", "write", [[originalOrder.id], {
+                    refund_cancel_reason: refundReason,  // ✅ Guardar el motivo
+                    note: `REEMBOLSADO - ${new Date().toLocaleString()} - Motivo: ${refundReason}`
+                }]);
+                console.log("✅ Orden original marcada como reembolsada con motivo:", refundReason);
             } catch (error) {
-                console.error("Error agregando producto:", error);
-            }
-        }
-
-        // Manejo de combos
-        for (const detail of refundableDetails) {
-            const originalLine = detail.orderline;
-            const refundLine = originalToRefundLineMap.get(originalLine.id);
-
-            if (originalLine.combo_parent_id) {
-            const parentLine = originalToRefundLineMap.get(originalLine.combo_parent_id[0]);
-            if (parentLine) refundLine.comboParent = parentLine;
+                console.log("⚠️ No se pudo marcar la orden en BD:", error);
             }
 
-            if (originalLine.combo_line_ids?.length) {
-            refundLine.comboLines = originalLine.combo_line_ids.map(id => originalToRefundLineMap.get(id)).filter(Boolean);
-            }
-        }
+            // Redirigir a pantalla de pago
+            this.pos.Sale_type = "Reembolso";
+            this.pos.set_order(refundOrder);
+            this.pos.Reembolso = true;
+            
+            console.log("✅ Reembolso creado, redirigiendo a pantalla de pago...");
+            this.pos.showScreen("PaymentScreen");
 
-        // Buscar pagos de la orden
-        const payments = await this.orm.call("pos.payment", "search_read", [
-            [["pos_order_id", "=", order.id]],
-            ["amount", "payment_method_id"]
-        ]);
+            // ✅ Limpiar variables temporales
+            delete this.pos.currentRefundReason;
+            
+            // ✅ Limpiar el localStorage después de 2 horas
+            setTimeout(() => {
+                localStorage.removeItem(refundKey);
+                console.log("🗑️ Limpiada marca temporal de reembolso");
+            }, 2 * 60 * 60 * 1000);
 
-        // Agregar pagos
-        for (const payment of payments) {
-            const method = this.pos.payment_methods.find(pm => pm.id === payment.payment_method_id[0]);
-            if (method) {
-                const paymentLine = refundOrder.add_paymentline(method);
-                paymentLine.set_amount(payment.amount*-1);
-            }
-        }
-
-        // ✅ MARCAR LA ORDEN ORIGINAL COMO REEMBOLSADA EN EL SISTEMA
-        try {
-            await this.orm.call("pos.order", "write", [[order.id], {
-                note: `REEMBOLSADO - ${new Date().toLocaleString()}`
-            }]);
         } catch (error) {
-            console.log("No se pudo marcar la orden en BD:", error);
+            console.error("❌ ERROR CRÍTICO en clickReembolso:", error);
+            // Limpiar variables temporales en caso de error
+            delete this.pos.currentRefundReason;
+            
+            await this.popup.add(ErrorPopup, {
+                title: "Error en reembolso",
+                body: `Ocurrió un error inesperado: ${error.message || error}`,
+            });
         }
-return
-        // Redirigir a pantalla de recibo
-        this.pos.Sale_type = "Reembolso";
-        this.pos.set_order(refundOrder);
-        this.pos.Reembolso = true;
-        this.pos.showScreen("PaymentScreen");
-
-        // ✅ Limpiar el localStorage después de 2 horas (suficiente tiempo para completar el proceso)
-        setTimeout(() => {
-            localStorage.removeItem(refundKey);
-        }, 2 * 60 * 60 * 1000);
     },
 
     async clear_pay_method(){
@@ -1265,5 +1368,58 @@ return
             console.error("🔴 ERROR en openCashDrawer:", error);
             // Solo log en consola, sin mostrar popup de error al usuario
         }
-    }
+    },
+
+    async getRefundReason() {
+        try {
+            // 1. Definir las opciones para el SelectionPopup
+            // 'label' es lo que ve el usuario, 'item' es el valor que recibimos al seleccionar
+            const selectionList = [
+                { id: 1, label: _t("Producto defectuoso"), item: "Producto defectuoso" },
+                { id: 2, label: _t("Cliente arrepentido"), item: "Cliente arrepentido" },
+                { id: 3, label: _t("Error en el pedido"), item: "Error en el pedido" },
+                { id: 4, label: _t("Producto incorrecto"), item: "Producto incorrecto" },
+                { id: 5, label: _t("Cambio de talla/color"), item: "Cambio de talla/color" },
+                { id: 6, label: _t("Problemas de entrega"), item: "Problemas de entrega" },
+                { id: 7, label: _t("Cancelación por cliente"), item: "Cancelación por cliente" },
+                { id: 8, label: _t("Error en precio"), item: "Error en precio" },
+                { id: 9, label: _t("Producto agotado"), item: "Producto agotado" },
+                { id: 10, label: _t("Otro motivo / Personalizado"), item: "custom_reason_flag" } // Usamos una bandera especial
+            ];
+
+            // 2. Mostrar el popup de selección (Clicable)
+            const { confirmed, payload: selectedItem } = await this.popup.add(SelectionPopup, {
+                title: _t("Seleccionar Motivo de Devolución"),
+                list: selectionList,
+            });
+
+            if (!confirmed) return null;
+
+            // 3. Procesar la selección
+            
+            // Si eligió la opción personalizada ("custom_reason_flag")
+            if (selectedItem === "custom_reason_flag") {
+                const { confirmed: inputConfirmed, payload: customReason } = await this.popup.add(TextInputPopup, {
+                    title: _t("Motivo Personalizado"),
+                    body: _t("Por favor, describe el motivo de la devolución:"),
+                    placeholder: _t("Ej: El cliente cambió de opinión..."),
+                    inputProps: {
+                        multiline: true, // Esto no siempre funciona en POS nativo, pero es intentable
+                    },
+                    confirmText: _t("Guardar"),
+                    cancelText: _t("Cancelar")
+                });
+
+                if (!inputConfirmed || !customReason.trim()) return null;
+                return customReason.trim();
+            }
+
+            // Si eligió una opción de la lista estándar, devolvemos el texto directamente
+            return selectedItem;
+
+        } catch (error) {
+            console.error("Error en getRefundReason:", error);
+            return null;
+        }
+    },
 });

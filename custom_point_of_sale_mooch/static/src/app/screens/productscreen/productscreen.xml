@@ -19,7 +19,7 @@
          <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' control-buttons ')]" position="inside">
             <button class="control-button btn btn-light rounded-0 fw-bolder" t-on-click="clickReembolso">
                 <i class="fa fa-ticket me-1" role="img" aria-label="Reembolsox" title="Reembolsox"></i>
-                Devoluciones
+                Devoluciones y Cancelaciones
             </button>
         </xpath>
     </t>

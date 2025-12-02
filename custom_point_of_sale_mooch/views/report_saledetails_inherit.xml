@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="report_saledetails_inherit_otros_retiros" inherit_id="point_of_sale.report_saledetails">
+            
+            <xpath expr="//div[@id='discounts']" position="before">
+                
+                <!-- PROTECCIÓN CONTRA CORTE DE PÁGINA -->
+                <!-- Este div asegura que todo el bloque viaje junto y no se rompa ni repita headers -->
+                <div style="page-break-inside: avoid;">
+                
+                    <!-- ========================================== -->
+                    <!-- 1. LÓGICA DE TARJETAS                      -->
+                    <!-- ========================================== -->
+                    <t t-set="suma_tarjetas" t-value="0"/>
+                    
+                    <t t-if="payments">
+                        <t t-foreach="payments" t-as="p_calc">
+                            <t t-if="'Credito' in p_calc['name'] or 'Debito' in p_calc['name']">
+                                <t t-set="suma_tarjetas" t-value="suma_tarjetas + p_calc['total']"/>
+                            </t>
+                        </t>
+                    </t>
+
+                    <t t-if="suma_tarjetas != 0">
+                        <br/>
+                        <h3>Otros</h3>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th class="text-start">Conceptos Agrupados</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Total Tarjetas (Crédito + Débito)</strong></td>
+                                    <td class="text-end">
+                                        <span t-if="currency['position']">
+                                            <span t-out="suma_tarjetas" t-options="{'widget': 'float', 'precision': currency['precision']}">0.00</span>
+                                            <span t-out='currency["symbol"]'>$</span>
+                                        </span>
+                                        <span t-else="">
+                                            <span t-out='currency["symbol"]'>$</span>
+                                            <span t-out="suma_tarjetas" t-options="{'widget': 'float', 'precision': currency['precision']}">0.00</span>
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="oe_structure"></div>
+                    </t>
+
+                    <!-- ========================================== -->
+                    <!-- 2. LÓGICA DE RETIROS                       -->
+                    <!-- ========================================== -->
+                    <t t-set="total_retiros" t-value="0"/>
+                    <t t-set="has_retiros" t-value="False"/>
+
+                    <t t-if="payments">
+                        <t t-foreach="payments" t-as="p_check">
+                            <t t-if="p_check.get('cash_moves')">
+                                <t t-foreach="p_check['cash_moves']" t-as="m_check">
+                                    <t t-if="m_check['amount'] &lt; 0">
+                                        <t t-set="has_retiros" t-value="True"/>
+                                        <t t-set="total_retiros" t-value="total_retiros + m_check['amount']"/>
+                                    </t>
+                                </t>
+                            </t>
+                        </t>
+                    </t>
+
+                    <t t-if="has_retiros">
+                        <br/>
+                        <h3>Retiros de Efectivo</h3>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th class="text-start">Movimientos de los Retiros</th>
+                                    <th class="text-end">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="payments" t-as="p_print">
+                                    <t t-if="p_print.get('cash_moves')">
+                                        <t t-foreach="p_print['cash_moves']" t-as="move">
+                                            <t t-if="move['amount'] &lt; 0">
+                                                <tr>
+                                                    <td><span t-out="move['name']">Motivo</span></td>
+                                                    <td class="text-end">
+                                                        <span t-if="currency['position']">
+                                                            <span t-out="move['amount']" t-options="{'widget': 'float', 'precision': currency['precision']}">-100.00</span>
+                                                            <span t-out='currency["symbol"]'>$</span>
+                                                        </span>
+                                                        <span t-else="">
+                                                            <span t-out='currency["symbol"]'>$</span>
+                                                            <span t-out="move['amount']" t-options="{'widget': 'float', 'precision': currency['precision']}">-100.00</span>
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </t>
+                                    </t>
+                                </t>
+                                <tr>
+                                    <td style="border-top: 1px solid black;"><strong>Total Retirado</strong></td>
+                                    <td class="text-end" style="border-top: 1px solid black;">
+                                        <strong>
+                                            <span t-if="currency['position']">
+                                                <span t-out="total_retiros" t-options="{'widget': 'float', 'precision': currency['precision']}">0.00</span>
+                                                <span t-out='currency["symbol"]'>$</span>
+                                            </span>
+                                            <span t-else="">
+                                                <span t-out='currency["symbol"]'>$</span>
+                                                <span t-out="total_retiros" t-options="{'widget': 'float', 'precision': currency['precision']}">0.00</span>
+                                            </span>
+                                        </strong>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="oe_structure"></div>
+                    </t>
+                
+                </div> <!-- FIN DEL DIV DE PROTECCIÓN -->
+                <br/>
+
+            </xpath>
+        </template>
+    </data>
+</odoo>

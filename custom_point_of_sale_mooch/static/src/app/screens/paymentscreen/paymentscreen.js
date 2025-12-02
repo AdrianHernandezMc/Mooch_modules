@@ -123,10 +123,22 @@ patch(PaymentScreen.prototype, {
         return !!method.require_transaction_id;
     },
 
-    requiresTextId(line){
+    requiresTextId(line) {
         const method = line?.payment_method;
-        //console.log("method",method)
         if (!method) return false;
+        
+        // Verificar si es un reembolso
+        const order = this.pos.get_order();
+        const isRefund = this.pos.Reembolso || 
+                        (order && order.is_return) ||
+                        (order && order.amount_total < 0);
+        
+        // NO requerir Transaction ID para reembolsos
+        if (isRefund) {
+            console.log('✅ Reembolso detectado - omitiendo requerimiento de Transaction ID');
+            return false;
+        }
+        
         return !!method.require_transaction_id;
     },
 
@@ -140,43 +152,60 @@ patch(PaymentScreen.prototype, {
     },
 
     async validateOrder() {
-        // Bloquea validación si hace falta y no se capturó t.credito t.de
         const order = this.pos.get_order();
-        const paymentLines = order.get_paymentlines();
-        let requireErro = false
-        paymentLines.forEach(line => {
-            console.log("transaction_id",line.transaction_id)
-             console.log("required", this.requiresTextId(line))
-             console.log("orderline",line)
-            if (this.requiresTextId(line) && (!line?.transaction_id || !line.transaction_id.trim())) {
-                console.warn(`:`, line);
-                this.popup.add(ErrorPopup, {
-                title: _t("Falto capturar id de "+ line?.name),
-                body: _t("Captura el Transaction ID para pagos con tarjeta."),
+        
+        // ✅ VERIFICAR SI ES UN REEMBOLSO
+        const isRefund = this.pos.Reembolso || 
+                        (order.name && order.name.includes('REEMBOLSO')) ||
+                        (order.name && order.name.includes('DEVOLUCIÓN')) ||
+                        order.is_return ||
+                        order.amount_total < 0;
+        
+        console.log('🔍 Validación de orden - Es reembolso?:', isRefund, 'Reembolso flag:', this.pos.Reembolso);
+        
+        // ✅ BLOQUE 1: Validación de Transaction ID SOLO para ventas normales (NO reembolsos)
+        if (!isRefund) {
+            const paymentLines = order.get_paymentlines();
+            let requireError = false;
+            
+            paymentLines.forEach(line => {
+                console.log("🔍 Validando línea de pago:", {
+                    método: line?.payment_method?.name,
+                    transaction_id: line?.transaction_id,
+                    requiere: this.requiresTextId(line),
+                    esReembolso: isRefund
+                });
+                
+                if (this.requiresTextId(line) && (!line?.transaction_id || !line.transaction_id.trim())) {
+                    console.warn(`❌ Falta Transaction ID en:`, line);
+                    this.popup.add(ErrorPopup, {
+                        title: _t("Falta capturar ID de " + (line?.payment_method?.name || 'tarjeta')),
+                        body: _t("Captura el Transaction ID para pagos con tarjeta."),
+                    });
+                    requireError = true;
+                }
             });
-                requireErro = true
+            
+            if (requireError) {
+                return false;
             }
-        });
-        if (requireErro) {
-            return
+        } else {
+            console.log('✅ Reembolso detectado - omitiendo validación de Transaction ID');
         }
 
-        // bloque para mover los cambios de los articulos
-        const order_iines = order.get_orderlines();
+        // ✅ BLOQUE 2: Manejo de cambios de artículos (si aplica)
+        const orderLines = order.get_orderlines();
         const product_id = order.product_changes_id;
-        const existe = order_iines.some(line => line.product.id === product_id);
+        const existe = orderLines.some(line => line.product.id === product_id);
 
         if (existe) {
             const ondoInventory = await this.apply_changes();
             if (!ondoInventory) {
-            return;
+                return false;
             }
         }
 
-        /********* Agrego el vale al programa */
-        // const exist_vale = order_iines.some(line => line.product.id === order.voucher_code);
-        // console.log("order.voucher_code_super",order.voucher_code)
-        // console.log("exist_vale",exist_vale)
+        /********* BLOQUE 3: Agrego el vale al programa */
         if (!order.voucher_code) {
             this.currentOrder.couponPointChanges = [];
         }
@@ -187,24 +216,18 @@ patch(PaymentScreen.prototype, {
             const crate_vale = await this.create_vale(order, loyalty_program_id);
             if (!crate_vale) {
                 console.log("error_vale");
-                return;
+                return false;
             }
         }
 
-        // ✅ [NUEVO FLUJO] Mostrar confirmación de entrega ANTES del formulario
+        // ✅ BLOQUE 4: Flujo de entrega a domicilio (solo para ventas normales)
         try {
             const config = this.pos?.config;
             const currentOrder = this.pos?.get_order?.();
 
-            console.log("[DEBUG] Home Delivery Check:", {
-                configExists: !!config,
-                isHomeBox: config?.is_home_box,
-                currentOrder: !!currentOrder,
-                alreadyShown: currentOrder?._homeBoxPopupShown
-            });
-
-            if (config && config.is_home_box && currentOrder && !currentOrder._homeBoxPopupShown) {
-                console.log("[DEBUG] Showing Delivery Confirmation Popup");
+            // Solo mostrar popup de entrega si NO es reembolso
+            if (!isRefund && config && config.is_home_box && currentOrder && !currentOrder._homeBoxPopupShown) {
+                console.log("[DEBUG] Mostrando confirmación de entrega (no es reembolso)");
 
                 // 1. Primero mostrar popup de confirmación
                 const confirmationResult = await this.popup.add(DeliveryConfirmationPopup, {
@@ -212,17 +235,17 @@ patch(PaymentScreen.prototype, {
                 });
 
                 if (!confirmationResult) {
-                    console.log("[DEBUG] User cancelled delivery confirmation");
-                    return false; // Usuario canceló todo
+                    console.log("[DEBUG] Usuario canceló confirmación de entrega");
+                    return false;
                 }
 
                 if (!confirmationResult.confirmed) {
-                    console.log("[DEBUG] User cancelled delivery flow");
-                    return false; // Usuario canceló
+                    console.log("[DEBUG] Usuario canceló flujo de entrega");
+                    return false;
                 }
 
                 if (confirmationResult.wantsDelivery) {
-                    console.log("[DEBUG] User wants delivery - showing address form");
+                    console.log("[DEBUG] Usuario quiere entrega - mostrando formulario de dirección");
 
                     // 2. Mostrar popup de datos de entrega
                     const deliveryResult = await this.popup.add(HomeDeliveryPopup, {
@@ -233,30 +256,39 @@ patch(PaymentScreen.prototype, {
                     });
 
                     if (!deliveryResult || !deliveryResult.confirmed) {
-                        console.log("[DEBUG] User cancelled address form");
-                        return false; // Usuario canceló el formulario de dirección
+                        console.log("[DEBUG] Usuario canceló formulario de dirección");
+                        return false;
                     }
 
                     // Marcar como mostrado solo si completó la entrega
                     currentOrder._homeBoxPopupShown = true;
-                    console.log("[DEBUG] Delivery address completed");
+                    console.log("[DEBUG] Dirección de entrega completada");
 
                 } else {
-                    console.log("[DEBUG] User skipped delivery - proceeding to payment");
-                    // Usuario eligió "Saltar Entrega" - continuar al pago sin datos de entrega
-                    currentOrder._homeBoxPopupShown = true; // Marcar para que no vuelva a preguntar
+                    console.log("[DEBUG] Usuario omitió entrega - continuando con pago");
+                    currentOrder._homeBoxPopupShown = true;
                 }
+            } else if (isRefund) {
+                console.log("[DEBUG] Reembolso detectado - omitiendo flujo de entrega");
             }
         } catch (err) {
             console.error("Error en flujo de entrega:", err);
-            // Si hay error, continuar con el pago normal
         }
 
-        // ✅ SOLO si el popup se confirmó o no era necesario, procesar el pago
-        
-        const result = await super.validateOrder(...arguments);
-        this.clear_client()
-        return result;
+        // ✅ BLOQUE 5: Procesar el pago final
+        try {
+            const result = await super.validateOrder(...arguments);
+            
+            // Limpiar cliente solo si NO es reembolso (opcional)
+            if (!isRefund) {
+                this.clear_client();
+            }
+            
+            return result;
+        } catch (error) {
+            console.error("Error en validación final:", error);
+            return false;
+        }
     },
 
     async clear_client() {
