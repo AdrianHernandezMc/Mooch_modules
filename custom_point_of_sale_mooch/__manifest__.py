@@ -66,6 +66,8 @@
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/control_buttons_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/refund_button/refund_button.xml",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.xml",
+          "custom_point_of_sale_mooch/static/src/app/navbar/sale_details_button/sale_details_button.js",
+          "custom_point_of_sale_mooch/static/src/app/navbar/sale_details_button/sales_detail_report.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml",
           "custom_point_of_sale_mooch/static/src/overrides/components/discount_button/discount_button.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.xml",
