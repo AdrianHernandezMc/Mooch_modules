@@ -72,6 +72,12 @@ patch(TicketScreen.prototype, {
         });
     },
 
+    async _fetchSyncedOrders() {
+        const orders = await this.get_all_synced_orders();
+        this._state.syncedOrders.toShow = orders;
+        this._state.syncedOrders.totalCount = orders.length; 
+    },
+
     /**
      * Verifica si la orden actual permite cambios
      * 🟢 AJUSTE: aceptamos opcionalmente una orden (por ejemplo, la seleccionada en TicketScreen)
@@ -136,29 +142,49 @@ patch(TicketScreen.prototype, {
     },
 
     async get_all_synced_orders() {
+        // 1. Limpiar caché visual interno de Odoo para evitar datos viejos
+        if (this._state && this._state.syncedOrders) {
+            this._state.syncedOrders.cache = {}; 
+        }
+
         const domain = this._computeSyncedOrdersDomain();
         const config_id = this.pos.config.id;
 
-        this._state.syncedOrders.currentPage = 1;
-        const offset = (this._state.syncedOrders.currentPage - 1) * this._state.syncedOrders.nPerPage;
+        // ✅ CORRECCIÓN CRÍTICA AQUÍ:
+        // Si currentPage es 0, null o undefined, forzamos que sea 1.
+        // Esto evita que (0 - 1) genere un offset de -80.
+        const currentPage = this._state.syncedOrders.currentPage;
+        const safePage = (!currentPage || currentPage < 1) ? 1 : currentPage;
 
-        const { ordersInfo } = await this.orm.call(
-            "pos.order",
-            "search_paid_order_ids",
-            [],
-            { config_id, domain, limit: 1000000, offset }
-        );
+        const offset = (safePage - 1) * this._state.syncedOrders.nPerPage;
 
-        const ids = ordersInfo.map(info => info[0]);
-        if (!ids.length) return [];
+        console.log(`🔍 Buscando órdenes: Página ${safePage}, Offset ${offset}`);
 
-        let fetchedOrders = await this.orm.call("pos.order", "export_for_ui", [ids]);
+        try {
+            const { ordersInfo } = await this.orm.call(
+                "pos.order",
+                "search_paid_order_ids",
+                [],
+                { config_id, domain, limit: 1000000, offset } 
+            );
 
-        await this.pos._loadMissingProducts(fetchedOrders);
-        await this.pos._loadMissingPartners(fetchedOrders);
+            const ids = ordersInfo.map(info => info[0]);
+            
+            // Si no hay IDs, regresamos array vacío inmediatamente
+            if (!ids.length) return [];
 
-        fetchedOrders = fetchedOrders.map(o => new Order({ env: this.env }, { pos: this.pos, json: o }));
-        return fetchedOrders;
+            let fetchedOrders = await this.orm.call("pos.order", "export_for_ui", [ids]);
+
+            await this.pos._loadMissingProducts(fetchedOrders);
+            await this.pos._loadMissingPartners(fetchedOrders);
+
+            fetchedOrders = fetchedOrders.map(o => new Order({ env: this.env }, { pos: this.pos, json: o }));
+            return fetchedOrders;
+
+        } catch (error) {
+            console.error("❌ Error en get_all_synced_orders:", error);
+            return [];
+        }
     },
 
     async clearRefundlines() {
