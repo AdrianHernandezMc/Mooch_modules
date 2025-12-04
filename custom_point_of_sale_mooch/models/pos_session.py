@@ -1,5 +1,5 @@
 # # -*- coding: utf-8 -*-
-from odoo import models
+from odoo import models, api , _
 
 class PosSession(models.Model):
     _inherit = "pos.session"
@@ -32,4 +32,127 @@ class PosSession(models.Model):
 # -*- coding: utf-8 -*-
 # models/pos_session_loader.py
 
- 
+class ReportSaleDetails(models.AbstractModel):
+    _inherit = 'report.point_of_sale.report_saledetails'
+
+    @api.model
+    def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
+        # 1. Obtener datos originales
+        data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
+        
+        # 2. Obtener sesión
+        sessions = self.env['pos.session'].browse(session_ids)
+        session_name = sessions[0].name if sessions else ''
+        
+        # 3. CONSULTA DIRECTA (Más precisa)
+        all_lines = self.env['pos.order.line'].sudo().search([
+            ('order_id.session_id', 'in', sessions.ids)
+        ])
+
+        # --- A. DEVOLUCIONES ---
+        refund_lines = all_lines.filtered(lambda l: l.qty < 0)
+        dev_base = sum(abs(l.price_subtotal) for l in refund_lines)
+        dev_total = sum(abs(l.price_subtotal_incl) for l in refund_lines)
+        
+        # --- B. DESCUENTOS ---
+        disc_base = 0.0
+        disc_total = 0.0
+        
+        # B1. Porcentaje
+        percentage_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.discount > 0)
+        for l in percentage_disc_lines:
+            if l.discount != 100:
+                original_base = l.price_subtotal / (1 - l.discount/100.0)
+                original_total = l.price_subtotal_incl / (1 - l.discount/100.0)
+                disc_base += (original_base - l.price_subtotal)
+                disc_total += (original_total - l.price_subtotal_incl)
+            else:
+                taxes = l.tax_ids.compute_all(l.price_unit, l.order_id.pricelist_id.currency_id, l.qty, product=l.product_id, partner=l.order_id.partner_id)
+                disc_base += taxes['total_excluded']
+                disc_total += taxes['total_included']
+
+        # B2. Globales (Precio negativo)
+        global_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.price_unit < 0)
+        disc_base += sum(abs(l.price_subtotal) for l in global_disc_lines)
+        disc_total += sum(abs(l.price_subtotal_incl) for l in global_disc_lines)
+
+        # Totales Deducciones
+        deduction_base_total = dev_base + disc_base
+        deduction_amount_total = dev_total + disc_total
+        deduction_tax_total = deduction_amount_total - deduction_base_total
+
+        # 4. OTROS DATOS
+        orders_count = len(sessions.mapped('order_ids'))
+        
+        # Impuestos de Ventas (Totales)
+        total_impuestos_venta = 0.0
+        if 'taxes' in data:
+            for tax in data['taxes']:
+                total_impuestos_venta += tax['tax_amount']
+
+        # Totales de Productos (Suma de líneas)
+        total_items = 0.0
+        total_products_base = 0.0
+        
+        # NOTA: Calculamos esto basándonos en los datos procesados por Odoo
+        # para coincidir con el reporte estándar
+        if 'products' in data:
+            for category in data['products']:
+                for line in category['products']:
+                    total_items += line['quantity']
+                    total_products_base += (line['price_unit'] * line['quantity'])
+        
+        # Calculamos el Total con Impuestos en Python para evitar error de redondeo en JS
+        total_products_incl = total_products_base + total_impuestos_venta
+
+        # 5. Limpieza nombres pago
+        if 'payments' in data:
+            for payment in data['payments']:
+                original_name = payment['name']
+                if session_name:
+                    original_name = original_name.replace(session_name, '')
+                payment['name'] = original_name.strip().strip('-').strip()
+
+        # 6. Movimientos Caja
+        moves_info = []
+        total_entradas = 0.0
+        total_salidas = 0.0
+        if sessions:
+            domain = [('pos_session_id', 'in', sessions.ids)]
+            lines = self.env['account.bank.statement.line'].sudo().search(domain)
+            for line in lines:
+                if not line.pos_payment_ids:
+                    if line.amount > 0:
+                        total_entradas += line.amount
+                    else:
+                        total_salidas += abs(line.amount)
+                    moves_info.append({
+                        'name': line.payment_ref or line.name or 'Movimiento',
+                        'amount': line.amount,
+                    })
+
+        # 7. ACTUALIZAR DATOS CON REDONDEO (ROUND 2 DECIMALES)
+        # Esto elimina los centavos fantasma (ej: 10.0000001 -> 10.00)
+        data.update({
+            'moves_info': moves_info,
+            'summary_entradas': round(total_entradas, 2),
+            'summary_salidas': round(total_salidas, 2),
+            
+            'session_name': session_name,
+            'user_name': sessions[0].user_id.name if sessions else '',
+            'orders_count': orders_count,
+            
+            'total_impuestos': round(total_impuestos_venta, 2),
+            'total_items': total_items, # Items no se redondea, es cantidad
+            'total_products_base': round(total_products_base, 2),
+            'total_products_incl': round(total_products_incl, 2), # <--- NUEVO VARIABLE YA SUMADA
+            
+            # Deducciones
+            'dev_total': round(dev_total, 2),
+            'disc_total': round(disc_total, 2),
+            'deduction_base': round(deduction_base_total, 2),
+            'deduction_tax': round(deduction_tax_total, 2),
+            'deduction_total': round(deduction_amount_total, 2)
+        })
+        
+        return data

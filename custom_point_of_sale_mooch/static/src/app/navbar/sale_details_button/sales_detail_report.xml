@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="point_of_sale.SaleDetailsReport" t-inherit="point_of_sale.SaleDetailsReport" t-inherit-mode="extension">
+        
+        <xpath expr="//div[@class='pos-receipt']" position="replace">
+            <div class="pos-receipt" style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.2; font-weight: bold; color: #000;">
+
+                <!-- 1. ENCABEZADO -->
+                <div style="text-align: center;">
+                    <t t-if="pos.company_logo_base64">
+                        <img t-att-src="pos.company_logo_base64" style="max-width: 50%; max-height: 70px; filter: grayscale(100%) contrast(150%); margin-bottom: 5px;"/>
+                        <br/>
+                    </t>
+                    <div style="font-size: 16px; font-weight: 900; margin-top:2px;">
+                        <t t-esc="pos.company.name" />
+                    </div>
+                    <div style="font-size: 14px; border: 2px solid black; padding: 3px; margin: 5px 0;">
+                        CORTE DE CAJA (X)
+                    </div>
+                    <div style="font-size: 12px; text-align: left; margin-bottom: 5px;">
+                        <div>📅 <t t-esc="date" /></div>
+                        <div>👤 <t t-esc="user_name || 'Cajero'" /></div>
+                        <div>🏪 Caja: <t t-esc="pos.config.name" /></div>
+                        <div>🔢 Sesión: <t t-esc="session_name" /></div>
+                        <div>🧾 No. Ordenes: <t t-esc="orders_count || 0" /></div>
+                    </div>
+                </div>
+
+                <!-- 2. RESUMEN VENTA -->
+                <div style="border-bottom: 1px solid black; margin-bottom: 3px;"></div>
+                <div style="font-size: 14px; text-align: center;">RESUMEN VENTA</div>
+                <div style="border-bottom: 1px solid black; margin-bottom: 5px;"></div>
+                
+                <t t-foreach="payments" t-as="payment" t-key="payment_index">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span t-esc="payment['name']" />
+                        <span t-esc="formatCurrency(payment['total'] || 0, false)" />
+                    </div>
+                </t>
+                
+                <div style="border-top: 1px dashed black; margin-top: 5px; margin-bottom: 5px;"></div>
+
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Subtotal:</span>
+                    <span t-esc="formatCurrency(total_products_base || 0, false)"/>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <span>(+) Impuestos:</span>
+                    <span t-esc="formatCurrency(total_impuestos || 0, false)"/>
+                </div>
+                
+                <div style="border-top: 2px solid black; margin-top: 3px; padding-top: 2px; display: flex; justify-content: space-between; font-size: 15px; font-weight: 900;">
+                    <span>TOTAL:</span>
+                    <!-- Usamos la variable ya redondeada desde Python -->
+                    <span t-esc="formatCurrency(total_products_incl || 0, false)" />
+                </div>
+                <br/>
+
+                <!-- 3. DEDUCCIONES VENTA -->
+                <div style="border-bottom: 1px solid black; margin-bottom: 3px;"></div>
+                <div style="font-size: 14px; text-align: center;">DEDUCCIONES VENTA</div>
+                <div style="border-bottom: 1px solid black; margin-bottom: 5px;"></div>
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <span>DEVOLUCIONES:</span>
+                    <span t-esc="formatCurrency(dev_total || 0, false)"/>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <span>DESCUENTOS:</span>
+                    <span t-esc="formatCurrency(disc_total || 0, false)"/>
+                </div>
+                
+                <div style="border-top: 1px dashed black; margin-top: 5px; margin-bottom: 5px;"></div>
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Subtotal:</span>
+                    <span t-esc="formatCurrency(deduction_base || 0, false)"/>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <span>(+) Impuestos:</span>
+                    <span t-esc="formatCurrency(deduction_tax || 0, false)"/>
+                </div>
+                
+                <div style="border-top: 2px solid black; margin-top: 3px; padding-top: 2px; display: flex; justify-content: space-between; font-size: 15px; font-weight: 900;">
+                    <span>TOTAL DEDUCCIONES:</span>
+                    <span t-esc="formatCurrency(deduction_total || 0, false)"/>
+                </div>
+                <br/>
+
+                <!-- 4. MOVIMIENTOS CAJA -->
+                <div style="border: 2px solid black; padding: 5px; margin-bottom: 10px;">
+                    <div style="text-align: center; font-size: 14px; background-color: #000; color: #fff; margin: -2px -2px 5px -2px;">
+                        MOVIMIENTOS CAJA
+                    </div>
+                    
+                    <div style="font-size: 13px; border-bottom: 1px dashed black;">(+) INGRESOS</div>
+                    <t t-set="has_entries" t-value="false"/>
+                    <t t-if="moves_info">
+                        <t t-foreach="moves_info" t-as="move" t-key="move_index">
+                            <t t-if="move['amount'] &gt; 0">
+                                <t t-set="has_entries" t-value="true"/>
+                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                    <span style="flex: 1;"><t t-esc="move['name']"/></span>
+                                    <span><t t-esc="formatCurrency(move['amount'], false)"/></span>
+                                </div>
+                            </t>
+                        </t>
+                    </t>
+                    <t t-if="!has_entries">
+                        <div style="font-size: 11px; font-style: italic;">(Sin ingresos)</div>
+                    </t>
+                    <div style="text-align: right; font-size: 13px; font-weight: bold;">
+                        Total: <span t-esc="formatCurrency(summary_entradas || 0, false)"/>
+                    </div>
+                    <br/>
+
+                    <div style="font-size: 13px; border-bottom: 1px dashed black;">(-) RETIROS</div>
+                    <t t-set="has_outs" t-value="false"/>
+                    <t t-if="moves_info">
+                        <t t-foreach="moves_info" t-as="move" t-key="move_index">
+                            <t t-if="move['amount'] &lt; 0">
+                                <t t-set="has_outs" t-value="true"/>
+                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                    <span style="flex: 1;"><t t-esc="move['name']"/></span>
+                                    <span><t t-esc="formatCurrency(move['amount'], false)"/></span>
+                                </div>
+                            </t>
+                        </t>
+                    </t>
+                    <t t-if="!has_outs">
+                        <div style="font-size: 11px; font-style: italic;">(Sin retiros)</div>
+                    </t>
+                    <div style="text-align: right; font-size: 13px; font-weight: bold;">
+                        <span t-esc="formatCurrency((summary_salidas || 0) * -1, false)"/>
+                    </div>
+                </div>
+
+                <!-- 5. DETALLE PRODUCTOS -->
+                <t t-if="products and products.length > 0">
+                    <div style="text-align: center; font-size: 14px;">DETALLE PRODUCTOS</div>
+                    <div style="border-bottom: 1px solid black; margin-bottom: 3px;"></div>
+                    
+                    <t t-foreach="products" t-as="category" t-key="category['name']">
+                        <t t-foreach="category['products']" t-as="line" t-key="line_index">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                <span style="flex: 1;">
+                                    <t t-esc="line['product_name'].substr(0, 20)" />
+                                    <t t-if="line.discount and line.discount > 0">**</t>
+                                </span>
+                                <span style="white-space: nowrap;">
+                                    <t t-esc="line.quantity" />x <t t-esc="formatCurrency(line.price_unit, false)" />
+                                </span>
+                            </div>
+                        </t>
+                    </t>
+                    
+                    <!-- PIE DE PRODUCTOS -->
+                    <div style="border-top: 2px solid black; margin-top: 5px; padding-top: 2px;">
+                        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px;">
+                            <span>Total Artículos:</span>
+                            <t t-esc="Math.round(total_items || 0)" />
+                        </div>
+                        
+                        <div style="border-top: 1px dashed black; margin: 3px 0;"></div>
+                        
+                        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                            <span>Suma Base:</span>
+                            <t t-esc="formatCurrency(total_products_base || 0, false)" />
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                            <span>(+) Impuestos:</span>
+                            <t t-esc="formatCurrency(total_impuestos || 0, false)" />
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 15px; margin-top: 2px;">
+                            <span>TOTAL PRODUCTOS:</span>
+                            <!-- Usamos la variable segura desde Python -->
+                            <t t-esc="formatCurrency(total_products_incl || 0, false)" />
+                        </div>
+                    </div>
+                </t>
+                
+                <br/>
+                <t t-if="disc_total and disc_total > 0">
+                    <div style="text-align: center; font-size: 11px; margin-bottom: 5px; font-style: italic;">
+                        (**) Producto con descuento aplicado
+                    </div>
+                </t>
+
+                <div style="text-align: center; font-size: 11px;">
+                    === FIN DEL REPORTE ===
+                </div>
+            </div>
+        </xpath>
+    </t>
+</templates>

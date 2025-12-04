@@ -2,6 +2,7 @@
 <templates id="pos_receipt_items_ext" xml:space="preserve">
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
 
+    <!-- 1. ARTÍCULOS VENDIDOS -->
     <xpath expr="//div[contains(@class,'paymentlines')][@t-foreach='props.data.paymentlines']" position="after">
       <div class="paymentlines items-count">
         <span>Artículos vendidos</span>
@@ -9,11 +10,11 @@
       </div>
     </xpath>
 
+    <!-- 2. MOVER 'CHANGE' (CAMBIO) -->
     <xpath expr="//div[contains(@class,'receipt-change')]" position="replace">
       <t/>
     </xpath>
 
-    <!-- Agregar CHANGE después del TOTAL -->
     <xpath expr="//div[contains(@class,'pos-receipt-amount')][span[@t-esc='props.formatCurrency(props.data.amount_total)']]" position="after">
       <div class="pos-receipt-amount receipt-change mt-2">
         CHANGE
@@ -21,57 +22,88 @@
       </div>
     </xpath>
 
-    <!-- Eliminar "Powered by Odoo" -->
+    <!-- 3. ELIMINAR 'POWERED BY ODOO' -->
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')]//p[contains(text(),'Powered by Odoo')]" position="replace">
       <t/>
     </xpath>
 
-    <!-- Agregar tipo de venta después de los impuestos -->
+    <!-- 4. BLOQUE UNIFICADO: TIPO DE VENTA + VALES DE REGALO -->
     <xpath expr="//div[contains(@class,'pos-receipt-taxes')]" position="after">
+
+      <!-- A) TIPO DE VENTA -->
       <t t-if="props.data.sale_type">
         <div class="pos-sale-type">
           <span t-esc="props.data.sale_type" style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
         </div>
       </t>
-    </xpath>
 
-    <!-- Agregar VALE después del tipo de venta -->
-    <xpath expr="//div[contains(@class,'pos-sale-type')]" position="after">
+      <!-- B) VALES / CUPONES (Lógica corregida) -->
       <t t-if="props.data.new_coupon_info and props.data.new_coupon_info.length > 0">
-        <div class="voucher-simple" style="text-align: center; margin: 15px 0; padding: 8px; border: 2px solid #000; background: #ffffcc;">
-          <p style="margin: 0; font-size: 16pt; font-weight: bold;">
-            VALE: <span t-esc="props.data.new_coupon_info[0].code" style="font-family: 'Courier New', monospace; letter-spacing: 3px; font-size: 18pt;"/>
-          </p>
+        <div class="pos-coupon-section" style="margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px;">
+            <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">Codigos de cupnes:</div>
+
+            <t t-foreach="props.data.new_coupon_info" t-as="coupon_info" t-key="coupon_info.code">
+                <!-- Contenedor individual de cada vale -->
+                <div style="background: white; padding-bottom: 15px; margin-bottom: 10px;">
+
+                    <!-- Nombre del vale -->
+                    <div style="text-align: center; font-size: 110%; font-weight: bold;">
+                        <t t-esc="coupon_info.program_name"/>
+                    </div>
+
+                    <!-- Fecha -->
+                    <div style="text-align: center; font-size: 90%; margin-bottom: 5px;">
+                        <span>Vence: </span>
+                        <t t-if="coupon_info.expiration_date">
+                            <t t-esc="coupon_info.expiration_date"/>
+                        </t>
+                        <t t-else="">Indefinido</t>
+                    </div>
+
+                    <!-- IMAGEN DEL CÓDIGO DE BARRAS -->
+                    <div style="display: flex; justify-content: center;">
+                        <img t-att-src="'/report/barcode/Code128/' + coupon_info.code + '?width=800&amp;height=150&amp;humanreadable=0'"
+                             alt="Barcode"
+                             style="width: 200px; height: 60px; max-width: 95%;"/>
+                    </div>
+
+                    <!-- NÚMERO DEL CÓDIGO (estilo grande) -->
+                    <div style="text-align: center; margin-top: 2px;
+                                font-family: monospace; font-size: 14pt; font-weight: bold; letter-spacing: 2px;">
+                        <t t-esc="coupon_info.code"/>
+                    </div>
+
+                </div>
+            </t>
         </div>
       </t>
     </xpath>
 
-    <!-- CÓDIGO DE BARRAS CON CENTRADO Y ESPACIADO CORREGIDOS -->
+    <!-- 5. CÓDIGO DE BARRAS DE LA ORDEN (ORIGINAL) -->
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')][div[@id='order-date']]" position="before">
         <t t-if="props.data.order_barcode">
-
-            <!-- 🔹 CONTENEDOR 1: Código de barras -->
             <div class="barcode-container"
-                style="text-align: center; margin-top: 20px; margin-bottom: 10px; padding: 8px 5px;
-                        background: white;">
-                
+                style="text-align: center; margin-top: 20px; margin-bottom: 10px; padding: 8px 5px; background: white;">
                 <div style="display: flex; justify-content: center;">
                     <img t-att-src="'/report/barcode/Code128/' + props.data.order_barcode + '?width=800&amp;height=150&amp;humanreadable=0'"
                         t-att-alt="props.data.order_barcode"
                         class="thermal-barcode"
                         style="width: 95%; max-width: 200px; height: 80px;"/>
                 </div>
-
             </div>
-
-            <!-- 🔹 CONTENEDOR 2: Número del código -->
             <div class="barcode-number"
                 style="text-align: center; margin-top: 5px; margin-bottom: 20px;
                         font-family: monospace; font-size: 14pt; font-weight: bold; letter-spacing: 2px;">
                 <t t-esc="props.data.order_barcode"/>
             </div>
-
         </t>
+    </xpath>
+
+    <!-- 6. OCULTAR EL CUPÓN ORIGINAL DE ODOO -->
+    <xpath expr="//div[hasclass('pos-receipt')]" position="inside">
+        <style>
+            .pos-coupon-rewards { display: none !important; }
+        </style>
     </xpath>
   </t>
 </templates>
