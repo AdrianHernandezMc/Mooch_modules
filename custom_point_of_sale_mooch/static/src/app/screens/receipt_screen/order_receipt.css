@@ -1,7 +1,7 @@
 /* ================================
    CONFIGURACIÓN GENERAL DEL TICKET
    ================================ */
-/* Ticket ancho: 75mm
+/* Ticket ancho: 130mm
    Tamaño de letra base: 15px (luego lo sobreescribimos a 14pt más abajo)
 */
 
@@ -19,14 +19,14 @@
 }
 
 .receipt-screen .default-view .pos-receipt-container {
-    flex: 0 0 75mm;
-    max-width: 75mm;
+    flex: 0 0 130mm;
+    max-width: 130mm;
     padding: 12px;
 }
 
 /* BASE DEL TICKET (luego se sobreescribe abajo con fuentes más grandes) */
 .pos-receipt {
-    width: 75mm;
+    width: 130mm;
     margin: 0 auto;
     padding: 10px 8px;
     background: #ffffff;
@@ -181,7 +181,7 @@
    IMPRESIÓN
    ========================== */
 @page {
-    size: 75mm auto;
+    size: 130mm auto;
     margin: 0;
 }
 
@@ -219,14 +219,14 @@
     }
 
     .pos-receipt-container {
-        width: 75mm !important;
-        max-width: 75mm !important;
+        width: 130mm !important;
+        max-width: 130mm !important;
         margin: 0 auto !important;
         padding: 0 !important;
     }
 
     .pos-receipt {
-        width: 75mm !important;
+        width: 130mm !important;
         margin: 0 auto !important;
         padding: 1mm 2mm 3mm 2mm !important;
         border: 0 !important;
