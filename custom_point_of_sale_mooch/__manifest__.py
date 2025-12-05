@@ -25,6 +25,7 @@
           "custom_point_of_sale_mooch/static/src/js/refund_coupon.js",
           "custom_point_of_sale_mooch/static/src/js/selection_popup.js",
           "custom_point_of_sale_mooch/static/src/js/pos_discount_discount_button.js",
+          "custom_point_of_sale_mooch/static/src/js/close_pos_popup.js",
           "custom_point_of_sale_mooch/static/src/overrides/components/discount_button/discount_button.js",
 
           # Popups

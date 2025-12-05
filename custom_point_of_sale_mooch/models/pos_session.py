@@ -37,43 +37,34 @@ class ReportSaleDetails(models.AbstractModel):
 
     @api.model
     def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
-        # 1. Obtener datos originales
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
         
-        # 2. Obtener sesión
         sessions = self.env['pos.session'].browse(session_ids)
+        session = sessions[0] if sessions else False
         session_name = sessions[0].name if sessions else ''
         
-        # 3. Consulta para conteos y deducciones
         all_lines = self.env['pos.order.line'].sudo().search([
             ('order_id.session_id', 'in', sessions.ids)
         ])
 
-        # =========================================================
-        # 4. TOTALES FORZADOS (LA VERDAD ES LO COBRADO)
-        # =========================================================
+        # 4. TOTALES DE VENTA (Suma de Pagos)
+        total_products_incl = 0.0
+        total_cash_sales = 0.0
         
-        # A. SUMAR PAGOS (Esto es lo que realmente hay en caja)
-        total_pagado_real = 0.0
         if 'payments' in data:
             for payment in data['payments']:
-                total_pagado_real += payment['total']
+                total_products_incl += payment['total']
+                # Detectar efectivo para el arqueo
+                if 'efectivo' in payment['name'].lower() or 'cash' in payment['name'].lower():
+                    total_cash_sales += payment['total']
 
-        # B. CONTEO ARTÍCULOS
         total_items = sum(all_lines.mapped('qty'))
 
-        # =========================================================
-        # 5. DEDUCCIONES (Informativo)
-        # =========================================================
-        
-        # Devoluciones
+        # 5. DEDUCCIONES
         refund_lines = all_lines.filtered(lambda l: l.qty < 0)
         dev_total = sum(abs(l.price_subtotal_incl) for l in refund_lines)
         
-        # Descuentos
         disc_total = 0.0
-        
-        # Porcentaje
         percentage_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.discount > 0)
         for l in percentage_disc_lines:
             if l.discount != 100:
@@ -83,17 +74,19 @@ class ReportSaleDetails(models.AbstractModel):
                 taxes = l.tax_ids.compute_all(l.price_unit, l.order_id.pricelist_id.currency_id, l.qty, product=l.product_id, partner=l.order_id.partner_id)
                 disc_total += taxes['total_included']
 
-        # Descuento Global
         global_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.price_unit < 0)
         disc_total += sum(abs(l.price_subtotal_incl) for l in global_disc_lines)
 
         deduction_total = dev_total + disc_total
 
-        # =========================================================
         # 6. OTROS DATOS
-        # =========================================================
         orders_count = len(sessions.mapped('order_ids'))
         
+        # Folios
+        orders = session.order_ids.sorted(key=lambda r: r.id)
+        folio_start = orders[0].pos_reference if orders else "N/A"
+        folio_end = orders[-1].pos_reference if orders else "N/A"
+
         # Limpieza nombres pago
         if 'payments' in data:
             for payment in data['payments']:
@@ -120,6 +113,12 @@ class ReportSaleDetails(models.AbstractModel):
                         'amount': line.amount,
                     })
 
+        # CÁLCULO DE FONDO INICIAL (CRÍTICO)
+        opening_cash = session.cash_register_balance_start if session else 0.0
+        
+        # Efectivo Teórico
+        theoretical_cash = opening_cash + total_cash_sales + total_entradas - total_salidas
+
         # 7. ACTUALIZAR DATOS
         data.update({
             'moves_info': moves_info,
@@ -128,18 +127,22 @@ class ReportSaleDetails(models.AbstractModel):
             'session_name': session_name,
             'user_name': sessions[0].user_id.name if sessions else '',
             'orders_count': orders_count,
+            'folio_start': folio_start,
+            'folio_end': folio_end,
             
-            # TOTALES
+            # Totales
             'total_items': total_items,
+            'total_products_incl': round(total_products_incl, 2),
             
-            # AQUÍ ESTÁ EL ARREGLO:
-            # En lugar de sumar productos, usamos la suma de PAGOS como total.
-            'total_products_incl': round(total_pagado_real, 2), 
-            
-            # DEDUCCIONES
+            # Deducciones
             'dev_total': round(dev_total, 2),
             'disc_total': round(disc_total, 2),
-            'deduction_total': round(deduction_total, 2)
+            'deduction_total': round(deduction_total, 2),
+            
+            # Arqueo
+            'opening_cash': round(opening_cash, 2), # <--- ESTE ES EL FONDO INICIAL
+            'total_cash_sales': round(total_cash_sales, 2),
+            'theoretical_cash': round(theoretical_cash, 2)
         })
         
         return data
