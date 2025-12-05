@@ -44,68 +44,57 @@ class ReportSaleDetails(models.AbstractModel):
         sessions = self.env['pos.session'].browse(session_ids)
         session_name = sessions[0].name if sessions else ''
         
-        # 3. CONSULTA DIRECTA (Más precisa)
+        # 3. Consulta para conteos y deducciones
         all_lines = self.env['pos.order.line'].sudo().search([
             ('order_id.session_id', 'in', sessions.ids)
         ])
 
-        # --- A. DEVOLUCIONES ---
+        # =========================================================
+        # 4. TOTALES FORZADOS (LA VERDAD ES LO COBRADO)
+        # =========================================================
+        
+        # A. SUMAR PAGOS (Esto es lo que realmente hay en caja)
+        total_pagado_real = 0.0
+        if 'payments' in data:
+            for payment in data['payments']:
+                total_pagado_real += payment['total']
+
+        # B. CONTEO ARTÍCULOS
+        total_items = sum(all_lines.mapped('qty'))
+
+        # =========================================================
+        # 5. DEDUCCIONES (Informativo)
+        # =========================================================
+        
+        # Devoluciones
         refund_lines = all_lines.filtered(lambda l: l.qty < 0)
-        dev_base = sum(abs(l.price_subtotal) for l in refund_lines)
         dev_total = sum(abs(l.price_subtotal_incl) for l in refund_lines)
         
-        # --- B. DESCUENTOS ---
-        disc_base = 0.0
+        # Descuentos
         disc_total = 0.0
         
-        # B1. Porcentaje
+        # Porcentaje
         percentage_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.discount > 0)
         for l in percentage_disc_lines:
             if l.discount != 100:
-                original_base = l.price_subtotal / (1 - l.discount/100.0)
                 original_total = l.price_subtotal_incl / (1 - l.discount/100.0)
-                disc_base += (original_base - l.price_subtotal)
                 disc_total += (original_total - l.price_subtotal_incl)
             else:
                 taxes = l.tax_ids.compute_all(l.price_unit, l.order_id.pricelist_id.currency_id, l.qty, product=l.product_id, partner=l.order_id.partner_id)
-                disc_base += taxes['total_excluded']
                 disc_total += taxes['total_included']
 
-        # B2. Globales (Precio negativo)
+        # Descuento Global
         global_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.price_unit < 0)
-        disc_base += sum(abs(l.price_subtotal) for l in global_disc_lines)
         disc_total += sum(abs(l.price_subtotal_incl) for l in global_disc_lines)
 
-        # Totales Deducciones
-        deduction_base_total = dev_base + disc_base
-        deduction_amount_total = dev_total + disc_total
-        deduction_tax_total = deduction_amount_total - deduction_base_total
+        deduction_total = dev_total + disc_total
 
-        # 4. OTROS DATOS
+        # =========================================================
+        # 6. OTROS DATOS
+        # =========================================================
         orders_count = len(sessions.mapped('order_ids'))
         
-        # Impuestos de Ventas (Totales)
-        total_impuestos_venta = 0.0
-        if 'taxes' in data:
-            for tax in data['taxes']:
-                total_impuestos_venta += tax['tax_amount']
-
-        # Totales de Productos (Suma de líneas)
-        total_items = 0.0
-        total_products_base = 0.0
-        
-        # NOTA: Calculamos esto basándonos en los datos procesados por Odoo
-        # para coincidir con el reporte estándar
-        if 'products' in data:
-            for category in data['products']:
-                for line in category['products']:
-                    total_items += line['quantity']
-                    total_products_base += (line['price_unit'] * line['quantity'])
-        
-        # Calculamos el Total con Impuestos en Python para evitar error de redondeo en JS
-        total_products_incl = total_products_base + total_impuestos_venta
-
-        # 5. Limpieza nombres pago
+        # Limpieza nombres pago
         if 'payments' in data:
             for payment in data['payments']:
                 original_name = payment['name']
@@ -113,7 +102,7 @@ class ReportSaleDetails(models.AbstractModel):
                     original_name = original_name.replace(session_name, '')
                 payment['name'] = original_name.strip().strip('-').strip()
 
-        # 6. Movimientos Caja
+        # Movimientos Caja
         moves_info = []
         total_entradas = 0.0
         total_salidas = 0.0
@@ -131,28 +120,26 @@ class ReportSaleDetails(models.AbstractModel):
                         'amount': line.amount,
                     })
 
-        # 7. ACTUALIZAR DATOS CON REDONDEO (ROUND 2 DECIMALES)
-        # Esto elimina los centavos fantasma (ej: 10.0000001 -> 10.00)
+        # 7. ACTUALIZAR DATOS
         data.update({
             'moves_info': moves_info,
             'summary_entradas': round(total_entradas, 2),
             'summary_salidas': round(total_salidas, 2),
-            
             'session_name': session_name,
             'user_name': sessions[0].user_id.name if sessions else '',
             'orders_count': orders_count,
             
-            'total_impuestos': round(total_impuestos_venta, 2),
-            'total_items': total_items, # Items no se redondea, es cantidad
-            'total_products_base': round(total_products_base, 2),
-            'total_products_incl': round(total_products_incl, 2), # <--- NUEVO VARIABLE YA SUMADA
+            # TOTALES
+            'total_items': total_items,
             
-            # Deducciones
+            # AQUÍ ESTÁ EL ARREGLO:
+            # En lugar de sumar productos, usamos la suma de PAGOS como total.
+            'total_products_incl': round(total_pagado_real, 2), 
+            
+            # DEDUCCIONES
             'dev_total': round(dev_total, 2),
             'disc_total': round(disc_total, 2),
-            'deduction_base': round(deduction_base_total, 2),
-            'deduction_tax': round(deduction_tax_total, 2),
-            'deduction_total': round(deduction_amount_total, 2)
+            'deduction_total': round(deduction_total, 2)
         })
         
         return data
