@@ -22,9 +22,9 @@
                     <div style="font-size: 20px; text-align: left; margin-bottom: 5px;">
                         <div>📅 <t t-esc="date" /></div>
                         <div>👤 <t t-esc="user_name || 'Cajero'" /></div>
-                        <div>🏪 <t t-esc="pos.config.name" /></div>
+                        <div>🏪 Caja: <t t-esc="pos.config.name" /></div>
                         <div>🔢 Sesión: <t t-esc="session_name" /></div>
-                        <div>🧾 Ordenes: <t t-esc="orders_count || 0" /></div>
+                        <div>🧾 No. Ordenes: <t t-esc="orders_count || 0" /></div>
                     </div>
                 </div>
 
