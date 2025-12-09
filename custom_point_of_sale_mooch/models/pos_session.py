@@ -37,14 +37,12 @@ class ReportSaleDetails(models.AbstractModel):
 
     @api.model
     def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
-        # 1. Obtener datos originales
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
         
-        # 2. Obtener sesión
         sessions = self.env['pos.session'].browse(session_ids)
+        session = sessions[0] if sessions else False
         session_name = sessions[0].name if sessions else ''
         
-        # 3. Consulta para conteos y deducciones
         all_lines = self.env['pos.order.line'].sudo().search([
             ('order_id.session_id', 'in', sessions.ids)
         ])
@@ -74,7 +72,6 @@ class ReportSaleDetails(models.AbstractModel):
                 if 'tarjeta' in p_name or 'crédito' in p_name or 'credito' in p_name or 'débito' in p_name or 'debito' in p_name or 'visa' in p_name or 'master' in p_name:
                     total_tpv += payment['total']
 
-        # B. CONTEO ARTÍCULOS
         total_items = sum(all_lines.mapped('qty'))
 
         # =========================================================
@@ -98,9 +95,7 @@ class ReportSaleDetails(models.AbstractModel):
 
         deduction_total = dev_total + disc_total
 
-        # =========================================================
         # 6. OTROS DATOS
-        # =========================================================
         orders_count = len(sessions.mapped('order_ids'))
         
         orders = session.order_ids.sorted(key=lambda r: r.id)
@@ -148,7 +143,7 @@ class ReportSaleDetails(models.AbstractModel):
             'folio_start': folio_start,
             'folio_end': folio_end,
             
-            # TOTALES
+            # Totales
             'total_items': total_items,
             'total_products_incl': round(total_products_incl, 2),
             'total_cash_sales': round(total_cash_sales, 2),
@@ -161,7 +156,12 @@ class ReportSaleDetails(models.AbstractModel):
             # DEDUCCIONES
             'dev_total': round(dev_total, 2),
             'disc_total': round(disc_total, 2),
-            'deduction_total': round(deduction_total, 2)
+            'deduction_total': round(deduction_total, 2),
+            
+            # Arqueo
+            'opening_cash': round(opening_cash, 2), # <--- ESTE ES EL FONDO INICIAL
+            'total_cash_sales': round(total_cash_sales, 2),
+            'theoretical_cash': round(theoretical_cash, 2)
         })
         
         return data
