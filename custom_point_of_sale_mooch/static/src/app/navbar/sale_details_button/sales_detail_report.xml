@@ -4,7 +4,7 @@
     <t t-name="point_of_sale.SaleDetailsReport" t-inherit="point_of_sale.SaleDetailsReport" t-inherit-mode="extension">
         
         <xpath expr="//div[@class='pos-receipt']" position="replace">
-            <div class="pos-receipt" style="font-family: 'Courier New', monospace; font-size: 16px; line-height: 1.1; font-weight: bold; color: #000; width: 90mm; max-width: 100%; margin: 0 auto;">
+            <div class="pos-receipt" style="font-family: 'Courier New', monospace; font-size: 16px; line-height: 1.1; font-weight: bold; color: #000; width: 140mm; max-width: 100%; margin: 0 auto;">
 
                 <!-- 1. ENCABEZADO -->
                 <div style="text-align: center;">
