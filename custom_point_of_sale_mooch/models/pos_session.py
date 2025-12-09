@@ -40,9 +40,11 @@ class ReportSaleDetails(models.AbstractModel):
         # 1. Obtener datos originales
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
 
-        # 2. Obtener sesión
+        # 2. Obtener sesión (AQUÍ ESTABA EL ERROR)
         sessions = self.env['pos.session'].browse(session_ids)
-        session_name = sessions[0].name if sessions else ''
+        # Definimos 'session' (singular) para usarla más abajo
+        session = sessions[0] if sessions else self.env['pos.session']
+        session_name = session.name if session else ''
 
         # 3. Consulta para conteos y deducciones
         all_lines = self.env['pos.order.line'].sudo().search([
@@ -103,11 +105,12 @@ class ReportSaleDetails(models.AbstractModel):
         # =========================================================
         orders_count = len(sessions.mapped('order_ids'))
 
+        # Folios (AQUÍ ES DONDE FALLABA ANTES POR FALTA DE 'session')
         orders = session.order_ids.sorted(key=lambda r: r.id)
         folio_start = orders[0].pos_reference if orders else "N/A"
         folio_end = orders[-1].pos_reference if orders else "N/A"
 
-        # Limpieza nombres pago (Quitar nombre de sesión)
+        # Limpieza nombres pago
         if 'payments' in data:
             for payment in data['payments']:
                 original_name = payment['name']
@@ -134,7 +137,7 @@ class ReportSaleDetails(models.AbstractModel):
                     })
 
         # Arqueo
-        opening_cash = sessions[0].cash_register_balance_start if sessions else 0.0
+        opening_cash = session.cash_register_balance_start if session else 0.0
         theoretical_cash = opening_cash + total_cash_sales + total_entradas - total_salidas
 
         # 7. ACTUALIZAR DATOS
@@ -143,7 +146,7 @@ class ReportSaleDetails(models.AbstractModel):
             'summary_entradas': round(total_entradas, 2),
             'summary_salidas': round(total_salidas, 2),
             'session_name': session_name,
-            'user_name': sessions[0].user_id.name if sessions else '',
+            'user_name': session.user_id.name if session else '',
             'orders_count': orders_count,
             'folio_start': folio_start,
             'folio_end': folio_end,
@@ -152,7 +155,7 @@ class ReportSaleDetails(models.AbstractModel):
             'total_items': total_items,
             'total_products_incl': round(total_products_incl, 2),
             'total_cash_sales': round(total_cash_sales, 2),
-            'total_tpv': round(total_tpv, 2), # <--- Aquí va la suma solo de tarjetas
+            'total_tpv': round(total_tpv, 2),
 
             # ARQUEO
             'opening_cash': round(opening_cash, 2),
@@ -163,5 +166,5 @@ class ReportSaleDetails(models.AbstractModel):
             'disc_total': round(disc_total, 2),
             'deduction_total': round(deduction_total, 2)
         })
-        
+
         return data

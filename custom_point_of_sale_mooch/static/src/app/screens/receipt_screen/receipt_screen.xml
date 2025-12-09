@@ -2,6 +2,11 @@
 <templates id="pos_receipt_items_ext" xml:space="preserve">
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
 
+
+    <!-- ========================================================= -->
+    <!-- 1. HERENCIA PRINCIPAL: CUERPO DEL TICKET (OrderReceipt)   -->
+    <!-- ========================================================= -->
+
     <!-- 1. ARTÍCULOS VENDIDOS -->
     <xpath expr="//div[contains(@class,'paymentlines')][@t-foreach='props.data.paymentlines']" position="after">
       <div class="paymentlines items-count">
@@ -105,5 +110,42 @@
             .pos-coupon-rewards { display: none !important; }
         </style>
     </xpath>
+
+    <!-- 7. AGRANDAR LA LÍNEA DE MÉTODO DE PAGO (NUEVO) -->
+    <xpath expr="//div[contains(@class,'paymentlines')][@t-foreach='props.data.paymentlines']" position="attributes">
+        <!-- Puedes ajustar 20px al tamaño que desees (ej: 1.5em, 18px, etc.) -->
+        <attribute name="style">font-size: 20px; font-weight: bold; margin-bottom: 5px;</attribute>
+    </xpath>
+  </t>
+
+  <!-- ========================================================= -->
+  <!-- 2. HERENCIA SECUNDARIA: CABECERA (ReceiptHeader)          -->
+  <!--    AQUÍ CAMBIAMOS EL NOMBRE DEL CAJERO                    -->
+  <!-- ========================================================= -->
+  <t t-inherit="point_of_sale.ReceiptHeader" t-inherit-mode="extension" owl="1">
+    
+    <xpath expr="//div[contains(@class, 'cashier')]" position="replace">
+        <div t-if="props.data.cashier" class="cashier">
+            <div>--------------------------------</div>
+            
+            <!-- LÓGICA PARA ACORTAR NOMBRE: Primer Nombre + Último Apellido -->
+            <t t-set="full_name" t-value="props.data.cashier"/>
+            <t t-set="name_parts" t-value="full_name.split(' ')"/>
+            
+            <!-- Tomamos el primer nombre -->
+            <t t-set="short_name" t-value="name_parts[0]"/>
+            
+            <!-- Si tiene más de una palabra, agregamos la última -->
+            <t t-if="name_parts.length > 1">
+                <t t-set="short_name" t-value="short_name + ' ' + name_parts[name_parts.length - 1]"/>
+            </t>
+
+            <!-- MOSTRAR EN PANTALLA -->
+            <div style="font-weight: bold; font-size: 16px;">
+                Le atendió: <t t-esc="short_name" />
+            </div>
+        </div>
+    </xpath>
+
   </t>
 </templates>
