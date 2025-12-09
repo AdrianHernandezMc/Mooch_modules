@@ -37,12 +37,14 @@ class ReportSaleDetails(models.AbstractModel):
 
     @api.model
     def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
+        # 1. Obtener datos originales
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
-        
+
+        # 2. Obtener sesión
         sessions = self.env['pos.session'].browse(session_ids)
-        session = sessions[0] if sessions else False
         session_name = sessions[0].name if sessions else ''
-        
+
+        # 3. Consulta para conteos y deducciones
         all_lines = self.env['pos.order.line'].sudo().search([
             ('order_id.session_id', 'in', sessions.ids)
         ])
@@ -50,7 +52,7 @@ class ReportSaleDetails(models.AbstractModel):
         # =========================================================
         # 4. TOTALES Y CLASIFICACIÓN DE PAGOS
         # =========================================================
-        
+
         total_products_incl = 0.0 # Total General (Suma de todo)
         total_cash_sales = 0.0    # Solo Efectivo (Para arqueo)
         total_tpv = 0.0           # Solo Tarjetas (Crédito/Débito)
@@ -59,19 +61,20 @@ class ReportSaleDetails(models.AbstractModel):
             for payment in data['payments']:
                 # Sumamos al total general
                 total_products_incl += payment['total']
-                
+
                 # Convertimos nombre a minúsculas para buscar palabras clave
                 p_name = payment['name'].lower()
-                
+
                 # A. CLASIFICAR EFECTIVO (Para el arqueo)
                 if 'efectivo' in p_name or 'cash' in p_name:
                     total_cash_sales += payment['total']
-                
+
                 # B. CLASIFICAR TARJETAS (Para el Total T.P.V.)
                 # Sumamos si el nombre contiene: tarjeta, credito, debito, visa, master, etc.
                 if 'tarjeta' in p_name or 'crédito' in p_name or 'credito' in p_name or 'débito' in p_name or 'debito' in p_name or 'visa' in p_name or 'master' in p_name:
                     total_tpv += payment['total']
 
+        # B. CONTEO ARTÍCULOS
         total_items = sum(all_lines.mapped('qty'))
 
         # =========================================================
@@ -79,7 +82,7 @@ class ReportSaleDetails(models.AbstractModel):
         # =========================================================
         refund_lines = all_lines.filtered(lambda l: l.qty < 0)
         dev_total = sum(abs(l.price_subtotal_incl) for l in refund_lines)
-        
+
         disc_total = 0.0
         percentage_disc_lines = all_lines.filtered(lambda l: l.qty > 0 and l.discount > 0)
         for l in percentage_disc_lines:
@@ -95,13 +98,15 @@ class ReportSaleDetails(models.AbstractModel):
 
         deduction_total = dev_total + disc_total
 
+        # =========================================================
         # 6. OTROS DATOS
+        # =========================================================
         orders_count = len(sessions.mapped('order_ids'))
-        
+
         orders = session.order_ids.sorted(key=lambda r: r.id)
         folio_start = orders[0].pos_reference if orders else "N/A"
         folio_end = orders[-1].pos_reference if orders else "N/A"
-        
+
         # Limpieza nombres pago (Quitar nombre de sesión)
         if 'payments' in data:
             for payment in data['payments']:
@@ -142,26 +147,21 @@ class ReportSaleDetails(models.AbstractModel):
             'orders_count': orders_count,
             'folio_start': folio_start,
             'folio_end': folio_end,
-            
-            # Totales
+
+            # TOTALES
             'total_items': total_items,
             'total_products_incl': round(total_products_incl, 2),
             'total_cash_sales': round(total_cash_sales, 2),
             'total_tpv': round(total_tpv, 2), # <--- Aquí va la suma solo de tarjetas
-            
+
             # ARQUEO
             'opening_cash': round(opening_cash, 2),
             'theoretical_cash': round(theoretical_cash, 2),
-            
+
             # DEDUCCIONES
             'dev_total': round(dev_total, 2),
             'disc_total': round(disc_total, 2),
-            'deduction_total': round(deduction_total, 2),
-            
-            # Arqueo
-            'opening_cash': round(opening_cash, 2), # <--- ESTE ES EL FONDO INICIAL
-            'total_cash_sales': round(total_cash_sales, 2),
-            'theoretical_cash': round(theoretical_cash, 2)
+            'deduction_total': round(deduction_total, 2)
         })
         
         return data
