@@ -138,7 +138,7 @@ class ReportSaleDetails(models.AbstractModel):
 
         # Arqueo
         opening_cash = session.cash_register_balance_start if session else 0.0
-        theoretical_cash = opening_cash + total_cash_sales + total_entradas - total_salidas
+        theoretical_cash = total_cash_sales + total_entradas - total_salidas
 
         # 7. ACTUALIZAR DATOS
         data.update({
