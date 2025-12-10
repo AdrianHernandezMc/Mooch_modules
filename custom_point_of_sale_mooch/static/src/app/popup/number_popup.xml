@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-inherit="point_of_sale.NumberPopup" t-inherit-mode="extension">
+        
+        <!-- 1. OCULTAR EL VISOR DE NÚMEROS (Donde salen los numeritos) -->
+        <!-- En tu código se llama: <div class="input-symbol pt-3"> -->
+        <xpath expr="//div[hasclass('input-symbol')]" position="attributes">
+            <attribute name="t-if">!props.isPassword</attribute>
+        </xpath>
+
+        <!-- 2. OCULTAR EL TECLADO NUMÉRICO (El componente <Numpad />) -->
+        <!-- IMPORTANTE: Aquí atacamos al componente, no a un div -->
+        <xpath expr="//Numpad" position="attributes">
+            <attribute name="t-if">!props.isPassword</attribute>
+        </xpath>
+
+        <!-- 3. PONER TU INPUT ALFANUMÉRICO -->
+        <!-- Lo ponemos justo antes del Numpad -->
+        <xpath expr="//Numpad" position="before">
+            <t t-if="props.isPassword">
+                <div class="d-flex flex-column align-items-center justify-content-center w-100 my-4">
+                    
+                    <h4 class="text-muted mb-3">Contraseña (Letras permitidas)</h4>
+
+                    <input type="password" 
+                           class="form-control"
+                           t-ref="text-input-pw"
+                           t-on-input="onTextInput"
+                           placeholder="Escribe aquí..."
+                           style="
+                               font-size: 28px; 
+                               text-align: center; 
+                               width: 80%; 
+                               padding: 15px; 
+                               border: 2px solid #714B67;
+                               border-radius: 10px;
+                           "
+                    />
+                    
+                    <small class="text-muted mt-2">
+                        <i class="fa fa-keyboard-o"/> Usa tu teclado físico
+                    </small>
+                </div>
+            </t>
+        </xpath>
+
+    </t>
+</templates>

@@ -35,6 +35,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.js",
           "custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.js",
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.js",
+          "custom_point_of_sale_mooch/static/src/app/popup/number_popup.js",
           "custom_point_of_sale_mooch/static/src/app/utilis/Input_popups/text_inpup_popup.xml",
 
           # Screens
@@ -62,6 +63,7 @@
           "custom_point_of_sale_mooch/static/src/app/popup/productscreen_help.xml",
           "custom_point_of_sale_mooch/static/src/app/popup/hide_passwordpopup.xml",
           "custom_point_of_sale_mooch/static/src/app/popup/masked_input_popup.xml",
+          "custom_point_of_sale_mooch/static/src/app/popup/number_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/productscreen.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/ticketscreen/ticketscreen.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/control_buttons_popup.xml",
