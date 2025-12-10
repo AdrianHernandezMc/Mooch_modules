@@ -18,3 +18,10 @@ class HrEmployee(models.Model):
             ('company_id', '=', self.env.company.id),
         ], limit=1)
         return {'ok': bool(emp), 'name': emp.name or '' , 'id': emp.id }
+    
+    # Sobrescribimos la validación original para anularla
+    @api.constrains('pin')
+    def _verify_pin(self):
+        # La función original revisa "if not pin.isdigit()".
+        # Al dejarla vacía (pass), permitimos guardar letras, símbolos, etc.
+        pass
