@@ -116,21 +116,17 @@ patch(CashMovePopup.prototype, {
         // Obtenemos la configuración de esta caja
         const config = this.pos.config;
 
-        // Verificamos si hay empleados configurados en "Permisos básicos" (basic_employee_ids)
-        // Odoo carga esto en this.pos.config.basic_employee_ids
+        // Verificamos si hay empleados configurados en "Permisos básicos"
         if (config.basic_employee_ids && config.basic_employee_ids.length > 0) {
-            // Tomamos el primer ID de la lista (generalmente es solo uno, Luz)
             const basicEmployeeId = config.basic_employee_ids[0];
-
-            // Buscamos el nombre de ese empleado en la lista cargada (this.pos.employees)
             const basicEmployee = this.pos.employees.find(emp => emp.id === basicEmployeeId);
 
             if (basicEmployee) {
-                sessionOpener = basicEmployee.name; // ¡Aquí asignamos a Luz!
+                sessionOpener = basicEmployee.name;
             }
         }
 
-        // Fallback: Si no hay nadie en permisos básicos, usamos el Usuario de la sesión (Caja Tlajo)
+        // Fallback: Si no hay nadie en permisos básicos
         if (sessionOpener === "Desconocido") {
              if (this.pos.pos_session.user_id) {
                  sessionOpener = this.pos.pos_session.user_id[1];
@@ -140,7 +136,8 @@ patch(CashMovePopup.prototype, {
 
         const posName = this.pos.config.name;
 
-        await this.printer.print(CashMoveReceipt, {
+        // --- CORRECCIÓN AQUÍ: Definimos receiptData ANTES de usarlo ---
+        const receiptData = {
             reason,
             translatedType,
             formattedAmount,
@@ -150,7 +147,13 @@ patch(CashMovePopup.prototype, {
             responsable: currentResponsable,
             isCashOut: type === 'out',
             posName: posName
-        });
+        };
+
+        // Primera copia (Usando la variable receiptData)
+        await this.printer.print(CashMoveReceipt, receiptData);
+
+        // Segunda copia (Usando la variable receiptData)
+        await this.printer.print(CashMoveReceipt, receiptData);
 
         this.props.close();
         this.notification.add(
