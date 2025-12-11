@@ -621,14 +621,28 @@ class PurchaseOrder(models.Model):
 
         return total_po_amount
 
-    @api.depends('invoice_status')
+    @api.depends('order_line.qty_invoiced', 'order_line.product_qty')
     def _compute_custom_invoice_status(self):
         for order in self:
-            if order.invoice_status == 'no':
+            # 1. Filtramos para ignorar notas y secciones, solo queremos productos/servicios
+            lines = order.order_line.filtered(lambda x: x.display_type not in ('line_section', 'line_note'))
+            
+            # Si no hay líneas, lo marcamos como sin facturar por defecto
+            if not lines:
                 order.custom_invoice_status = 'Sin facturar'
-            elif order.invoice_status == 'to invoice':
-                order.custom_invoice_status = 'Pendiente facturar'
-            elif order.invoice_status == 'invoiced':
+                continue
+
+            # 2. Lógica Solicitada:
+            
+            # CASO A: ¿Todas las líneas tienen 0 facturado?
+            if all(l.qty_invoiced == 0 for l in lines):
+                order.custom_invoice_status = 'Sin facturar'
+            
+            # CASO B: ¿Todas las líneas están totalmente facturadas? 
+            # (Lo facturado es igual o mayor a lo pedido)
+            elif all(l.qty_invoiced >= l.product_qty for l in lines):
                 order.custom_invoice_status = 'Facturación completa'
+            
+            # CASO C: Mezcla (unas sí, otras no) o Parciales (mitad de cantidad)
             else:
-                order.custom_invoice_status = 'Sin definir'
+                order.custom_invoice_status = 'Pendiente facturar'
