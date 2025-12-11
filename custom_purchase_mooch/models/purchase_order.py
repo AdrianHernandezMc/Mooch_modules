@@ -80,6 +80,10 @@ class PurchaseOrder(models.Model):
         store=True,
         required=True
     )
+    custom_invoice_status = fields.Char(
+        string='Estatus de Facturación',
+        compute='_compute_custom_invoice_status'
+    )
 
     # =========================
     #        COMPUTES
@@ -616,3 +620,15 @@ class PurchaseOrder(models.Model):
             total_po_amount += po_amount
 
         return total_po_amount
+
+    @api.depends('invoice_status')
+    def _compute_custom_invoice_status(self):
+        for order in self:
+            if order.invoice_status == 'no':
+                order.custom_invoice_status = 'Sin facturar'
+            elif order.invoice_status == 'to invoice':
+                order.custom_invoice_status = 'Pendiente facturar'
+            elif order.invoice_status == 'invoiced':
+                order.custom_invoice_status = 'Facturación completa'
+            else:
+                order.custom_invoice_status = 'Sin definir'
