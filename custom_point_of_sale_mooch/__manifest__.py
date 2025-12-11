@@ -51,6 +51,7 @@
           # Models y navbar
           "custom_point_of_sale_mooch/static/src/app/store/models.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/navbar.js",
+          "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.js",
 
           # XML
           "custom_point_of_sale_mooch/static/src/app/screens/login_screen/login_screen.xml",
