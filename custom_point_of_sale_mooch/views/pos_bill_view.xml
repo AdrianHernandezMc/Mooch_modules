@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_bill_view_tree_inherit_type" model="ir.ui.view">
+        <field name="name">pos.bill.view.tree.inherit.type</field>
+        <field name="model">pos.bill</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_bill_tree"/>
+        <field name="arch" type="xml">
+            <field name="value" position="after">
+                <!-- Sin widget, aparecerá como un menú desplegable normal -->
+                <field name="money_type" />
+            </field>
+        </field>
+    </record>
+</odoo>

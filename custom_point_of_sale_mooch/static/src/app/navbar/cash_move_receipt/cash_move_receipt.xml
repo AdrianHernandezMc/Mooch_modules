@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="custom_point_of_sale_mooch.CashMoveReceipt">
+        <div class="pos-receipt">
+            
+            <!-- Título de la Compañía -->
+            <div class="pos-receipt-center-align">
+                <t t-if="props.headerData.company">
+                    <div style="font-size: 1.2em; font-weight: bold;">
+                        <t t-esc="props.headerData.company.name" />
+                    </div>
+                    <br/>
+                </t>
+            </div>
+
+            <!-- FECHA -->
+            <div class="pos-receipt-center-align">
+                <t t-esc="props.date" />
+            </div>
+            <br/>
+
+            <!-- TÍTULO GRANDE -->
+            <div class="pos-receipt-center-align" style="font-size: 1.6em; font-weight: bold; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 10px;">
+                <t t-if="props.isCashOut">RETIRO DE EFECTIVO</t>
+                <t t-else="">ENTRADA DE EFECTIVO</t>
+            </div>
+
+            <!-- CAJA (Grande) -->
+            <div style="font-size: 12.em; margin-bottom: 5px;">
+                <strong>Caja:</strong> <span t-esc="props.posName"/>
+            </div>
+
+            <!-- CAJERO (Apertura)-->
+            <div style="font-size: 1.2em; margin-bottom: 15px;">
+                <strong>Cajero (Apertura):</strong> <span t-esc="props.sessionOpener"/>
+            </div>
+
+            <!-- DETALLE DE CONCEPTOS -->
+            <div style="text-align: left; white-space: pre-wrap; font-family: 'Inconsolata', monospace; font-size: 1.1em; border-top: 1px dashed black; padding-top: 10px;">
+                <t t-esc="props.reason" />
+            </div>
+            <br />
+            <br />
+
+            <!-- IMPORTE TOTAL (Muy Grande) -->
+            <div style="border-top: 2px solid black; padding-top: 10px; padding-bottom: 10px; font-size: 1.5em; font-weight: bold;">
+                <strong>Importe Total:</strong>
+                <div class="pos-receipt-right-align">
+                    <span t-esc="props.formattedAmount"/>
+                </div>
+            </div>
+            <br />
+
+            <!-- RESPONSABLE (Grande) -->
+            <div style="font-size: 12.em;">
+                <strong>Responsable:</strong> <br/>
+                <span t-esc="props.responsable"/>
+            </div>
+            <br />
+            <br />
+            <br />
+            
+            <!-- FIRMA (Grande y Centrada) -->
+            <div class="pos-receipt-center-align" style="font-size: 12.em; font-weight: bold;">
+                __________________________________<br/>
+                Firma
+            </div>
+            
+        </div>
+    </t>
+
+</templates>

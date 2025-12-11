@@ -12,6 +12,7 @@
         'views/stock_picking_views.xml',
         'views/pos_order_views.xml',
         'views/product_views.xml',
+        'views/pos_bill_view.xml',
 
         # Documentos
         'views/report_saledetails_inherit.xml'
@@ -52,6 +53,7 @@
           "custom_point_of_sale_mooch/static/src/app/store/models.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/navbar.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.js",
+          "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_receipt.js",
 
           # XML
           "custom_point_of_sale_mooch/static/src/app/screens/login_screen/login_screen.xml",
@@ -70,6 +72,7 @@
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/control_buttons_popup.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/control_buttons/refund_button/refund_button.xml",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.xml",
+          "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_receipt.xml",
           "custom_point_of_sale_mooch/static/src/app/navbar/sale_details_button/sale_details_button.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/sale_details_button/sales_detail_report.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml",
