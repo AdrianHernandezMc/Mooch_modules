@@ -54,6 +54,7 @@
           "custom_point_of_sale_mooch/static/src/app/navbar/navbar.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_receipt.js",
+          "custom_point_of_sale_mooch/static/src/app/navbar/sales_detail_receipt/sales_detail_receipt_button.js",
 
           # XML
           "custom_point_of_sale_mooch/static/src/app/screens/login_screen/login_screen.xml",
@@ -75,6 +76,8 @@
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_receipt.xml",
           "custom_point_of_sale_mooch/static/src/app/navbar/sale_details_button/sale_details_button.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/sale_details_button/sales_detail_report.xml",
+          "custom_point_of_sale_mooch/static/src/app/navbar/sales_detail_receipt/sales_detail_receipt_button.xml",
+          "custom_point_of_sale_mooch/static/src/app/navbar/closing_popup/closing_popup_patch.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/productscreen/action_pad/action_pad.xml",
           "custom_point_of_sale_mooch/static/src/overrides/components/discount_button/discount_button.xml",
           "custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.xml",

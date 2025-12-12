@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="custom_point_of_sale_mooch.ClosePosPopupPatch" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
+        
+        <!-- Forzamos estilo en la etiqueta main que contiene la clase body -->
+        <xpath expr="//main[contains(@class, 'body')]" position="attributes">
+            <attribute name="style">max-height: 50vh !important; overflow-y: auto !important; display: block !important;</attribute>
+        </xpath>
+
+    </t>
+</templates>
