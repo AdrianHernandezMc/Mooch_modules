@@ -82,7 +82,9 @@ class PurchaseOrder(models.Model):
     )
     custom_invoice_status = fields.Char(
         string='Estatus de Facturación',
-        compute='_compute_custom_invoice_status'
+        compute='_compute_custom_invoice_status',
+        store=True,
+        readonly=True
     )
 
     # =========================
@@ -632,13 +634,13 @@ class PurchaseOrder(models.Model):
                 order.custom_invoice_status = 'Sin facturar'
                 continue
 
-            # 2. Lógica Solicitada:
+            # 2. Lógica:
             
             # CASO A: ¿Todas las líneas tienen 0 facturado?
             if all(l.qty_invoiced == 0 for l in lines):
                 order.custom_invoice_status = 'Sin facturar'
             
-            # CASO B: ¿Todas las líneas están totalmente facturadas? 
+            # CASO B: ¿Todas las líneas están totalmente facturadas?
             # (Lo facturado es igual o mayor a lo pedido)
             elif all(l.qty_invoiced >= l.product_qty for l in lines):
                 order.custom_invoice_status = 'Facturación completa'

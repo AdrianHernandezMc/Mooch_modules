@@ -235,7 +235,7 @@
         </field>
     </record>
 
-    <!-- Vista para mostrar estatus de la factua -->
+    <!-- Vista para mostrar estatus de la factura -->
     <record id="purchase_order_kpis_tree_inherit_custom" model="ir.ui.view">
         <field name="name">purchase.order.kpis.tree.inherit.custom</field>
         <field name="model">purchase.order</field>
