@@ -8,3 +8,36 @@ span.text-success.fs-5 {
 }
 
 
+/* 1. ESTILO BASE Y BORDES REDONDEADOS PARA AMBOS BOTONES */
+/* Se aplica a todos los botones del grupo para darles la forma deseada. */
+button.input-type {
+    border-radius: 8px !important; /* ¡Aquí aplicamos los bordes redondeados! */
+}
+
+/* 2. BOTÓN DE SALIDA (SIEMPRE ROJO) */
+/* Le damos prioridad !important para que gane sobre otros estilos. */
+button.input-type.red-highlight,
+button.input-type.btn-danger {
+    background-color: #dc3545 !important; /* Rojo intenso (Bootstrap Danger) */
+    border-color: #dc3545 !important;
+    color: white !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+}
+
+/* 3. BOTÓN ACTIVO / SELECCIONADO (VERDE) */
+/* Se aplica cuando un botón es seleccionado (ej. Entrada de efectivo). */
+button.input-type.active,
+button.input-type.highlight {
+    background-color: #0aaf04 !important; /* Verde brillante */
+    border-color: #0aaf04 !important;     /* Borde del mismo color verde */
+    color: white !important;
+}
+
+/* 4. ESTADO NORMAL / NO SELECCIONADO (GRIS CLARO) */
+/* Se aplica a cualquier botón que no sea el rojo y no esté activo. */
+button.input-type:not(.red-highlight):not(.btn-danger):not(.active):not(.highlight) {
+    background-color: #e9ecef !important; /* Gris muy claro */
+    color: #495057 !important;           /* Texto oscuro */
+    border-color: #ced4da !important;
+}
