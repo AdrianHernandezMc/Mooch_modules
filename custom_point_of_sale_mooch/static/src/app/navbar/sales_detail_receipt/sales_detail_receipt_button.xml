@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <!-- 1. El Botón Visual -->
+    <t t-name="SalesDetailReceiptButton" owl="1">
+        <div class="oe_status ticket-button" t-on-click="onClick" 
+             style="cursor: pointer; display: flex; align-items: center; padding: 0 10px; margin: 0 5px; background: rgba(0,0,0,0.05); border-radius: 4px; height: 100%;">
+            <i class="fa fa-list-alt" style="font-size: 18px; margin-right: 5px; color: #555;" title="Imprimir Detalle"></i>
+            <span style="font-weight: bold; font-size: 13px; color: #333;">Detalle</span>
+        </div>
+    </t>
+
+    <!-- 2. Insertar en el Navbar (Al lado del nombre del cajero) -->
+    <t t-inherit="point_of_sale.Navbar" t-inherit-mode="extension" owl="1">
+        <xpath expr="//CashierName" position="after">
+            <SalesDetailReceiptButton />
+        </xpath>
+    </t>
+
+    <!-- 3. Ticket de Impresión -->
+    <t t-name="SalesDetailsReceipt" owl="1">
+        <div class="pos-receipt">
+            <div class="pos-receipt-contact">
+                <br/>
+                <div style="font-size: 22px; font-weight: 900; text-align: center;">
+                    DETALLE DE VENTA
+                </div>
+                <div style="text-align: center; font-size: 14px;">
+                    Desglose por Orden
+                </div>
+                <br/>
+                <div style="text-align: center;">
+                    <t t-esc="props.date" />
+                </div>
+                <div style="text-align: center; font-size: 12px; margin-bottom: 10px;">
+                    Cajero: <t t-esc="props.cashier" />
+                </div>
+                <div>--------------------------------</div>
+            </div>
+
+            <t t-foreach="props.details" t-as="method_key" t-key="method_key">
+                <t t-set="method" t-value="props.details[method_key]"/>
+                <div class="payment-group" style="margin-bottom: 20px;">
+                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">
+                        <t t-esc="method.name"/>
+                    </div>
+                    <t t-foreach="method.orders" t-as="order" t-key="order.ref">
+                        <div style="display: flex; justify-content: space-between; font-size: 16px; margin-left: 5px; color: #333;">
+                            <span>Orden <t t-esc="order.ref"/>:</span>
+                            <span><t t-esc="props.formatCurrency(order.amount)"/></span>
+                        </div>
+                    </t>
+                    <div style="border-top: 1px solid #000; margin-top: 5px; padding-top: 2px; font-weight: bold; font-size: 18px; text-align: right;">
+                        Total <t t-esc="method.name"/>: 
+                        <span t-esc="props.formatCurrency(method.total)"/>
+                    </div>
+                </div>
+            </t>
+
+            <div class="pos-receipt-center-align">
+                <br/>
+                <div>--------------------------------</div>
+                <div style="font-size: 24px; font-weight: 900; margin-top: 5px;">
+                    TOTAL: <t t-esc="props.formatCurrency(props.grand_total)"/>
+                </div>
+                <div>--------------------------------</div>
+            </div>
+        </div>
+    </t>
+
+</templates>

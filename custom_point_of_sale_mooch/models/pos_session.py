@@ -1,5 +1,8 @@
 # # -*- coding: utf-8 -*-
 from odoo import models, api , _
+import logging
+
+_logger = logging.getLogger(__name__)
 
 class PosSession(models.Model):
     _inherit = "pos.session"
@@ -31,6 +34,48 @@ class PosSession(models.Model):
 #         return res
 # -*- coding: utf-8 -*-
 # models/pos_session_loader.py
+
+    def get_sales_details_backend(self):
+        self.ensure_one()
+
+        details = {}
+        grand_total = 0.0
+
+        # Busca órdenes de esta sesión
+        orders = self.env['pos.order'].search([('session_id', '=', self.id)])
+
+        for order in orders:
+            for payment in order.payment_ids:
+                amount = payment.amount
+                if amount == 0:
+                    continue
+
+                method = payment.payment_method_id
+                key = str(method.id) # Convertir a string para evitar errores JS
+
+                if key not in details:
+                    details[key] = {
+                        'name': method.name,
+                        'total': 0.0,
+                        'orders': []
+                    }
+
+                ref_name = order.pos_reference or order.name
+                if ref_name and 'Order ' in ref_name:
+                    ref_name = ref_name.replace('Order ', '')
+
+                details[key]['orders'].append({
+                    'ref': ref_name,
+                    'amount': amount
+                })
+
+                details[key]['total'] += amount
+                grand_total += amount
+
+        return {
+            'details': details,
+            'grand_total': grand_total,
+        }
 
 class ReportSaleDetails(models.AbstractModel):
     _inherit = 'report.point_of_sale.report_saledetails'

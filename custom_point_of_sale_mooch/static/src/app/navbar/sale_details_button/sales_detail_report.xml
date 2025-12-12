@@ -146,10 +146,10 @@
                 <div style="border-bottom: 2px solid black; margin-bottom: 5px;"></div>
 
                 <t t-if="is_z_report">
-                    <div style="display: flex; justify-content: space-between; font-size: 20px;">
+                    <!-- <div style="display: flex; justify-content: space-between; font-size: 20px;">
                         <span>(+) Fondo Inicial:</span>
                         <span t-esc="formatCurrency(opening_cash || 0, false)"/>
-                    </div>
+                    </div> -->
                     <div style="display: flex; justify-content: space-between; font-size: 20px;">
                         <span>(+) Ventas Efectivo:</span>
                         <span t-esc="formatCurrency(total_cash_sales || 0, false)"/>
