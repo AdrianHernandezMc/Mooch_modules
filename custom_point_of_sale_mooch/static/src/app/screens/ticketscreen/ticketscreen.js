@@ -373,10 +373,29 @@ patch(TicketScreen.prototype, {
         );
 
         order.voucher_code = pos_voucher_code[0]?.code;
-        const addcode_to_orderline =  order.get_orderlines();
+        const discountConfig = this.pos.config.discount_product_id;
+        const discountProductId = Array.isArray(discountConfig) ? discountConfig[0] : discountConfig;
+
+        const addcode_to_orderline = order.get_orderlines();
         addcode_to_orderline.forEach(l => {
-            if (!l.full_product_name.includes(l.product.barcode) && l.product.id !== order.product_changes_id && l.product.id !== order.product_voucher_id) {
-                l.full_product_name = l.full_product_name + " - [" + l.product.barcode+"]";
+            // Verificar código de barras (que no sea null/false)
+            const barcode = l.product.barcode;
+            const hasBarcode = barcode && barcode !== false;
+            
+            // Verificar si es el producto de descuento
+            const isDiscount = l.product.id === discountProductId;
+
+            // Solo agregamos el código si:
+            // 1. Existe el barcode
+            // 2. NO lo tiene ya en el nombre
+            // 3. NO es cambio, NO es vale, y NO es descuento
+            if (hasBarcode && 
+                !l.full_product_name.includes(barcode) && 
+                l.product.id !== order.product_changes_id && 
+                l.product.id !== order.product_voucher_id && 
+                !isDiscount) {
+                
+                l.full_product_name = l.full_product_name + " - [" + barcode + "]";
             }
 
             if (!l.full_product_name.includes(change_codes) && l.product.id == order.product_changes_id){

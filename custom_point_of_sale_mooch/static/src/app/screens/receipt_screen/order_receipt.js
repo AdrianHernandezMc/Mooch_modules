@@ -100,7 +100,7 @@ patch(Order.prototype, {
               line.price = num.toFixed(2);
             }
 
-            let shortName = line.productName.substring(0, 20); 
+            let shortName = line.productName.substring(0, 35); 
             if (code && prod.id != oline_.pos.product_changes_id)  shortName += ` - ${code}` ; 
            
             // detecto si el producto es un cambio.
