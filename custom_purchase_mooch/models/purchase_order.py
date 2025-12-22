@@ -87,6 +87,12 @@ class PurchaseOrder(models.Model):
         readonly=True
     )
 
+    custom_reception_status = fields.Char(
+        string='Estatus de Recepción',
+        compute='_compute_custom_reception_status',
+        store=True  # Importante para ordenar y agrupar
+    )
+
     # =========================
     #        COMPUTES
     # =========================
@@ -648,3 +654,27 @@ class PurchaseOrder(models.Model):
             # CASO C: Mezcla (unas sí, otras no) o Parciales (mitad de cantidad)
             else:
                 order.custom_invoice_status = 'Pendiente facturar'
+
+    @api.depends('order_line.qty_received', 'order_line.product_qty')
+    def _compute_custom_reception_status(self):
+        for order in self:
+            # Filtramos para ignorar notas y secciones
+            lines = order.order_line.filtered(lambda x: x.display_type not in ('line_section', 'line_note'))
+            
+            if not lines:
+                order.custom_reception_status = 'Sin recibir'
+                continue
+
+            # LÓGICA DE RECEPCIÓN:
+            
+            # 1. ¿Nadie ha recibido nada? (Todo en 0)
+            if all(l.qty_received == 0 for l in lines):
+                order.custom_reception_status = 'Sin recibir'
+            
+            # 2. ¿Ya llegó todo? (Recibido >= Pedido)
+            elif all(l.qty_received >= l.product_qty for l in lines):
+                order.custom_reception_status = 'Recepción completa'
+            
+            # 3. ¿Llegó incompleto o solo algunas líneas?
+            else:
+                order.custom_reception_status = 'Pendiente recibir'

@@ -248,6 +248,12 @@
                       decoration-warning="custom_invoice_status == 'Pendiente facturar'"
                       decoration-muted="custom_invoice_status == 'Sin facturar'"/>
             </xpath>
+            <xpath expr="//field[@name='custom_invoice_status']" position="before">
+                <field name="custom_reception_status" widget="badge"
+                      decoration-success="custom_reception_status == 'Recepción completa'"
+                      decoration-warning="custom_reception_status == 'Pendiente recibir'"
+                      decoration-info="custom_reception_status == 'Sin recibir'"/>
+            </xpath>
         </field>
     </record>
 
