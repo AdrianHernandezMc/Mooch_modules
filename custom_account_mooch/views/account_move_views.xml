@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 1. VISTA DE FORMULARIO (Donde editas la factura) -->
+    <record id="view_move_form_inherit_mooch" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.mooch</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='ref']" position="after">
+                <field name="x_transfer_number" placeholder="Ej: SPEI-123456"/>
+            </xpath>
+            <xpath expr="//field[@name='x_transfer_number']" position="after">
+              <field name="x_payment_method_mode" widget="radio"/>
+              <field name="x_is_provisioned"/>
+              <field name="x_is_complete"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 2. VISTA DE ÁRBOL / LISTA (El listado de facturas) -->
+    <record id="view_invoice_tree_inherit_mooch" model="ir.ui.view">
+        <field name="name">account.move.tree.inherit.mooch</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='payment_state']" position="before">
+                <field name="x_transfer_number" optional="show"/>
+                <field name="x_is_provisioned"
+                       optional="show"
+                       readonly="1"/>
+            </xpath>
+            <xpath expr="//field[@name='invoice_date_due']" position="after">
+                <field name="x_payment_method_mode"
+                       optional="show"
+                       widget="badge"
+                       decoration-success="x_payment_method_mode == 'PUE'"
+                       decoration-warning="x_payment_method_mode == 'PPD'"/>
+            </xpath>
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="x_is_complete"
+                       optional="show"
+                       readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 3. VISTA DE BÚSQUEDA (Filtros y Agrupadores) -->
+    <record id="view_account_invoice_filter_inherit_mooch" model="ir.ui.view">
+        <field name="name">account.move.select.inherit.mooch</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+
+            <!-- 1. BÚSQUEDA POR TEXTO (Para que puedas escribir y buscar) -->
+            <!-- Buscamos el campo 'name' (Número de factura) y agregamos los nuestros después -->
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="x_transfer_number" string="No. Transferencia"/>
+                <field name="x_payment_method_mode" string="Método de Pago (PUE/PPD)"/>
+            </xpath>
+
+            <!-- 2. FILTROS RÁPIDOS (Botones para filtrar Sí/No) -->
+            <!-- Los ponemos antes del filtro de "Fecha de factura" o "Mis facturas" -->
+            <xpath expr="//filter[@name='late']" position="before">
+                <separator/>
+                <filter string="Es PUE" name="filter_pue" domain="[('x_payment_method_mode', '=', 'PUE')]"/>
+                <filter string="Es PPD" name="filter_ppd" domain="[('x_payment_method_mode', '=', 'PPD')]"/>
+                <separator/>
+                <filter string="Provisionado" name="filter_provisioned" domain="[('x_is_provisioned', '=', True)]"/>
+                <filter string="Pendiente de Provisionar" name="filter_not_provisioned" domain="[('x_is_provisioned', '=', False)]"/>
+                <separator/>
+                <filter string="Completo" name="filter_complete" domain="[('x_is_complete', '=', True)]"/>
+                <filter string="Incompleto" name="filter_incomplete" domain="[('x_is_complete', '=', False)]"/>
+                <separator/>
+            </xpath>
+
+            <!-- 3. AGRUPAR POR (Para ver totales por categoría) -->
+            <!-- Buscamos el grupo de filtros y agregamos el nuestro -->
+            <xpath expr="//group" position="inside">
+                <filter string="Método de Pago" name="group_payment_method" context="{'group_by': 'x_payment_method_mode'}"/>
+                <filter string="Estado de Provisión" name="group_provisioned" context="{'group_by': 'x_is_provisioned'}"/>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
