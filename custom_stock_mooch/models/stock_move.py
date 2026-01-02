@@ -2,7 +2,7 @@
 from odoo import models, api, _ , fields
 from odoo.tools import float_compare
 import logging
-from odoo.exceptions import ValidationError
+from datetime import datetime, timedelta
 
 _logger = logging.getLogger(__name__)
 
@@ -17,15 +17,72 @@ class StockMove(models.Model):
     )
 
     def _assign_picking(self):
-        """Override to avoid grouping: each stock.move -> its own picking."""
+        """
+        Sobreescritura corregida:
+        1. Agrupa movimientos actuales.
+        2. Busca pickings recientes (24h) ignorando si el destino ya cambió por la lógica de departamentos.
+        """
         StockPicking = self.env['stock.picking']
-        for move in self:  # iterar por cada movimiento individualmente
-            if float_compare(move.product_uom_qty, 0.0, precision_rounding=move.product_uom.rounding) <= 0:
+        grouped_moves = {}
+
+        # 1. Agrupar los movimientos que vienen en este proceso (self)
+        for move in self:
+            if move.picking_id or float_compare(move.product_uom_qty, 0.0, precision_rounding=move.product_uom.rounding) <= 0:
                 continue
-            picking_vals = move._get_new_picking_values()
-            new_picking = StockPicking.create(picking_vals)
-            move.write({'picking_id': new_picking.id})
-            move._assign_picking_post_process(new=True)
+
+            # Clave de agrupación interna para este lote
+            key = (
+                move.picking_type_id.id,
+                move.location_id.id,
+                move.location_dest_id.id,
+                move.partner_id.id,
+                move.origin,
+                move.group_id.id
+            )
+            if key not in grouped_moves:
+                grouped_moves[key] = self.env['stock.move']
+            grouped_moves[key] |= move
+
+        # 2. Procesar cada grupo e intentar unirlo a un picking existente
+        for key, moves in grouped_moves.items():
+            picking_type_id, location_id, location_dest_id, partner_id, origin, group_id = key
+            
+            # --- CAMBIO CRÍTICO AQUÍ ---
+            # Quitamos 'location_dest_id' del dominio de búsqueda.
+            # Esto permite que si el picking existente ya cambió de destino (por departamento),
+            # las nuevas líneas aún puedan encontrarlo y unirse.
+            domain = [
+                ('picking_type_id', '=', picking_type_id),
+                ('location_id', '=', location_id),
+                # ('location_dest_id', '=', location_dest_id),  <-- ELIMINADO PARA PERMITIR UNIÓN
+                ('partner_id', '=', partner_id),
+                ('state', 'in', ['draft', 'confirmed', 'assigned', 'waiting']),
+                ('create_date', '>=', fields.Datetime.now() - timedelta(hours=24))
+            ]
+            
+            if origin:
+                domain.append(('origin', '=', origin))
+            else:
+                domain.append(('origin', '=', False))
+                
+            if group_id:
+                domain.append(('group_id', '=', group_id))
+
+            # Buscar picking existente
+            picking = StockPicking.search(domain, limit=1)
+
+            if picking:
+                _logger.info("Uniendo movimientos al picking existente: %s", picking.name)
+                moves.write({'picking_id': picking.id})
+                moves._assign_picking_post_process(new=False)
+            else:
+                # Crear uno nuevo
+                vals = moves[0]._get_new_picking_values()
+                picking = StockPicking.create(vals)
+                _logger.info("Creando nuevo picking: %s", picking.name)
+                moves.write({'picking_id': picking.id})
+                moves._assign_picking_post_process(new=True)
+
         return True
 
     @api.depends('product_id.product_tmpl_id.department_id.name')
@@ -37,27 +94,37 @@ class StockMove(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         moves = super().create(vals_list)
-        pickings = moves.mapped('picking_id').filtered(
-            lambda p: p and p.picking_type_code == 'incoming' and p.state not in ('done', 'cancel')
-        )
-        for p in pickings:
-            try:
-                p._auto_set_destination_on_receipt()
-            except Exception as e:
-                _logger.debug("Auto destino desde move.create %s: %s", p.name or p.id, e)
-        return moves
-
-    def write(self, vals):
-        res = super().write(vals)
-        if {'product_id', 'location_dest_id', 'picking_id'} & set(vals.keys()):
-            pickings = self.mapped('picking_id').filtered(
-                lambda p: p and p.picking_type_code == 'incoming' and p.state not in ('done', 'cancel')
+        
+        # Validar que picking_type_id exista antes de acceder a code
+        incoming_moves = moves.filtered(lambda m: m.picking_type_id and m.picking_type_id.code == 'incoming')
+        
+        if incoming_moves:
+            pickings = incoming_moves.mapped('picking_id').filtered(
+                lambda p: p.state not in ('done', 'cancel')
             )
             for p in pickings:
                 try:
                     p._auto_set_destination_on_receipt()
                 except Exception as e:
-                    _logger.debug("Auto destino desde move.write %s: %s", p.name or p.id, e)
+                    _logger.debug("Auto destino desde move.create %s: %s", p.name or p.id, e)
+        return moves
+
+    def write(self, vals):
+        res = super().write(vals)
+        if {'product_id', 'location_dest_id', 'picking_id'} & set(vals.keys()):
+            
+            # Validar que picking_type_id exista antes de acceder a code
+            incoming_moves = self.filtered(lambda m: m.picking_type_id and m.picking_type_id.code == 'incoming')
+            
+            if incoming_moves:
+                pickings = incoming_moves.mapped('picking_id').filtered(
+                    lambda p: p.state not in ('done', 'cancel')
+                )
+                for p in pickings:
+                    try:
+                        p._auto_set_destination_on_receipt()
+                    except Exception as e:
+                        _logger.debug("Auto destino desde move.write %s: %s", p.name or p.id, e)
         return res
 
     def check_quantity_exceeded(self):
@@ -80,7 +147,7 @@ class StockMove(models.Model):
         exceeded_moves = self.check_quantity_exceeded()
         
         if exceeded_moves:
-            # Mensaje formateado con saltos de línea y formato limpio
+            # Mensaje formateado
             warning_message = _("⚠️ ADVERTENCIA: Los siguientes productos exceden la cantidad demandada:\n\n")
             
             for i, move_data in enumerate(exceeded_moves, 1):
@@ -89,7 +156,6 @@ class StockMove(models.Model):
                 warning_message += _("   • Recibido: %s\n") % move_data['received']
                 warning_message += _("   • Exceso: %s\n\n") % move_data['excess']
             
-            # Mensaje alternativo más compacto
             compact_message = _("⚠️ ADVERTENCIA: Productos con exceso de cantidad:\n\n")
             for move_data in exceeded_moves:
                 compact_message += _("• %s: %s → %s (+%s)\n") % (
@@ -99,14 +165,12 @@ class StockMove(models.Model):
                     move_data['excess']
                 )
             
-            # Mostrar advertencia en el log
             _logger.warning("="*80)
             _logger.warning("ADVERTENCIA DE CANTIDAD EXCEDIDA")
             _logger.warning("="*80)
             _logger.warning(compact_message)
             _logger.warning("="*80)
             
-            # Forzar el mensaje en la interfaz mediante el picking relacionado
             pickings = self.mapped('picking_id')
             for picking in pickings:
                 picking.message_post(
@@ -123,12 +187,8 @@ class StockMoveLine(models.Model):
 
     def _show_warning_notification(self, message, title):
         """Método para mostrar notificaciones de advertencia"""
-        # Registrar en log
         _logger.warning("%s: %s", title, message)
-        
-        # Intentar mostrar notificación usando varios métodos
         try:
-            # Método 1: Usar bus.bus si está disponible
             if hasattr(self.env['bus.bus'], '_sendone'):
                 self.env['bus.bus']._sendone(
                     self.env.user.partner_id,
@@ -145,7 +205,6 @@ class StockMoveLine(models.Model):
             _logger.debug("Método bus.bus falló: %s", e)
         
         try:
-            # Método 2: Crear un mensaje en el chatter del usuario
             self.env.user.partner_id.message_post(
                 body=message,
                 subject=title,
