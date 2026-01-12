@@ -50,7 +50,7 @@
           "custom_point_of_sale_mooch/static/src/app/screens/reserved/reserved.js",
 
           # Models y navbar
-          "custom_point_of_sale_mooch/static/src/app/store/models.js",
+        #   "custom_point_of_sale_mooch/static/src/app/store/models.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/navbar.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_popup.js",
           "custom_point_of_sale_mooch/static/src/app/navbar/cash_move_receipt/cash_move_receipt.js",
