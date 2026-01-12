@@ -1,11 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="pos_receipt_items_ext" xml:space="preserve">
+  
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
 
+    <!-- 0. REEMPLAZAR LISTA DE PRODUCTOS -->
+    <xpath expr="//OrderWidget" position="replace">
+        <div class="orderlines" style="margin-top: 10px; width: 100%; border-bottom: 1px dashed #000; padding-bottom: 10px;">
+            
+            <!-- Encabezados -->
+            <div style="border-bottom: 1px solid black; margin-bottom: 5px; font-weight: bold; display: flex; font-size: 26px;">
+                <div style="width: 60%;">Producto</div>
+                <div style="width: 40%; text-align: right;">Total</div>
+            </div>
 
-    <!-- ========================================================= -->
-    <!-- 1. HERENCIA PRINCIPAL: CUERPO DEL TICKET (OrderReceipt)   -->
-    <!-- ========================================================= -->
+            <!-- BUCLE MANUAL -->
+            <t t-foreach="props.data.orderlines" t-as="line" t-key="line_index">
+                <div style="margin-bottom: 20px;">
+                    
+                    <!-- A. NOMBRE Y TOTAL -->
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 20px;">
+                        <span t-esc="line.product_name" style="word-wrap: break-word; max-width: 85%; text-align: left;"/>
+                        <!-- Usamos price_display que forzamos en el JS -->
+                        <span t-esc="props.formatCurrency(line.price_display || 0)" style="text-align: right;"/>
+                    </div>
+
+                    <!-- B. MULTIPLICACIÓN: Cantidad x Precio -->
+                    <!-- CAMBIO AQUÍ: Aumentado a 22px y Negrita -->
+                    <div style="font-size: 20px; font-weight: bold; color: #333; margin-top: 2px;">
+                        <t t-esc="line.qty" /> 
+                        <span> x </span>
+                        <!-- Usamos line.price (texto generado en JS) -->
+                        <t t-esc="line.price" />
+                    </div>
+
+                    <!-- C. DESCUENTO -->
+                    <!-- CAMBIO AQUÍ: Aumentado a 18px -->
+                    <t t-if="line.discount > 0">
+                        <div style="font-size: 20px; color: #444; font-style: italic; margin-top: 2px;">
+                            <t t-esc="props.formatCurrency(line.price_unit_val || 0)"/>
+                            <span> Con un </span>
+                            <t t-esc="line.discount"/>% descuento de
+                            <t t-esc="props.formatCurrency((line.price_unit_val) / (1 - (line.discount / 100)) || 0)"/>
+                        </div>
+                    </t>
+
+                    <!-- D. Notas -->
+                    <t t-if="line.customer_note">
+                        <div style="font-size: 12px; font-style: italic; background-color: #f0f0f0;">
+                            Nota: <t t-esc="line.customer_note"/>
+                        </div>
+                    </t>
+
+                    <!-- E. Lotes -->
+                    <t t-if="line.pack_lot_lines">
+                        <ul style="font-size: 12px; list-style: none; padding-left: 0;">
+                            <li t-foreach="line.pack_lot_lines" t-as="lot" t-key="lot_index">
+                                <t t-if="lot.order_line.product.tracking == 'lot'">
+                                    Lote: <t t-esc="lot.lot_name"/>
+                                </t>
+                                <t t-else="">
+                                    SN: <t t-esc="lot.lot_name"/>
+                                </t>
+                            </li>
+                        </ul>
+                    </t>
+                </div>
+            </t>
+        </div>
+    </xpath>
 
     <!-- 1. ARTÍCULOS VENDIDOS -->
     <xpath expr="//div[contains(@class,'paymentlines')][@t-foreach='props.data.paymentlines']" position="after">
@@ -15,48 +77,37 @@
       </div>
     </xpath>
 
-    <!-- 2. MOVER 'CHANGE' (CAMBIO) -->
+    <!-- 2. CAMBIO (CHANGE) -->
     <xpath expr="//div[contains(@class,'receipt-change')]" position="replace">
       <t/>
     </xpath>
-
     <xpath expr="//div[contains(@class,'pos-receipt-amount')][span[@t-esc='props.formatCurrency(props.data.amount_total)']]" position="after">
-      <div class="pos-receipt-amount receipt-change mt-2">
+      <div class="pos-receipt-amount receipt-change mt-2" style="font-size: 24px; font-weight: 900;">
         CHANGE
-        <span t-esc="props.formatCurrency(props.data.change)" class="pos-receipt-right-align"/>
+        <span t-esc="props.formatCurrency(props.data.change || 0)" class="pos-receipt-right-align"/>
       </div>
     </xpath>
 
-    <!-- 3. ELIMINAR 'POWERED BY ODOO' -->
+    <!-- 3. ELIMINAR POWERED BY ODOO -->
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')]//p[contains(text(),'Powered by Odoo')]" position="replace">
       <t/>
     </xpath>
 
-    <!-- 4. BLOQUE UNIFICADO: TIPO DE VENTA + VALES DE REGALO -->
+    <!-- 4. BLOQUE UNIFICADO -->
     <xpath expr="//div[contains(@class,'pos-receipt-taxes')]" position="after">
-
-      <!-- A) TIPO DE VENTA -->
       <t t-if="props.data.sale_type">
         <div class="pos-sale-type">
           <span t-esc="props.data.sale_type" style="display:block; text-align:center; font-weight:bold; font-size:18px;"/>
         </div>
       </t>
-
-      <!-- B) VALES / CUPONES (Lógica corregida) -->
       <t t-if="props.data.new_coupon_info and props.data.new_coupon_info.length > 0">
         <div class="pos-coupon-section" style="margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px;">
-            <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">Codigos de cupnes:</div>
-
+            <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">Codigos de cupones:</div>
             <t t-foreach="props.data.new_coupon_info" t-as="coupon_info" t-key="coupon_info.code">
-                <!-- Contenedor individual de cada vale -->
                 <div style="background: white; padding-bottom: 15px; margin-bottom: 10px;">
-
-                    <!-- Nombre del vale -->
                     <div style="text-align: center; font-size: 110%; font-weight: bold;">
                         <t t-esc="coupon_info.program_name"/>
                     </div>
-
-                    <!-- Fecha -->
                     <div style="text-align: center; font-size: 90%; margin-bottom: 5px;">
                         <span>Vence: </span>
                         <t t-if="coupon_info.expiration_date">
@@ -64,35 +115,28 @@
                         </t>
                         <t t-else="">Indefinido</t>
                     </div>
-
-                    <!-- IMAGEN DEL CÓDIGO DE BARRAS -->
                     <div style="display: flex; justify-content: center;">
                         <img t-att-src="'/report/barcode/Code128/' + coupon_info.code + '?width=800&amp;height=150&amp;humanreadable=0'"
-                             alt="Barcode"
-                             style="width: 200px; height: 60px; max-width: 95%;"/>
+                             alt="Barcode" style="width: 200px; height: 60px; max-width: 95%;"/>
                     </div>
-
-                    <!-- NÚMERO DEL CÓDIGO (estilo grande) -->
                     <div style="text-align: center; margin-top: 2px;
                                 font-family: monospace; font-size: 14pt; font-weight: bold; letter-spacing: 2px;">
                         <t t-esc="coupon_info.code"/>
                     </div>
-
                 </div>
             </t>
         </div>
       </t>
     </xpath>
 
-    <!-- 5. CÓDIGO DE BARRAS DE LA ORDEN (ORIGINAL) -->
+    <!-- 5. CÓDIGO DE BARRAS ORDEN -->
     <xpath expr="//div[contains(@class,'pos-receipt-order-data')][div[@id='order-date']]" position="before">
         <t t-if="props.data.order_barcode">
             <div class="barcode-container"
                 style="text-align: center; margin-top: 20px; margin-bottom: 10px; padding: 8px 5px; background: white;">
                 <div style="display: flex; justify-content: center;">
                     <img t-att-src="'/report/barcode/Code128/' + props.data.order_barcode + '?width=800&amp;height=150&amp;humanreadable=0'"
-                        t-att-alt="props.data.order_barcode"
-                        class="thermal-barcode"
+                        t-att-alt="props.data.order_barcode" class="thermal-barcode"
                         style="width: 95%; max-width: 200px; height: 80px;"/>
                 </div>
             </div>
@@ -104,48 +148,37 @@
         </t>
     </xpath>
 
-    <!-- 6. OCULTAR EL CUPÓN ORIGINAL DE ODOO -->
+    <!-- 6. OCULTAR NATIVO -->
     <xpath expr="//div[hasclass('pos-receipt')]" position="inside">
-        <style>
-            .pos-coupon-rewards { display: none !important; }
-        </style>
+        <style> .pos-coupon-rewards { display: none !important; } </style>
     </xpath>
 
-    <!-- 7. AGRANDAR LA LÍNEA DE MÉTODO DE PAGO (NUEVO) -->
+    <!-- 7. PAGOS GRANDES -->
     <xpath expr="//div[contains(@class,'paymentlines')][@t-foreach='props.data.paymentlines']" position="attributes">
-        <!-- Puedes ajustar 20px al tamaño que desees (ej: 1.5em, 18px, etc.) -->
         <attribute name="style">font-size: 20px; font-weight: bold; margin-bottom: 5px;</attribute>
     </xpath>
   </t>
 
-  <!-- ========================================================= -->
-  <!-- 2. HERENCIA SECUNDARIA: CABECERA (ReceiptHeader)          -->
-  <!--    AQUÍ CAMBIAMOS EL NOMBRE DEL CAJERO                    -->
-  <!-- ========================================================= -->
+  <!-- 8. HERENCIA CABECERA (Cajero) -->
   <t t-inherit="point_of_sale.ReceiptHeader" t-inherit-mode="extension" owl="1">
-    
     <xpath expr="//div[contains(@class, 'cashier')]" position="replace">
         <div t-if="props.data.cashier" class="cashier">
             <div>--------------------------------</div>
-            
-            <!-- LÓGICA PARA ACORTAR NOMBRE: Primer Nombre + Último Apellido -->
-            <t t-set="full_name" t-value="props.data.cashier"/>
-            <t t-set="name_parts" t-value="full_name.split(' ')"/>
-            
-            <!-- Tomamos el primer nombre -->
-            <t t-set="short_name" t-value="name_parts[0]"/>
-            
-            <!-- Si tiene más de una palabra, agregamos la última -->
-            <t t-if="name_parts.length > 1">
-                <t t-set="short_name" t-value="short_name + ' ' + name_parts[name_parts.length - 1]"/>
+            <t t-if="props.data.cashier and typeof props.data.cashier === 'string'">
+                <t t-set="full_name" t-value="props.data.cashier"/>
+                <t t-set="name_parts" t-value="full_name.split(' ')"/>
+                <t t-set="short_name" t-value="name_parts[0]"/>
+                <t t-if="name_parts.length > 1">
+                    <t t-set="short_name" t-value="short_name + ' ' + name_parts[name_parts.length - 1]"/>
+                </t>
+                <div style="font-weight: bold; font-size: 16px;">
+                    Le atendió: <t t-esc="short_name" />
+                </div>
             </t>
-
-            <!-- MOSTRAR EN PANTALLA -->
-            <div style="font-weight: bold; font-size: 16px;">
-                Le atendió: <t t-esc="short_name" />
-            </div>
+            <t t-else="">
+                <div style="font-weight: bold;">Le atendió: Cajero</div>
+            </t>
         </div>
     </xpath>
-
   </t>
 </templates>
