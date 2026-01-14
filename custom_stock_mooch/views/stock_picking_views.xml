@@ -6,15 +6,23 @@
         <field name="arch" type="xml">
             <xpath expr="//page[@name='extra']//group//group[@name='other_infos']" position="after">
                 <group string="Envios" name="send_information">
-                    <field name="who_transfers" string="Traslada: "/>
-                    <field name="who_receive" string="Recibe: "/>
-                    <field name="driver" string="Chofer: "/>
+                    <field name="who_transfers" string="Traslada: " options="{'no_create': True}"/>
+                    <field name="who_receive" string="Recibe: " options="{'no_create': True}"/>
+                    <field name="driver" string="Chofer: " options="{'no_create': True}"/>
                     <field name="plates" string="Placas: "/>
                     <field name="unity" string="Unidad: "/>
                     <field name="box_quantity" string="Cantidad Cajas"/>
                 </group>
             </xpath>
-
+            <xpath expr="//page[@name='extra']//group[@name='other_infos']//field[@name='user_id']" position="attributes">
+                <attribute name="options">{'no_create': True}</attribute>
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="attributes">
+                <attribute name="options">{'no_create': True}</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_id']" position="attributes">
+                <attribute name="options">{'no_create': True}</attribute>
+            </xpath>
             <xpath expr="//field[@name='date_done']" position="after">
                 <field name="create_date" string="Creado el" readonly="1"/>
                 <field name="date_destination_done"
