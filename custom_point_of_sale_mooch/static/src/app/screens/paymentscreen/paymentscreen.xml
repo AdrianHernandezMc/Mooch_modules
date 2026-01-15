@@ -72,125 +72,153 @@
                                 <span>📡 Cargando datos de entrega del cliente...</span>
                             </div>
                         </t>
-                            <div class="form-section">
-                                <h4>👤 Información de Contacto</h4>
-                                <div class="form-grid">
-                                    <label>Nombre del Contacto:</label>
-                                    <input type="text"
-                                          t-model="state.contact_name"
-                                          placeholder="Persona que recibirá el pedido"
-                                          class="form-input"/>
-
-                                    <label>📞 Teléfono:</label>
-                                    <input type="text"
-                                          t-model="state.phone"
-                                          placeholder="Número de contacto"
-                                          class="form-input"/>
-
-                                    <label>📝 Notas de Entrega:</label>
-                                    <textarea t-model="state.notes"
-                                              placeholder="Indicaciones especiales, horarios preferidos, referencias, etc." 
-                                              class="form-textarea"></textarea>
-                                </div>
-                            </div>
-
+                        
+                        <!-- SECCIÓN z: UBICACIÓN -->
                         <div class="form-section">
                             <h4>📍 Ubicación de Entrega</h4>
 
+                            <!-- BUSCADOR GENERAL (AUTOCOMPLETE) -->
                             <div class="address-search">
-                                <label>Buscar Dirección en Google Maps:</label>
+                                <label>Buscar Dirección General:</label>
                                 <div class="search-container">
                                     <input type="text"
                                            id="address-input"
                                            t-model="state.address"
-                                           placeholder="Escribe la dirección completa..."
+                                           placeholder="Ej: Av Vallarta 2440, Guadalajara"
                                            class="form-input search-input"/>
-                                    <button class="btn btn-search"
-                                            t-on-click="searchAddress"
-                                            title="Buscar en Google Maps">🔍</button>
+                                    <button class="btn btn-search" t-on-click="searchAddress" title="Buscar">🔍</button>
                                 </div>
-                                <small class="text-muted">
-                                    💡 Escribe la dirección y haz clic en la lupa para buscarla en Google Maps
-                                </small>
                             </div>
 
-                            <div class="coordinates-display">
+                            <!-- ✅ NUEVA SECCIÓN: CAMPOS DETALLADOS (BIDIRECCIONAL) -->
+                            <!-- ✅ SECCIÓN DE DESGLOSE CON LISTA DE MUNICIPIOS DE JALISCO -->
+                            <div class="detailed-address-section" style="margin-top: 15px; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                                <h5 style="margin-bottom: 10px; font-size: 0.9em; color: #666; font-weight: bold;">📝 Editar Detalles (Manual)</h5>
+
+                                <!-- Fila 1: Calle y Número -->
+                                <div class="form-grid-row" style="display: flex; gap: 10px; margin-bottom: 8px;">
+                                    <div style="flex: 2;">
+                                        <label class="small-label">Calle:</label>
+                                        <input type="text"
+                                               t-model="state.street"
+                                               t-on-change="updateFromSpecificFields"
+                                               class="form-input form-control-sm"
+                                               placeholder="Calle"/>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label class="small-label">Número:</label>
+                                        <input type="text"
+                                               t-model="state.street_number"
+                                               t-on-change="updateFromSpecificFields"
+                                               class="form-input form-control-sm"
+                                               placeholder="#"/>
+                                    </div>
+                                </div>
+
+                                <!-- Fila 2: Colonia y CP -->
+                                <div class="form-grid-row" style="display: flex; gap: 10px; margin-bottom: 8px;">
+                                    <div style="flex: 2;">
+                                        <label class="small-label">Colonia:</label>
+                                        <input type="text"
+                                               t-model="state.colonia"
+                                               t-on-change="updateFromSpecificFields"
+                                               class="form-input form-control-sm"
+                                               placeholder="Colonia"/>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label class="small-label">C.P.:</label>
+                                        <input type="text"
+                                               t-model="state.zip"
+                                               t-on-change="updateFromSpecificFields"
+                                               class="form-input form-control-sm"
+                                               placeholder="CP"/>
+                                    </div>
+                                </div>
+
+                                <!-- Fila 3: Municipio (Con Lista JALISCO) -->
+                                <div class="form-grid-row" style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <label class="small-label">Municipio / Ciudad:</label>
+                                        <input type="text"
+                                            t-model="state.city"
+                                            list="municipios_jalisco_list"
+                                            t-on-change="updateFromSpecificFields"
+                                            class="form-input form-control-sm"
+                                            placeholder="Selecciona municipio..."/>
+
+                                        <!-- ✅ Generación dinámica y limpia -->
+                                        <datalist id="municipios_jalisco_list">
+                                            <!-- Puedes poner los principales primero manualmente si quieres -->
+                                            <option value="Tlajomulco de Zúñiga"/>
+                                            <option value="Guadalajara"/>
+                                            <option value="Zapopan"/>
+
+                                            <!-- El resto se genera desde el JS -->
+                                            <t t-foreach="municipiosList" t-as="municipio" t-key="municipio">
+                                                <option t-att-value="municipio"/>
+                                            </t>
+                                        </datalist>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- FIN NUEVA SECCIÓN -->
+
+                            <div class="coordinates-display" style="margin-top: 15px;">
                                 <div class="coordinate-group">
                                     <label>Latitud:</label>
-                                    <input type="text"
-                                           t-model="state.lat"
-                                           readonly="readonly"
-                                           class="form-input coordinate-input"/>
+                                    <input type="text" t-model="state.lat" readonly="readonly" class="form-input coordinate-input"/>
                                 </div>
                                 <div class="coordinate-group">
                                     <label>Longitud:</label>
-                                    <input type="text"
-                                           t-model="state.lng"
-                                           readonly="readonly"
-                                           class="form-input coordinate-input"/>
+                                    <input type="text" t-model="state.lng" readonly="readonly" class="form-input coordinate-input"/>
                                 </div>
 
-                                <!-- Indicador de Reverse Geocoding -->
                                 <t t-if="state.reverse_geocoding">
                                     <div class="geocoding-status">
-                                        <div class="geocoding-loading">
-                                            <div class="small-spinner"></div>
-                                            <span>Obteniendo dirección...</span>
-                                        </div>
-                                    </div>
-                                </t>
-                                <t t-elif="state.lat and state.lng and state.address">
-                                    <div class="geocoding-status success">
-                                        <span>✅ Dirección obtenida</span>
+                                        <div class="small-spinner"></div>
+                                        <span>Actualizando mapa...</span>
                                     </div>
                                 </t>
                             </div>
 
                             <div class="location-actions">
-                                <button class="btn btn-location"
-                                        t-on-click="useMyLocation"
-                                        t-att-disabled="state.searching_address">
-                                    <t t-if="state.searching_address">
-                                        <div class="small-spinner"></div>
-                                        Buscando ubicación...
-                                    </t>
-                                    <t t-else="">
-                                        📍 Usar Mi Ubicación Actual
-                                    </t>
+                                <button class="btn btn-location" t-on-click="useMyLocation" t-att-disabled="state.searching_address">
+                                    <t t-if="state.searching_address">Buscando...</t>
+                                    <t t-else="">📍 Usar Mi Ubicación Actual</t>
                                 </button>
                             </div>
                         </div>
+
+                        <!-- SECCIÓN 2: CONTACTO  -->
+                        <div class="form-section">
+                            <h4>👤 Información de Contacto</h4>
+                            <div class="form-grid">
+                                <label>Nombre del Contacto:</label>
+                                <input type="text" t-model="state.contact_name" placeholder="Persona que recibirá el pedido" class="form-input"/>
+
+                                <label>📞 Teléfono:</label>
+                                <input type="text" t-model="state.phone" placeholder="Número de contacto" class="form-input"/>
+
+                                <label>📝 Notas / Referencias:</label>
+                                <textarea t-model="state.notes" placeholder="Entre calles, color de fachada, indicaciones..." class="form-textarea"></textarea>
+                            </div>
+                        </div>
+
                     </div>
 
-                    <!-- Columna derecha: Mapa -->
+                    <!-- Columna derecha: Mapa  -->
                     <div class="map-column">
                         <div class="map-section">
                             <h4>🗺️ Mapa de Entrega</h4>
-                            <p class="map-instructions">Haz clic en el mapa o arrastra el marcador para seleccionar la ubicación exacta</p>
-
                             <div class="map-container">
                                 <div id="delivery-map" class="delivery-map">
                                     <t t-if="!state.map_loaded">
-                                        <div class="map-loading">
-                                            <div class="loading-spinner"></div>
-                                            <p>Cargando mapa...</p>
-                                        </div>
-                                    </t>
-                                    <t t-elif="!props.config?.google_maps_api_key">
-                                        <div class="no-api-key-message">
-                                            <h5>⚠️ Google Maps no configurado</h5>
-                                            <p>Configura la API Key de Google Maps en la configuración del POS para usar el mapa interactivo.</p>
-                                            <p>Puedes continuar ingresando la dirección manualmente.</p>
-                                        </div>
+                                        <div class="map-loading"><p>Cargando mapa...</p></div>
                                     </t>
                                 </div>
                             </div>
-
                             <div class="map-tips">
-                                <p>💡 <strong>Tips:</strong><br/>
-                                • Haz clic en el mapa para colocar el marcador<br/>
-                                • Arrastra el marcador para ajustar la ubicación<br/>
-                                • Usa "Mi Ubicación" para ubicarte automáticamente</p>
+                                <p class="text-muted small">Al editar Calle o Número, presiona Enter o haz clic fuera para actualizar el mapa.</p>
                             </div>
                         </div>
                     </div>
@@ -201,7 +229,7 @@
                 <div class="footer-actions">
                     <button class="btn btn-cancel" t-on-click="cancel">❌ Cancelar</button>
                     <button class="btn btn-confirm" t-on-click="confirm">✅ Confirmar Entrega</button>
-                    <button class="btn btn-report" t-on-click="generateReport">🖨️ <br/>Imprimir Pedido</button>
+                    <button class="btn btn-report" t-on-click="generateReport">🖨️ Imprimir</button>
                 </div>
             </div>
         </div>
