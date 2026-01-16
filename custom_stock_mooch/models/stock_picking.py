@@ -100,10 +100,12 @@ class StockPicking(models.Model):
     def create(self, vals):
         picking = super().create(vals)
         # SOLO la primera vez que se crea el picking incoming
-        try:
-            picking._auto_set_destination_on_receipt(first_time_only=True)
-        except Exception as e:
-            _logger.debug("Auto destino recepción (create) %s: %s", picking.display_name, e)
+        # Verificar si es Almacén/Existencias antes de aplicar cambios
+        if not picking._is_stock_existencias_destination():
+            try:
+                picking._auto_set_destination_on_receipt(first_time_only=True)
+            except Exception as e:
+                _logger.debug("Auto destino recepción (create) %s: %s", picking.display_name, e)
 
         if 'invoice_order_ids' in vals:
             picking._sync_invoice_tags_to_purchase()
@@ -114,10 +116,12 @@ class StockPicking(models.Model):
         # Si aún no se ha aplicado y es recepción, intentamos aplicarlo
         if {'name', 'move_ids', 'move_line_ids', 'location_dest_id', 'location_id', 'state', 'picking_type_id'} & set(vals.keys()):
             for picking in self.filtered(lambda p: p.picking_type_code == 'incoming' and p.state not in ('done', 'cancel')):
-                try:
-                    picking._auto_set_destination_on_receipt(first_time_only=True)
-                except Exception as e:
-                    _logger.debug("Auto destino recepción (write) %s: %s", picking.display_name, e)
+                # Verificar si es Almacén/Existencias antes de aplicar cambios
+                if not picking._is_stock_existencias_destination():
+                    try:
+                        picking._auto_set_destination_on_receipt(first_time_only=True)
+                    except Exception as e:
+                        _logger.debug("Auto destino recepción (write) %s: %s", picking.display_name, e)
 
         if 'invoice_order_ids' in vals:
             self._sync_invoice_tags_to_purchase()
@@ -144,6 +148,20 @@ class StockPicking(models.Model):
                 # 2) Destino por Departamento: heredar o recalcular
                 orig = bo.backorder_id
                 if orig and orig.location_dest_id:
+                    # Verificar si el destino original es Almacén/Existencias
+                    if orig._is_stock_existencias_destination():
+                        # Mantener el destino original sin cambios
+                        bo.location_dest_id = orig.location_dest_id.id
+                        bo.move_ids.filtered(lambda m: m.state not in ('done','cancel')).write({
+                            'location_dest_id': bo.location_dest_id.id
+                        })
+                        bo.move_line_ids.filtered(lambda l: getattr(l, 'state', False) not in ('done','cancel')).write({
+                            'location_dest_id': bo.location_dest_id.id
+                        })
+                        if hasattr(bo, 'dept_dest_applied'):
+                            bo.dept_dest_applied = True
+                        continue
+                    
                     # Hereda destino del original
                     bo.location_dest_id = orig.location_dest_id.id
                     # Alinear moves/lines abiertos
@@ -157,8 +175,10 @@ class StockPicking(models.Model):
                         bo.dept_dest_applied = True
                 else:
                     # Recalcular por departamento bajo la raíz correcta (soporta compras Vendors)
-                    if hasattr(bo, '_auto_set_destination_on_receipt'):
-                        bo._auto_set_destination_on_receipt(first_time_only=False, force=True)
+                    # Verificar si es Almacén/Existencias antes de aplicar cambios
+                    if not bo._is_stock_existencias_destination():
+                        if hasattr(bo, '_auto_set_destination_on_receipt'):
+                            bo._auto_set_destination_on_receipt(first_time_only=False, force=True)
 
             except Exception as e:
                 _logger.debug("Backorder (parcial) ajustes compra/depto falló en %s: %s", bo.name or bo.id, e)
@@ -173,6 +193,10 @@ class StockPicking(models.Model):
         for picking in self:
             if picking.picking_type_code != 'incoming':
                 continue
+            # Verificar si es Almacén/Existencias antes de aplicar cambios
+            if picking._is_stock_existencias_destination():
+                continue
+            
             # Solo sugerencia visual si aún no se aplicó de forma definitiva
             if not picking.dept_dest_applied:
                 dest = picking._compute_department_destination_location()
@@ -199,6 +223,15 @@ class StockPicking(models.Model):
         for picking in self:
             if picking.picking_type_code != 'incoming' or picking.state in ('done', 'cancel'):
                 continue
+            
+            # VERIFICACIÓN CRÍTICA: Si el destino es Almacén/Existencias, no aplicar cambios
+            if picking._is_stock_existencias_destination():
+                _logger.info("Destino es Almacén/Existencias. Manteniendo destino sin cambios para %s", 
+                            picking.name or picking.id)
+                if not picking.dept_dest_applied:
+                    picking.dept_dest_applied = True
+                continue
+            
             if first_time_only and not force and picking.dept_dest_applied:
                 continue
 
@@ -228,6 +261,44 @@ class StockPicking(models.Model):
                 picking.dept_dest_applied = True
 
     # ---------- Helpers ----------
+    def _is_stock_existencias_destination(self):
+        """Verifica si el destino es Almacén/Existencias.
+        Compara por nombre (case-insensitive) y estructura jerárquica.
+        """
+        self.ensure_one()
+        
+        if not self.location_dest_id:
+            return False
+        
+        # Verificar por complete_name (que incluye la jerarquía completa)
+        complete_name = self.location_dest_id.complete_name.lower()
+        
+        # Patrones comunes para Almacén/Existencias
+        patterns = [
+            '/existencias',
+            '/stock',
+            '/almacén/existencias',
+            '/almacen/existencias',
+            '/inventario',
+            'almacén/existencias',
+            'almacen/existencias',
+        ]
+        
+        # También verificar si el nombre de la ubicación es "Existencias"
+        location_name = self.location_dest_id.name.lower()
+        
+        # Verificar patrones en el complete_name o si el nombre es "existencias"
+        for pattern in patterns:
+            if pattern in complete_name:
+                _logger.debug("Ubicación destino coincide con patrón Almacén/Existencias: %s", complete_name)
+                return True
+        
+        if 'existencias' == location_name:
+            _logger.debug("Ubicación destino es 'Existencias': %s", complete_name)
+            return True
+        
+        return False
+
     def _get_department_text(self):
         """Versión mejorada para obtener el departamento."""
         self.ensure_one()
@@ -343,85 +414,71 @@ class StockPicking(models.Model):
         return dest
 
     def _compute_department_destination_location(self):
-        """
-        Lógica dinámica:
-        1. Identifica el Almacén del picking.
-        2. Busca si existe una ubicación con el nombre del Depto DENTRO de ese almacén.
-        3. Si existe -> Devuelve la ubicación del Depto.
-        4. Si NO existe -> Devuelve la ubicación estándar del almacén (lot_stock_id).
-        """
+        """Versión MEJORADA con búsqueda más específica"""
         self.ensure_one()
         
-        # Solo para recepciones
         if self.picking_type_code != 'incoming':
             return False
 
-        # 1. Obtener el Almacén y su ubicación base (Stock estándar)
-        # Esto hace que sea dinámico para ALMAC, TLAJO, IXTLA, etc.
-        warehouse = self.picking_type_id.warehouse_id
-        if not warehouse:
-            # Fallback si el tipo de operación no tiene almacén asignado (raro)
-            _logger.warning("Picking %s no tiene almacén en su tipo de operación.", self.name)
+        # Verificar si es Almacén/Existencias antes de calcular
+        if self._is_stock_existencias_destination():
+            _logger.debug("Destino es Almacén/Existencias. No se calculará ubicación por departamento para %s", self.name)
             return False
-            
-        # Esta es la ubicación "Padre" o "Por defecto" (ej. ALMAC/Stock o TLAJO/Existencias)
-        default_loc = warehouse.lot_stock_id
-        # Esta es la raíz de vista (ej. ALMAC o TLAJO - tipo view)
-        view_loc = warehouse.view_location_id
 
-        # 2. Obtener el nombre del departamento
-        dept_name = self._get_department_text()
-        
-        # Si no detectamos departamento, devolvemos la ubicación por defecto del almacén
-        if not dept_name:
-            return default_loc
+        root = self._get_incoming_root()
+        if not root:
+            _logger.debug("No se pudo encontrar la raíz para %s", self.name)
+            return False
+
+        dept = self._get_department_text()
+        if not dept:
+            _logger.debug("No se pudo determinar el departamento para %s", self.name)
+            return False
 
         Location = self.env['stock.location']
-        _logger.debug("Buscando depto '%s' en almacén '%s'", dept_name, warehouse.name)
-
-        # 3. BÚSQUEDA DINÁMICA: ¿Existe el departamento aquí?
         
-        # Intento A: Buscar como sub-ubicación de la ubicación de Stock (ej. TLAJO/Stock/DAMAS)
-        target_loc = Location.search([
-            ('location_id', '=', default_loc.id),
-            ('name', '=ilike', dept_name),
+        _logger.debug("Buscando ubicación para depto '%s' bajo raíz '%s'", dept, root.name)
+        
+        # 1. Buscar directamente: RAÍZ/DEPARTAMENTO
+        expected_path = f"{root.name}/{dept}"
+        dest = Location.search([
+            ('complete_name', '=ilike', expected_path),
             ('usage', '=', 'internal')
         ], limit=1)
-
-        # Intento B: Buscar como hija directa de la raíz del almacén (ej. TLAJO/DAMAS)
-        if not target_loc and view_loc:
-            target_loc = Location.search([
-                ('location_id', '=', view_loc.id),
-                ('name', '=ilike', dept_name),
-                ('usage', '=', 'internal')
-            ], limit=1)
         
-        # Intento C (Opcional): Buscar recursivamente dentro del almacén 
-        # (útil si la estructura es más compleja, pero más arriesgado)
-        if not target_loc and view_loc:
-             target_loc = Location.search([
-                ('id', 'child_of', view_loc.id),
-                ('name', '=ilike', dept_name),
-                ('usage', '=', 'internal')
-            ], limit=1)
-
-        # 4. RESULTADO
-        if target_loc:
-            # ¡ÉXITO! Encontramos el departamento específico en esta sucursal (ej. TLAJO/DAMAS)
-            _logger.info("Ubicación departamento encontrada: %s", target_loc.complete_name)
-            return target_loc
-        else:
-            # FALLBACK: No existe el departamento en este almacén (caso ALMAC).
-            # Devolvemos la ubicación estándar del almacén.
-            _logger.info("Depto no existe en %s. Usando default: %s", warehouse.name, default_loc.complete_name)
-            return default_loc
+        if dest:
+            _logger.debug("Encontrado por path completo: %s", dest.complete_name)
+            return dest
+        
+        # 2. Buscar hijas de la raíz que coincidan con el departamento
+        dest = Location.search([
+            ('location_id', '=', root.id),
+            ('name', '=ilike', dept),
+            ('usage', '=', 'internal')
+        ], limit=1)
+        
+        if dest:
+            _logger.debug("Encontrado como hija directa: %s", dest.complete_name)
+            return dest
+        
+        # 3. Buscar en cualquier nivel bajo la raíz
+        all_children = Location.search([('id', 'child_of', root.id)])
+        for loc in all_children:
+            if loc.name.lower() == dept.lower() and loc.usage == 'internal':
+                _logger.debug("Encontrado en subniveles: %s", loc.complete_name)
+                return loc
+        
+        _logger.debug("No se encontró ubicación para departamento '%s'", dept)
+        return False
 
     def action_force_destination_correction(self):
         """Acción manual para forzar la corrección del destino"""
         for picking in self:
             if picking.picking_type_code == 'incoming' and picking.state not in ('done', 'cancel'):
-                picking._auto_set_destination_on_receipt(first_time_only=False, force=True)
-                _logger.info("Destino forzado para %s: %s", picking.name, picking.location_dest_id.complete_name)
+                # Verificar si es Almacén/Existencias antes de aplicar cambios
+                if not picking._is_stock_existencias_destination():
+                    picking._auto_set_destination_on_receipt(first_time_only=False, force=True)
+                    _logger.info("Destino forzado para %s: %s", picking.name, picking.location_dest_id.complete_name)
         return True
 
     def action_debug_destination(self):
@@ -432,14 +489,18 @@ class StockPicking(models.Model):
             _logger.info("Ubicación origen: %s (%s)", picking.location_id.complete_name, picking.location_id.usage)
             _logger.info("Ubicación destino actual: %s", picking.location_dest_id.complete_name)
             
-            root = picking._get_incoming_root()
-            _logger.info("Raíz calculada: %s", root.complete_name if root else "None")
+            es_existencias = picking._is_stock_existencias_destination()
+            _logger.info("¿Es Almacén/Existencias?: %s", es_existencias)
             
-            dept = picking._get_department_text()
-            _logger.info("Departamento: %s", dept)
-            
-            dest = picking._compute_department_destination_location()
-            _logger.info("Destino calculado: %s", dest.complete_name if dest else "None")
+            if not es_existencias:
+                root = picking._get_incoming_root()
+                _logger.info("Raíz calculada: %s", root.complete_name if root else "None")
+                
+                dept = picking._get_department_text()
+                _logger.info("Departamento: %s", dept)
+                
+                dest = picking._compute_department_destination_location()
+                _logger.info("Destino calculado: %s", dest.complete_name if dest else "None")
             
             _logger.info("=================================")
         
