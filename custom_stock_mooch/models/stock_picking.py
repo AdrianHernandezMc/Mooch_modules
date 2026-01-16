@@ -325,109 +325,96 @@ class StockPicking(models.Model):
         _logger.debug("No se pudo encontrar raíz")
         return False
 
+    def _find_department_location_under(self, root, dept):
+        Location = self.env['stock.location']
+        # 1) Preferir complete_name "ROOT/DEPTO%"
+        dest = Location.search([
+            ('id', 'child_of', root.id),
+            ('usage', '=', 'internal'),
+            ('complete_name', 'ilike', f"{root.name}/{dept}%"),
+        ], limit=1)
+        if not dest:
+            # 2) Segundo intento por name ('CALZADO', 'ACCESORIOS', etc.)
+            dest = Location.search([
+                ('id', 'child_of', root.id),
+                ('usage', '=', 'internal'),
+                ('name', 'ilike', dept),
+            ], limit=1)
+        return dest
+
     def _compute_department_destination_location(self):
-        """Versión MEJORADA - Busca dinámicamente según la estructura del almacén"""
+        """
+        Lógica dinámica:
+        1. Identifica el Almacén del picking.
+        2. Busca si existe una ubicación con el nombre del Depto DENTRO de ese almacén.
+        3. Si existe -> Devuelve la ubicación del Depto.
+        4. Si NO existe -> Devuelve la ubicación estándar del almacén (lot_stock_id).
+        """
         self.ensure_one()
         
+        # Solo para recepciones
         if self.picking_type_code != 'incoming':
             return False
 
-        root = self._get_incoming_root()
-        if not root:
-            _logger.debug("No se pudo encontrar la raíz para %s", self.name)
+        # 1. Obtener el Almacén y su ubicación base (Stock estándar)
+        # Esto hace que sea dinámico para ALMAC, TLAJO, IXTLA, etc.
+        warehouse = self.picking_type_id.warehouse_id
+        if not warehouse:
+            # Fallback si el tipo de operación no tiene almacén asignado (raro)
+            _logger.warning("Picking %s no tiene almacén en su tipo de operación.", self.name)
             return False
+            
+        # Esta es la ubicación "Padre" o "Por defecto" (ej. ALMAC/Stock o TLAJO/Existencias)
+        default_loc = warehouse.lot_stock_id
+        # Esta es la raíz de vista (ej. ALMAC o TLAJO - tipo view)
+        view_loc = warehouse.view_location_id
 
-        dept = self._get_department_text()
-        if not dept:
-            _logger.debug("No se pudo determinar el departamento para %s", self.name)
-            # Si no hay departamento, usar la ubicación de stock por defecto
-            return self._get_default_stock_location(root)
+        # 2. Obtener el nombre del departamento
+        dept_name = self._get_department_text()
+        
+        # Si no detectamos departamento, devolvemos la ubicación por defecto del almacén
+        if not dept_name:
+            return default_loc
 
         Location = self.env['stock.location']
+        _logger.debug("Buscando depto '%s' en almacén '%s'", dept_name, warehouse.name)
+
+        # 3. BÚSQUEDA DINÁMICA: ¿Existe el departamento aquí?
         
-        _logger.debug("Buscando ubicación para depto '%s' bajo raíz '%s'", dept, root.name)
-        
-        # 1. Primero, verificar si este almacén tiene departamentos
-        # Buscar si existe algún departamento bajo esta raíz
-        has_departments = Location.search_count([
-            ('id', 'child_of', root.id),
-            ('usage', '=', 'internal'),
-            ('name', '=ilike', dept)  # Buscar si existe este departamento
-        ]) > 0
-        
-        if not has_departments:
-            _logger.debug("Almacén %s no tiene departamento '%s'", root.name, dept)
-            # Este almacén no tiene este departamento, usar ubicación por defecto
-            return self._get_default_stock_location(root)
-        
-        # 2. Buscar la ubicación del departamento
-        # Intentar encontrar la ubicación más específica
-        
-        # 2a. Buscar en el primer nivel bajo la raíz
-        dest = Location.search([
-            ('location_id', '=', root.id),
-            ('name', '=ilike', dept),
+        # Intento A: Buscar como sub-ubicación de la ubicación de Stock (ej. TLAJO/Stock/DAMAS)
+        target_loc = Location.search([
+            ('location_id', '=', default_loc.id),
+            ('name', '=ilike', dept_name),
             ('usage', '=', 'internal')
         ], limit=1)
-        
-        if dest:
-            _logger.debug("Encontrado como hija directa de la raíz: %s", dest.complete_name)
-            return dest
-        
-        # 2b. Buscar en cualquier nivel bajo la raíz (búsqueda recursiva)
-        all_children = Location.search([('id', 'child_of', root.id)])
-        for loc in all_children:
-            if loc.name.lower() == dept.lower() and loc.usage == 'internal':
-                _logger.debug("Encontrado en subniveles: %s", loc.complete_name)
-                return loc
-        
-        # 3. Si no se encuentra el departamento, usar ubicación por defecto
-        _logger.debug("No se encontró el departamento '%s' bajo %s", dept, root.name)
-        return self._get_default_stock_location(root)
 
-    def _get_default_stock_location(self, root):
-        """Obtiene la ubicación de stock por defecto para un almacén"""
-        self.ensure_one()
-        Location = self.env['stock.location']
-        
-        # Buscar la ubicación de stock principal del almacén
-        # Primero intentar encontrar la ubicación 'Stock' o similar
-        default_names = ['stock', 'almacen', 'almacén', 'inventario', 'bodega']
-        
-        for name in default_names:
-            dest = Location.search([
-                ('id', 'child_of', root.id),
-                ('name', 'ilike', name),
+        # Intento B: Buscar como hija directa de la raíz del almacén (ej. TLAJO/DAMAS)
+        if not target_loc and view_loc:
+            target_loc = Location.search([
+                ('location_id', '=', view_loc.id),
+                ('name', '=ilike', dept_name),
                 ('usage', '=', 'internal')
             ], limit=1)
-            if dest:
-                _logger.debug("Ubicación por defecto encontrada: %s", dest.complete_name)
-                return dest
         
-        # Si no se encuentra, buscar cualquier ubicación interna hija de la raíz
-        dest = Location.search([
-            ('location_id', '=', root.id),
-            ('usage', '=', 'internal')
-        ], limit=1)
-        
-        if dest:
-            _logger.debug("Primera ubicación interna hija encontrada: %s", dest.complete_name)
-            return dest
-        
-        # Si no hay hijas internas, buscar la primera ubicación interna bajo la raíz
-        all_children = Location.search([('id', 'child_of', root.id)])
-        for loc in all_children:
-            if loc.usage == 'internal':
-                _logger.debug("Primera ubicación interna encontrada en subniveles: %s", loc.complete_name)
-                return loc
-        
-        # Último recurso: usar la raíz misma (si es interna)
-        if root.usage == 'internal':
-            _logger.debug("Usando la raíz como ubicación: %s", root.complete_name)
-            return root
-        
-        _logger.warning("No se pudo encontrar ubicación por defecto para %s", root.name)
-        return False
+        # Intento C (Opcional): Buscar recursivamente dentro del almacén 
+        # (útil si la estructura es más compleja, pero más arriesgado)
+        if not target_loc and view_loc:
+             target_loc = Location.search([
+                ('id', 'child_of', view_loc.id),
+                ('name', '=ilike', dept_name),
+                ('usage', '=', 'internal')
+            ], limit=1)
+
+        # 4. RESULTADO
+        if target_loc:
+            # ¡ÉXITO! Encontramos el departamento específico en esta sucursal (ej. TLAJO/DAMAS)
+            _logger.info("Ubicación departamento encontrada: %s", target_loc.complete_name)
+            return target_loc
+        else:
+            # FALLBACK: No existe el departamento en este almacén (caso ALMAC).
+            # Devolvemos la ubicación estándar del almacén.
+            _logger.info("Depto no existe en %s. Usando default: %s", warehouse.name, default_loc.complete_name)
+            return default_loc
 
     def action_force_destination_correction(self):
         """Acción manual para forzar la corrección del destino"""
