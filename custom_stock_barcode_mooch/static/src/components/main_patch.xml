@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="custom_stock_barcode_mooch.MainComponent" t-inherit="stock_barcode.MainComponent" t-inherit-mode="extension">
+        
+        <!-- ======================================================= -->
+        <!-- BARRA DE CONTEO TOTAL (Universal)                       -->
+        <!-- ======================================================= -->
+        <!-- Se mantiene siempre, porque es información útil en ambos -->
+        <xpath expr="//div[contains(@class, 'o_action_buttons')]" position="before">
+            <div t-if="env.model.canBeProcessed"
+                 class="d-flex justify-content-center align-items-center py-2 border-top bg-100"
+                 style="font-size: 1.3rem;">
+                
+                <div class="fw-bold text-primary">
+                    <i class="fa fa-cubes me-2"/>
+                    <span class="text-dark">Total: </span>
+                    <span t-esc="totalStats.done"/>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- ======================================================= -->
+        <!-- BOTÓN GUARDAR (Solo para stock.picking)                 -->
+        <!-- ======================================================= -->
+        <!-- CAMBIO: Añadimos la condición env.model.resModel === 'stock.picking' -->
+        <xpath expr="//button[contains(@class, 'o_validate_page')]" position="before">
+            <button t-if="env.model.resModel === 'stock.picking'"
+                    class="btn btn-secondary me-2 text-uppercase custom_save_mooch"
+                    t-on-click="onSaveButton">
+                <i class="fa fa-floppy-o me-1"/>
+                <span>Guardar</span>
+            </button>
+        </xpath>
+
+        <!-- ======================================================= -->
+        <!-- DESHABILITAR VALIDAR (Solo para stock.picking)          -->
+        <!-- ======================================================= -->
+        <!-- CAMBIO: Añadimos la condición env.model.resModel === 'stock.picking' -->
+        <xpath expr="//button[contains(@class, 'o_validate_page')]" position="attributes">
+            <attribute name="t-att-disabled">true</attribute>
+            <attribute name="t-attf-class">btn btn-secondary o_validate_page</attribute>
+        </xpath>
+
+        <!-- ======================================================= -->
+        <!-- ACCIONES ESPECÍFICAS DE AJUSTE DE INVENTARIO (Opcional) -->
+        <!-- Si quieres deshabilitar el botón "Apply" de Ajustes:   -->
+        <!-- ======================================================= -->
+        <!--
+        <xpath expr="//button[contains(@class, 'o_apply_page')]" position="attributes">
+            <attribute name="t-att-disabled">true</attribute>
+            <attribute name="t-attf-class">btn btn-secondary o_apply_page</attribute>
+        </xpath>
+        -->
+
+    </t>
+
+</templates>
