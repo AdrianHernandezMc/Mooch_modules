@@ -126,7 +126,7 @@ class ProductMooch(models.Model):
             ('sale_type_home', _('Tipo de Compra Hogar')),
             ('sale_type_shoe', _('Tipo de Compra Calzado')),
             ('sale_type_season', _('Tipo de Compra Ropa de Invierno')),
-            ('sale_type_old_2024', _('Tipo de Compra Articulos del 2024'))
+            ('sale_type_old_2024', _('Tipo de Compra Articulos del 2026'))
         ],
         string='Tipo de Compra',
         help="Seleccione el tipo de compra para usar el porcentaje correspondiente configurado",

@@ -48,7 +48,7 @@
                     <field name="sale_type_season_credit" widget="float" options="{'suffix': ' %'}"/>
                 </group>
                 <!-- OLD ITEMS -->
-                <group string="Productos del 2024" col="2">
+                <group string="Productos 2026" col="2">
                     <field name="sale_type_old_2024_cash" widget="float" options="{'suffix': ' %'}"/>
                     <field name="sale_type_old_2024_credit" widget="float" options="{'suffix': ' %'}"/>
                 </group>
