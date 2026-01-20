@@ -21,9 +21,9 @@ class ResConfigSettings(models.TransientModel):
     # — Para Ropa de Invierno —
     sale_type_season_cash    = fields.Float(string='Ropa de Invierno (Contado %)', help="Porcentaje contado para productos de temporada")
     sale_type_season_credit  = fields.Float(string='Ropa de Invierno (Crédito %)', help="Porcentaje crédito para productos de temporada")
-    # — Para Ropa y articulos 2024 —
-    sale_type_old_2024_cash    = fields.Float(string='Productos del 2024 (Contado %)', help="Porcentaje contado para productos del 2024")
-    sale_type_old_2024_credit  = fields.Float(string='Productos del 2024 (Crédito %)', help="Porcentaje crédito para productos del 2024")
+    # — Para Ropa y articulos 2026 —
+    sale_type_old_2024_cash    = fields.Float(string='Productos 2026 (Contado %)', help="Porcentaje contado para productos del 2026")
+    sale_type_old_2024_credit  = fields.Float(string='Productos 2026 (Crédito %)', help="Porcentaje crédito para productos del 2026")
 
     @api.model
     def set_values(self):
