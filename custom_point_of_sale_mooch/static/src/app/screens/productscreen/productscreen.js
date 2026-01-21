@@ -7,7 +7,7 @@ import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
 import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
 import { useService } from "@web/core/utils/hooks";
 import { HotkeyHelpPopup } from "@custom_point_of_sale_mooch/app/popup/productscreen_help";
-import { markup, onMounted, useState } from "@odoo/owl";
+import { markup, onMounted, useState, onWillUnmount } from "@odoo/owl"; 
 import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
 import { PasswordInputPopup } from "@custom_point_of_sale_mooch/app/popup/hide_passwordpopup";
 import { MaskedInputPopup } from "@custom_point_of_sale_mooch/app/popup/masked_input_popup"
@@ -25,8 +25,22 @@ patch(ProductScreen.prototype, {
         this.orm = useService("orm");
         this.posService = useService("pos");
         this.cashTotal = useState({ value: 0 });
-        //subo la variable al posStore para que se pueda leen en order_receipt y en todos lados
-        this.pos.bloqueodecaja = false;
+        this._isComponentAlive = true;
+        this._cashCheckInterval = null;
+
+        // ✅ CORRECCIÓN: Estado reactivo para control de caja
+        this.cashState = useState({
+            isBlocked: false,
+            cashTotal: 0,
+            cashOut: 0,
+            withdrawalLimit: 0,
+            checkInProgress: false,
+            warningShown: false
+        });
+        
+        // ✅ REMOVER: No usar variable global directamente
+        // this.pos.bloqueodecaja = false; // ← REMOVER ESTO
+        
         this.pos.Reembolso = false;
         this.pos.Sale_type = null;
         if (this.pos.couponPointChanges) this.pos.couponPointChanges = [];
@@ -34,7 +48,9 @@ patch(ProductScreen.prototype, {
             this.pos.sum_cash = async () => await this.sum_cash();
         }
         this.pos.get_cash_out = async () => await this.get_cash_out();
-
+        
+        // ✅ AÑADIR: Intervalo para monitoreo periódico
+        this.cashCheckInterval = null;
 
         // Alt + P limpias las lineas de la orden
         useHotkey("Alt+t", (ev) => {
@@ -79,29 +95,11 @@ patch(ProductScreen.prototype, {
 
         // **************   para hacer pruebad en productscreen  *******************
         useHotkey("alt+x", (ev) => {
-
             //this.clear_client()
-
             const orden = this.pos.get_order()
             console.log(orden)
             const orderlines = orden.get_orderlines()
             console.log(orderlines)
-            // const match = 'descuento';
-
-            // const discountLines = orderlines.filter(line => {
-            // // intentar obtener el nombre del producto de formas comunes
-            // const prodName =
-            //     (line.product && line.product.name) ||
-            //     line.product_name ||
-            //     line.name ||
-            //     line.display_name ||
-            //     '';
-
-            // return typeof prodName === 'string' && prodName.toLowerCase().includes(match.toLowerCase());
-            // });
-
-            // console.log("discountLines",discountLines)
-
         });
 
         // Alt + g para entrar a las ordenes guardadas
@@ -120,9 +118,27 @@ patch(ProductScreen.prototype, {
         });
     },
 
+    onWillUnmount() {
+        console.log("🔴 ProductScreen se está destruyendo - limpiando intervalos");
+        this._isComponentAlive = false;
+        this._cleanupIntervals();
+    },
+
+    _cleanupIntervals() {
+        if (this._cashCheckInterval) {
+            clearInterval(this._cashCheckInterval);
+            this._cashCheckInterval = null;
+            console.log("🛑 Intervalo de verificación de caja detenido");
+        }
+    },
+
+    _isAlive() {
+        return this._isComponentAlive;
+    },
+
     async debugOrderSearch(orderNumber) {
         console.log("🔍 DEBUG: Buscando orden:", orderNumber);
-        
+
         // Probar diferentes métodos de búsqueda
         const searchMethods = [
             { name: "Por name exacto", domain: [["name", "=", orderNumber]] },
@@ -130,14 +146,14 @@ patch(ProductScreen.prototype, {
             { name: "Por pos_reference con ilike", domain: [["pos_reference", "ilike", orderNumber]] },
             { name: "Por ID", domain: [["id", "=", parseInt(orderNumber)]] }
         ];
-        
+
         for (const method of searchMethods) {
             try {
                 const result = await this.orm.call("pos.order", "search_read", [
                     method.domain,
                     ["id", "name", "pos_reference", "state"]
                 ], { limit: 5 });
-                
+
                 console.log(`${method.name}:`, result);
             } catch (error) {
                 console.error(`Error en ${method.name}:`, error);
@@ -216,10 +232,10 @@ patch(ProductScreen.prototype, {
             "loyalty.reward",
             "search_read",
             [
-                [["program_id", "=", loyalty_program_id]],            // domain
-                ["discount_line_product_id"]                          // fields
+                [["program_id", "=", loyalty_program_id]],
+                ["discount_line_product_id"]
             ],
-            { limit: 1, order: "id asc" }                           // kwargs opcional
+            { limit: 1, order: "id asc" }
         );
         order.product_voucher_id = product_voucher_id?.[0]?.discount_line_product_id?.[0] ?? null;
     },
@@ -234,42 +250,316 @@ patch(ProductScreen.prototype, {
         return r;
     },
 
-    // clear_coupon(o) {
-    //     if (!o) return;
-    //     o.codeActivatedCoupons = [];
-    //     o.codeActivatedProgramRules = [];
-    //     o.couponPointChanges = [];
-    //     order.disabledRewards.clear();
-    //     o.get_orderlines()
-    //     .filter(l => l.is_reward_line || l.reward_rule_id)
-    //     .forEach(l => (o.remove_orderline || o.removeOrderline)?.(l));
-    // },
-
     async onMounted() {
-        this.getLocalCashTotal();
-        
+        // ✅ CORRECCIÓN: Iniciar monitoreo de caja
+        this._isComponentAlive = true;
+        await this.checkCashLimit();
+        this._startPeriodicCheck();
+
         await this.clear_pay_method();
         const { updated } =  this.orm.call(
             "loyalty.card",
             "sync_source_order_by_posref",
-            [],                 // args
-            { limit: 1000 }     // kwargs opcional
+            [],
+            { limit: 1000 }
         );
         console.log("loyalty.cards actualizados:", updated);
 
-        /******************* APLICAR PRECIO PROPORCIONAL CON DESCUENTO GLOBAL *******************/
         console.log("🔧 CALCULADOR PROPORCIONAL - Verificando líneas de cambios...");
-        
+
         // Esperar un momento para que la orden esté completamente cargada
         setTimeout(() => {
             this.applyProportionalPriceToChangeLines();
         }, 1000);
     },
 
+    // ✅ AÑADIR: Método para monitorear caja periódicamente
+    _startPeriodicCheck() {
+        // Limpiar intervalo existente
+        this._cleanupIntervals();
+
+        // Verificar cada 30 segundos
+        this._cashCheckInterval = setInterval(async () => {
+            if (!this._isAlive()) {
+                this._cleanupIntervals();
+                return;
+            }
+
+            try {
+                await this.checkCashLimit();
+            } catch (error) {
+                console.error("Error en verificación periódica:", error);
+            }
+        }, 30000); // 30 segundos
+    },
+
+    // ✅ AÑADIR: Método para verificar límite de caja
+    async checkCashLimit() {
+        if (!this._isAlive()) {
+            console.log("⚠️ Componente destruido, omitiendo checkCashLimit");
+            return;
+        }
+        try {
+            if (this.cashState.checkInProgress) return;
+
+            this.cashState.checkInProgress = true;
+
+            const cashTotal = await this.sum_cash();
+            const cashOut = await this.get_cash_out();
+            const cfgId = this.pos?.config?.id;
+
+            if (!cfgId) {
+                this.cashState.checkInProgress = false;
+                return;
+            }
+
+            const withdrawalLimit = await this.orm.call("pos.config", "get_withdrawal", [cfgId], {});
+
+            // Aplicar descuento del 10% para advertencia
+            const discounted = withdrawalLimit * 0.9;
+            const netCash = cashTotal - cashOut;
+
+            // Actualizar estado
+            this.cashState.cashTotal = cashTotal;
+            this.cashState.cashOut = cashOut;
+            this.cashState.withdrawalLimit = withdrawalLimit;
+
+            const wasBlocked = this.cashState.isBlocked;
+            const shouldBlock = netCash > withdrawalLimit;
+
+            this.cashState.isBlocked = shouldBlock;
+
+            // ✅ ACTUALIZAR la variable global para compatibilidad
+            this.pos.bloqueodecaja = shouldBlock;
+
+            // Si se activó el bloqueo
+            if (shouldBlock && !wasBlocked) {
+                console.log("🔴 BLOQUEO ACTIVADO - Efectivo excede límite");
+                await this.showBlockPopup();
+                this.disableSalesInterface();
+            }
+            // Si se desactivó el bloqueo
+            else if (!shouldBlock && wasBlocked) {
+                console.log("🟢 BLOQUEO DESACTIVADO - Efectivo dentro del límite");
+                this.enableSalesInterface();
+            }
+
+            // Mostrar advertencia cuando se acerca al límite
+            if (netCash >= discounted && netCash <= withdrawalLimit && !this.cashState.warningShown) {
+                await this.showWarningPopup(netCash, withdrawalLimit);
+                this.cashState.warningShown = true;
+            }
+
+            // Resetear advertencia si está por debajo del nivel de advertencia
+            if (netCash < discounted) {
+                this.cashState.warningShown = false;
+            }
+
+            // Actualizar botón de pago
+            this.updatePayButton(netCash, withdrawalLimit, discounted);
+
+            this.cashState.checkInProgress = false;
+
+        } catch (error) {
+            console.error("Error en checkCashLimit:", error);
+            this.cashState.checkInProgress = false;
+        }
+    },
+
+    // ✅ AÑADIR: Mostrar popup de bloqueo
+    async showBlockPopup() {
+        if (!this._isAlive() || !this.popup) {
+            console.log("⚠️ Componente destruido, no se puede mostrar popup");
+            return;
+        }
+
+        const netCash = this.cashState.cashTotal - this.cashState.cashOut;
+
+        try {
+
+            await this.popup.add(ErrorPopup, {
+                title: "❌ VENTAS BLOQUEADAS",
+                body: `El efectivo en caja ha superado el límite permitido.\n\n` +
+                    `Efectivo actual: $${netCash.toFixed(2)}\n` +
+                    `Límite permitido: $${this.cashState.withdrawalLimit.toFixed(2)}\n\n` +
+                    `Realiza un retiro para continuar con las ventas.`,
+                confirmText: "Entendido",
+            });
+        } catch (error) {
+            console.error("Error mostrando popup de bloqueo:", error);
+        }
+    },
+
+    // ✅ AÑADIR: Mostrar advertencia
+    async showWarningPopup(netCash, limit) {
+        if (!this._isAlive() || !this.popup) {
+            console.log("⚠️ Componente destruido, no se puede mostrar advertencia");
+            return;
+        }
+        const remaining = limit - netCash;
+
+        try {
+            await this.popup.add(ErrorPopup, {
+                title: "⚠️ ADVERTENCIA DE LÍMITE",
+                body: `El efectivo en caja se acerca al límite permitido.\n\n` +
+                    `Efectivo actual: $${netCash.toFixed(2)}\n` +
+                    `Límite permitido: $${limit.toFixed(2)}\n` +
+                    `Restante antes del límite: $${remaining.toFixed(2)}\n\n` +
+                    `Considera realizar un retiro pronto.`,
+                confirmText: "Entendido",
+            });
+        } catch (error) {
+            console.error("Error mostrando popup de advertencia:", error);
+        }
+    },
+
+    // ✅ AÑADIR: Deshabilitar interfaz de ventas
+    disableSalesInterface() {
+        // ✅ AÑADIR esta verificación:
+        if (!this._isAlive()) {
+            console.log("⚠️ Componente destruido, no se puede deshabilitar interfaz");
+            return;
+        }
+
+        console.log("🔴 Deshabilitando interfaz de ventas");
+
+        // ✅ CAMBIAR todo el contenido del método por:
+        setTimeout(() => {
+            const productButtons = document.querySelectorAll(".product");
+            productButtons.forEach(btn => {
+                btn.classList.add("disabled-by-cash-limit");
+            });
+
+            const payButton = document.querySelector("button.pay-order-button");
+            if (payButton) {
+                payButton.classList.add("disabled-by-cash-limit");
+                payButton.disabled = true;
+            }
+
+            let overlay = document.querySelector(".cash-limit-overlay");
+            if (!overlay) {
+                overlay = document.createElement("div");
+                overlay.className = "cash-limit-overlay";
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(220, 53, 69, 0.1);
+                    z-index: 9998;
+                    pointer-events: none;
+                    border: 3px solid #dc3545;
+                `;
+                const screen = document.querySelector(".products-screen") || 
+                              document.querySelector(".pos-content") || 
+                              document.body;
+                if (screen) screen.appendChild(overlay);
+            }
+        }, 0);
+    },
+
+    // ✅ AÑADIR: Habilitar interfaz de ventas
+    enableSalesInterface() {
+        // ✅ AÑADIR esta verificación:
+        if (!this._isAlive()) {
+            console.log("⚠️ Componente destruido, no se puede habilitar interfaz");
+            return;
+        }
+
+        console.log("🟢 Habilitando interfaz de ventas");
+
+        // ✅ CAMBIAR todo el contenido del método por:
+        setTimeout(() => {
+            const productButtons = document.querySelectorAll(".product");
+            productButtons.forEach(btn => {
+                btn.classList.remove("disabled-by-cash-limit");
+            });
+
+            const payButton = document.querySelector("button.pay-order-button");
+            if (payButton) {
+                payButton.classList.remove("disabled-by-cash-limit");
+                payButton.disabled = false;
+            }
+
+            const overlay = document.querySelector(".cash-limit-overlay");
+            if (overlay) {
+                overlay.remove();
+            }
+        }, 0);
+    },
+
+    // ✅ AÑADIR: Actualizar botón de pago
+    updatePayButton(netCash, limit, discounted) {
+        // ✅ AÑADIR esta verificación:
+        if (!this._isAlive()) return;
+
+        // ✅ CAMBIAR todo el contenido del método por:
+        setTimeout(() => {
+            const button = document.querySelector("button.pay-order-button");
+            if (!button) return;
+
+            button.classList.remove("btn-highlighted", "btn-warning");
+
+            if (netCash > limit) {
+                button.classList.add("btn-highlighted");
+            } else if (netCash >= discounted && netCash <= limit) {
+                button.classList.add("btn-warning");
+            }
+        }, 0);
+    },
+
+    // ✅ AÑADIR: Verificar antes de agregar producto
+    async _addProduct(product, options) {
+        // Verificar si la caja está bloqueada
+        if (this.cashState.isBlocked) {
+            // ✅ AÑADIR esta verificación:
+            if (this._isAlive() && this.popup) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Venta Bloqueada",
+                    body: "No se pueden agregar productos. El efectivo ha superado el límite. Realiza un retiro para continuar.",
+                    confirmText: "OK",
+                });
+            }
+            return false;
+        }
+
+        return super._addProduct(product, options);
+    },
+
+    // ✅ AÑADIR: Verificar antes de ir a pago
+    async clickPay() {
+        if (this.cashState.isBlocked) {
+            // ✅ AÑADIR esta verificación:
+            if (this._isAlive() && this.popup) {
+                await this.popup.add(ErrorPopup, {
+                    title: "Pago Bloqueado",
+                    body: "No se puede proceder al pago. El efectivo ha superado el límite. Realiza un retiro para continuar.",
+                    confirmText: "OK",
+                });
+            }
+            return false;
+        }
+
+        return super.clickPay(...arguments);
+    },
+
+    async forceCashCheck() {
+        console.log("🔍 Forzando verificación de caja...");
+        await this.checkCashLimit();
+        return {
+            isBlocked: this.cashState.isBlocked,
+            cashTotal: this.cashState.cashTotal,
+            cashOut: this.cashState.cashOut,
+            netCash: this.cashState.cashTotal - this.cashState.cashOut,
+            limit: this.cashState.withdrawalLimit
+        };
+    },
+
     async applyProportionalPriceToChangeLines() {
         try {
             console.log("🟢 APLICANDO PRECIO PROPORCIONAL MEJORADO (MEMORIA)");
-            
+
             const order = this.pos.get_order();
             if (!order || !order.get_orderlines) return;
 
@@ -283,42 +573,42 @@ patch(ProductScreen.prototype, {
                 console.log("📝 Contenido del cache:", this.pos.originalOrderDiscountInfo);
             }
             console.log("=================================");
-            
+
             const allOrderLines = order.get_orderlines();
             console.log(`🔧 ${allOrderLines.length} líneas en la orden`);
-            
+
             const changeLines = this.getChangeLines(order, allOrderLines);
-            
+
             if (changeLines.length > 0) {
                 console.log(`🔧 ${changeLines.length} líneas de cambios detectadas`);
-                
+
                 const originalOrderInfo = this.findOriginalOrderFromChanges(order);
-                
+
                 if (originalOrderInfo && originalOrderInfo.hasGlobalDiscount) {
                     const discountPercentage = originalOrderInfo.globalDiscountPercentage;
                     const discountFactor = originalOrderInfo.globalDiscountFactor;
-                    
+
                     console.log(`🎯 ✅✅✅ APLICANDO DESCUENTO PROPORCIONAL DEL ${discountPercentage}% ✅✅✅`);
-                    
+
                     let cambiosAplicados = 0;
-                    
+
                     changeLines.forEach((changeLine, index) => {
                         const precioOriginal = Math.abs(this.getLineUnitPrice(changeLine));
                         const precioProporcional = precioOriginal * discountFactor;
                         const precioFinal = -Math.round(precioProporcional * 100) / 100;
-                        
+
                         console.log(`🔧 Línea ${index + 1}: ${precioOriginal} → ${precioFinal}`);
-                        
+
                         const success = this.setLineUnitPrice(changeLine, precioFinal);
-                        
+
                         if (success) {
                             cambiosAplicados++;
                             console.log(`✅ PRECIO ACTUALIZADO: ${precioOriginal} → ${this.getLineUnitPrice(changeLine)}`);
                         }
                     });
-                    
+
                     console.log(`🔧 RESUMEN: ${cambiosAplicados} líneas actualizadas con descuento del ${discountPercentage}%`);
-                    
+
                     if (cambiosAplicados > 0) {
                         this.forceUIRefresh();
                     }
@@ -326,7 +616,7 @@ patch(ProductScreen.prototype, {
                     console.log(`🔧 Orden original NO tiene descuento global, no se aplica ajuste proporcional`);
                 }
             }
-            
+
         } catch (error) {
             console.error("❌ ERROR:", error);
         }
@@ -338,29 +628,29 @@ patch(ProductScreen.prototype, {
     findOriginalOrderFromChanges(currentOrder) {
         try {
             console.log("🔧 Buscando información de descuento en cache del POS...");
-            
+
             if (!currentOrder.changes_codes) {
                 console.log("🔧 ❌ No hay changes_codes en la orden actual");
                 return null;
             }
-            
+
             console.log(`🔧 changes_codes actual: '${currentOrder.changes_codes}'`);
-            
+
             // VERIFICAR SI EXISTE EL CACHE EN EL POS
             if (!this.pos.originalOrderDiscountInfo) {
                 console.log("🔧 ❌ No hay cache de descuentos en el POS");
                 return null;
             }
-            
+
             console.log("🔧 Cache disponible en POS:", Object.keys(this.pos.originalOrderDiscountInfo));
-            
+
             // BUSCAR COINCIDENCIA EXACTA EN EL CACHE
             const discountInfo = this.pos.originalOrderDiscountInfo[currentOrder.changes_codes];
             if (discountInfo) {
                 console.log(`🔧 ✅ COINCIDENCIA EXACTA ENCONTRADA!`);
                 console.log(`🔧 Orden original: ${discountInfo.originalOrderName}`);
                 console.log(`🔧 Descuento: ${discountInfo.discountPercentage}%`);
-                
+
                 return {
                     hasGlobalDiscount: discountInfo.hasGlobalDiscount,
                     globalDiscountPercentage: discountInfo.discountPercentage,
@@ -369,17 +659,17 @@ patch(ProductScreen.prototype, {
                     source: "exact_cache_match"
                 };
             }
-            
+
             // BUSCAR COINCIDENCIA PARCIAL (por si hay diferencias de formato)
             for (const [cacheKey, cacheInfo] of Object.entries(this.pos.originalOrderDiscountInfo)) {
                 if (currentOrder.changes_codes.includes(cacheKey.trim()) || 
                     cacheKey.includes(currentOrder.changes_codes.trim())) {
-                    
+
                     console.log(`🔧 ✅ COINCIDENCIA PARCIAL ENCONTRADA!`);
                     console.log(`🔧 Clave en cache: '${cacheKey}'`);
                     console.log(`🔧 Orden original: ${cacheInfo.originalOrderName}`);
                     console.log(`🔧 Descuento: ${cacheInfo.discountPercentage}%`);
-                    
+
                     return {
                         hasGlobalDiscount: cacheInfo.hasGlobalDiscount,
                         globalDiscountPercentage: cacheInfo.discountPercentage,
@@ -389,14 +679,10 @@ patch(ProductScreen.prototype, {
                     };
                 }
             }
-            
+
             console.log("🔧 ❌ No se encontró coincidencia en el cache");
-            console.log("🔧 Búsquedas intentadas:");
-            console.log("🔧 - Coincidencia exacta con:", currentOrder.changes_codes);
-            console.log("🔧 - Coincidencia parcial con todas las claves del cache");
-            
             return null;
-            
+
         } catch (error) {
             console.error("🔧 ❌ Error buscando en cache:", error);
             return null;
@@ -410,7 +696,7 @@ patch(ProductScreen.prototype, {
     async getOrderDetails(orderId) {
         try {
             console.log(`🔧 getOrderDetails - Buscando orden ID: ${orderId}`);
-            
+
             // PRIMERO: Obtener la orden básica con campos esenciales
             const orders = await this.orm.call("pos.order", "search_read", [
                 [["id", "=", orderId]],
@@ -493,38 +779,38 @@ patch(ProductScreen.prototype, {
     setLineUnitPrice(line, price) {
         try {
             console.log(`🔧 setLineUnitPrice: Intentando establecer precio ${price} en línea ${line.id}`);
-            
+
             // Método 1: set_unit_price si existe
             if (typeof line.set_unit_price === 'function') {
                 line.set_unit_price(price);
                 console.log(`✅ Precio establecido via set_unit_price`);
                 return true;
             }
-            
+
             // Método 2: Asignación directa a price
             if (line.price !== undefined) {
                 line.price = price;
                 console.log(`✅ Precio establecido via line.price`);
                 return true;
             }
-            
+
             // Método 3: Asignación directa a unit_price
             if (line.unit_price !== undefined) {
                 line.unit_price = price;
                 console.log(`✅ Precio establecido via line.unit_price`);
                 return true;
             }
-            
+
             // Método 4: Usar set_price si existe
             if (typeof line.set_price === 'function') {
                 line.set_price(price);
                 console.log(`✅ Precio establecido via set_price`);
                 return true;
             }
-            
+
             console.log(`❌ No se pudo encontrar método para establecer precio`);
             return false;
-            
+
         } catch (error) {
             console.error(`❌ Error en setLineUnitPrice:`, error);
             return false;
@@ -574,26 +860,24 @@ patch(ProductScreen.prototype, {
         console.log(`🔧 Total de líneas de cambios identificadas: ${changeLines.length}`);
         return changeLines;
     },
-    /**
-     * Fuerza actualización de la UI
-     */
+
     forceUIRefresh() {
         try {
             // Método 1: Intentar render del componente
             if (this.render && typeof this.render === 'function') {
                 this.render();
             }
-            
+
             // Método 2: Disparar evento de cambio en el pos
             if (this.pos && typeof this.pos.trigger === 'function') {
                 this.pos.trigger('change');
             }
-            
+
             // Método 3: Disparar evento global
             setTimeout(() => {
                 window.dispatchEvent(new Event('resize'));
             }, 100);
-            
+
         } catch (error) {
             console.error("🔧 Error forzando refresh UI:", error);
         }
@@ -814,7 +1098,7 @@ async clickReembolso(){
             // Crear orden de destino
             const refundOrder = this.pos.get_order();
             refundOrder.is_return = true;
-            
+
             // ✅ GUARDAR EL MOTIVO EN LA NUEVA ORDEN
             refundOrder.refund_cancel_reason = refundReason;
 
@@ -840,7 +1124,7 @@ async clickReembolso(){
                     const refundLine = await refundOrder.add_product(product, options);
                     originalToRefundLineMap.set(detail.orderline.id, refundLine);
                     detail.destinationOrderUid = refundOrder.uid;
-                    
+
                     console.log("✅ Producto agregado a reembolso:", product.display_name);
                 } catch (error) {
                     console.error("❌ Error agregando producto:", error, detail);
@@ -877,7 +1161,7 @@ async clickReembolso(){
                 const method = this.pos.payment_methods.find(pm => pm.id === payment.payment_method_id[0]);
                 if (method) {
                     const paymentLine = refundOrder.add_paymentline(method);
-                    paymentLine.set_amount(payment.amount * -1); // Negativo para reembolso
+                    paymentLine.set_amount(payment.amount * -1);
                     console.log("✅ Pago agregado:", payment.amount * -1, method.name);
                 }
             }
@@ -885,7 +1169,7 @@ async clickReembolso(){
             // ✅ MARCAR LA ORDEN ORIGINAL COMO REEMBOLSADA EN EL SISTEMA CON EL MOTIVO
             try {
                 await this.orm.call("pos.order", "write", [[originalOrder.id], {
-                    refund_cancel_reason: refundReason,  // ✅ Guardar el motivo
+                    refund_cancel_reason: refundReason,
                     note: `REEMBOLSADO - ${new Date().toLocaleString()} - Motivo: ${refundReason}`
                 }]);
                 console.log("✅ Orden original marcada como reembolsada con motivo:", refundReason);
@@ -897,13 +1181,13 @@ async clickReembolso(){
             this.pos.Sale_type = "Reembolso";
             this.pos.set_order(refundOrder);
             this.pos.Reembolso = true;
-            
+
             console.log("✅ Reembolso creado, redirigiendo a pantalla de pago...");
             this.pos.showScreen("PaymentScreen");
 
             // ✅ Limpiar variables temporales
             delete this.pos.currentRefundReason;
-            
+
             // ✅ Limpiar el localStorage después de 2 horas
             setTimeout(() => {
                 localStorage.removeItem(refundKey);
@@ -914,7 +1198,7 @@ async clickReembolso(){
             console.error("❌ ERROR CRÍTICO en clickReembolso:", error);
             // Limpiar variables temporales en caso de error
             delete this.pos.currentRefundReason;
-            
+
             await this.popup.add(ErrorPopup, {
                 title: "Error en reembolso",
                 body: `Ocurrió un error inesperado: ${error.message || error}`,
@@ -938,7 +1222,7 @@ async clickReembolso(){
         rate = rate / 100
         const cents = Math.round(amount * 100);
         const discounted = Math.round(cents * (1 - rate));
-        return discounted / 100; // regresa en unidades, ej. 89.99
+        return discounted / 100;
     },
 
 
@@ -970,7 +1254,7 @@ async clickReembolso(){
     async sum_cash(){
         const sessionId = this.posService.pos_session.id;
         const cashMethodIds = (this.posService.payment_methods || [])
-            .filter(pm => pm.type === "cash" || pm.is_cash_count) // ambas opciones por compatibilidad
+            .filter(pm => pm.type === "cash" || pm.is_cash_count)
             .map(pm => pm.id);
 
         if (!cashMethodIds.length) {
@@ -993,42 +1277,17 @@ async clickReembolso(){
         let total = 0;
         if (total_sale && total_sale.length) {
             total = Number(total_sale[0].amount || 0);
-        } // else {
-        //     // 2) Fallback: sumar con search_read
-        //     const recs = await this.orm.searchRead("pos.payment", domain, ["amount"]);
-        //     total = (recs || []).reduce((acc, r) => acc + Number(r.amount || 0), 0);
-        // }
+        }
         return total
     },
 
+    // ✅ CORREGIDO: Método getLocalCashTotal actualizado
     async getLocalCashTotal() {
-        this.cashTotal = await this.sum_cash();
-        const cfgId = this.pos?.config?.id || false;
-        const withdrawal = await this.orm.call("pos.config", "get_withdrawal", [cfgId], {});
-        const cash_out = await this.get_cash_out();
+        // Usar el método checkCashLimit que ya actualiza todo
+        await this.checkCashLimit();
 
-        //Aqui le descento el 10% 
-        let discounted = await this.Discount(withdrawal,10)
-
-        if (this.cashTotal - cash_out >= discounted) {
-            await this.popup.add(ErrorPopup, {
-                title: "Aviso de retiro",
-                body: "Solicitar un retiro de efectivo",
-                confirmText: "OK",
-            });
-
-            //cambio de color el boton de pago.
-            const button = document.querySelector("button.pay-order-button");
-            if (button) {
-                button.classList.add("btn-highlighted");
-            }
-        }
-        if (this.cashTotal - cash_out > withdrawal){
-            this.pos.bloqueodecaja = true
-        }
-        else{
-            this.pos.bloqueodecaja = false
-        }
+        // Mantener compatibilidad con código existente
+        return this.cashState.cashTotal;
     },
 
     get productsToDisplay() {
@@ -1074,16 +1333,16 @@ async clickReembolso(){
         });
 
         if (!confirmed || !payload) {
-            return; 
+            return;
         }
 
         const nip = String(payload).trim();
         if (!nip) return;
-    
+
         let check = { ok: false, name: "" };
         try {
             check = await orm.call("hr.employee", "check_pos_nip", [nip], {});
-            const advancedEmployeeIds = this.pos.config.advanced_employee_ids; // Lista de IDs
+            const advancedEmployeeIds = this.pos.config.advanced_employee_ids;
             const isAdvancedUser = advancedEmployeeIds.includes(check.id);
             if (!isAdvancedUser){
                 this.popup.add(ErrorPopup, {
@@ -1095,7 +1354,7 @@ async clickReembolso(){
 
             if (isAdvancedUser && mode === "price")  {
                 this.change_price()
-            } 
+            }
 
             if (check.ok && mode === "discount")  {
                 const order = this.posService.get_order();
@@ -1134,7 +1393,7 @@ async clickReembolso(){
                         {limit:1}
                     );
                 }
-                
+
                 if (Is_employee?.length){
                     const discountLines = orderlines.filter(line => line.discount > 0);
                     if (discountLines.length > 0){
@@ -1162,7 +1421,7 @@ async clickReembolso(){
                     this.change_desc()
                 }
 
-            } 
+            }
 
         } catch (err) {
             console.error("Error al validar NIP:", err);
@@ -1224,7 +1483,7 @@ async clickReembolso(){
         const { confirmed, payload } = await this.popup.add(TextInputPopup, {
             title: _t("Nuevo descuento"),
             body:  _t("Ingresa el descuento en porcentaje (ej. 10 para 10%)."),
-            startingValue: "", //String(current),
+            startingValue: "",
             inputProps: { type: "number", inputmode: "decimal", pattern: "[0-9]*[.]?[0-9]*",className: "verde-input", },
             confirmText: _t("Aplicar"),
             cancelText: _t("Cancelar"),
@@ -1254,13 +1513,13 @@ async clickReembolso(){
             });
 
             if (!confirmed || !payload) {
-                return; // Usuario canceló
+                return;
             }
 
             // 2. Validar contraseña del operador actual
             const password = String(payload).trim();
             let employeeCheck = { ok: false, name: "", id: null };
-            
+
             try {
                 employeeCheck = await this.orm.call("hr.employee", "check_pos_nip", [password], {});
             } catch (err) {
@@ -1281,8 +1540,7 @@ async clickReembolso(){
             }
 
             console.log("🔑 Contraseña válida. Operador:", employeeCheck.name);
-            
-            // 3. Intentar abrir el cajón
+
             console.log("🔵 Intentando abrir cajón...");
 
             let cajonAbierto = false;
@@ -1293,7 +1551,7 @@ async clickReembolso(){
                 console.log("🔵 Camino 1: Usando hardwareProxy.openCashbox()");
                 const success = await this.pos.hardwareProxy.openCashbox();
                 console.log("✅ hardwareProxy.openCashbox() ejecutado, resultado:", success);
-                
+
                 if (success) {
                     cajonAbierto = true;
                     metodoUsado = "hardwareProxy.openCashbox";
@@ -1307,7 +1565,7 @@ async clickReembolso(){
             if (!cajonAbierto && this.pos.hardwareProxy && this.pos.hardwareProxy.printer) {
                 console.log("🔵 Camino 2: Usando hardwareProxy.printer con comando ESC/POS");
                 try {
-                    const command = "\x1B\x70\x00\x19\xFA"; // Comando estándar para abrir cajón
+                    const command = "\x1B\x70\x00\x19\xFA";
                     console.log("📋 Enviando comando ESC/POS");
                     await this.pos.hardwareProxy.printer.printReceipt(command);
                     cajonAbierto = true;
@@ -1327,17 +1585,17 @@ async clickReembolso(){
             try {
                 const ahora = new Date().toISOString();
                 console.log("📝 Registrando apertura de cajón...");
-                
+
                 // Guardar en el servidor
                 await this.orm.call(
-                    "pos.session", 
-                    "register_cash_drawer_open", 
-                    [this.pos.pos_session.id, employeeCheck.id, ahora, metodoUsado], 
+                    "pos.session",
+                    "register_cash_drawer_open",
+                    [this.pos.pos_session.id, employeeCheck.id, ahora, metodoUsado],
                     {}
                 );
-                
+
                 console.log("✅ Registro guardado en servidor");
-                
+
             } catch (error) {
                 console.error("⚠️ No se pudo guardar el registro en servidor:", error);
                 // Fallback: guardar en localStorage
@@ -1349,11 +1607,11 @@ async clickReembolso(){
                         metodo: metodoUsado,
                         session_id: this.pos.pos_session.id
                     };
-                    
+
                     const registrosExistentes = JSON.parse(localStorage.getItem('cash_drawer_open_logs') || '[]');
                     registrosExistentes.push(registro);
                     localStorage.setItem('cash_drawer_open_logs', JSON.stringify(registrosExistentes));
-                    
+
                     console.log("📋 Registro guardado en localStorage");
                 } catch (localError) {
                     console.error("❌ No se pudo guardar ni en localStorage:", localError);
@@ -1384,7 +1642,7 @@ async clickReembolso(){
                 { id: 7, label: _t("Cancelación por cliente"), item: "Cancelación por cliente" },
                 { id: 8, label: _t("Error en precio"), item: "Error en precio" },
                 { id: 9, label: _t("Producto agotado"), item: "Producto agotado" },
-                { id: 10, label: _t("Otro motivo / Personalizado"), item: "custom_reason_flag" } // Usamos una bandera especial
+                { id: 10, label: _t("Otro motivo / Personalizado"), item: "custom_reason_flag" }
             ];
 
             // 2. Mostrar el popup de selección (Clicable)
@@ -1396,7 +1654,7 @@ async clickReembolso(){
             if (!confirmed) return null;
 
             // 3. Procesar la selección
-            
+
             // Si eligió la opción personalizada ("custom_reason_flag")
             if (selectedItem === "custom_reason_flag") {
                 const { confirmed: inputConfirmed, payload: customReason } = await this.popup.add(TextInputPopup, {
@@ -1404,7 +1662,7 @@ async clickReembolso(){
                     body: _t("Por favor, describe el motivo de la devolución:"),
                     placeholder: _t("Ej: El cliente cambió de opinión..."),
                     inputProps: {
-                        multiline: true, // Esto no siempre funciona en POS nativo, pero es intentable
+                        multiline: true,
                     },
                     confirmText: _t("Guardar"),
                     cancelText: _t("Cancelar")
