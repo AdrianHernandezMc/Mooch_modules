@@ -1,3 +1,181 @@
+/* ============================================
+   ESTILOS PARA CONTROL DE LÍMITE DE CAJA
+   ============================================ */
+
+/* Botón de pago con diferentes estados */
+button.pay-order-button.btn-highlighted {
+  background-color: #fa4f4f !important; /* Rojo para bloqueado */
+  color: white !important;
+  border: none !important;
+  animation: pulse-red 2s infinite;
+}
+
+button.pay-order-button.btn-warning {
+  background-color: #ffc107 !important; /* Amarillo para advertencia */
+  color: black !important;
+  border: none !important;
+  animation: pulse-yellow 2s infinite;
+}
+
+button.pay-order-button.disabled-by-cash-limit {
+  background-color: #6c757d !important; /* Gris cuando está bloqueado */
+  color: white !important;
+  border: none !important;
+  cursor: not-allowed !important;
+  opacity: 0.7 !important;
+}
+
+/* Botones de productos deshabilitados */
+.product.disabled-by-cash-limit {
+  opacity: 0.5 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  filter: grayscale(70%);
+}
+
+/* Overlay para bloqueo total */
+.cash-limit-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(250, 79, 79, 0.05) !important; /* Rojo muy transparente */
+  z-index: 9998 !important;
+  pointer-events: none !important;
+  border: 4px solid #fa4f4f !important;
+  animation: pulse-border 2s infinite;
+}
+
+/* Estilos para mensajes de estado */
+.cash-status-indicator {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cash-status-indicator.blocked {
+  background: #fa4f4f;
+}
+
+.cash-status-indicator.warning {
+  background: #ffc107;
+  color: black;
+}
+
+.cash-status-indicator.normal {
+  background: #28a745;
+}
+
+/* Animaciones */
+@keyframes pulse-red {
+  0% { 
+    background-color: #fa4f4f;
+    box-shadow: 0 0 5px #fa4f4f;
+  }
+  50% { 
+    background-color: #ff6b6b;
+    box-shadow: 0 0 15px #ff6b6b;
+  }
+  100% { 
+    background-color: #fa4f4f;
+    box-shadow: 0 0 5px #fa4f4f;
+  }
+}
+
+@keyframes pulse-yellow {
+  0% { 
+    background-color: #ffc107;
+    box-shadow: 0 0 5px #ffc107;
+  }
+  50% { 
+    background-color: #ffd54f;
+    box-shadow: 0 0 10px #ffd54f;
+  }
+  100% { 
+    background-color: #ffc107;
+    box-shadow: 0 0 5px #ffc107;
+  }
+}
+
+@keyframes pulse-border {
+  0% { 
+    border-color: #fa4f4f;
+    box-shadow: 0 0 10px rgba(250, 79, 79, 0.3);
+  }
+  50% { 
+    border-color: #ff6b6b;
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+  }
+  100% { 
+    border-color: #fa4f4f;
+    box-shadow: 0 0 10px rgba(250, 79, 79, 0.3);
+  }
+}
+
+/* Indicador visual en la barra superior */
+.pos-topheader::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 10000;
+  transition: all 0.3s ease;
+}
+
+.pos-topheader.blocked::after {
+  background: linear-gradient(90deg, #fa4f4f, #ff6b6b);
+  animation: slide 2s infinite linear;
+}
+
+.pos-topheader.warning::after {
+  background: linear-gradient(90deg, #ffc107, #ffd54f);
+}
+
+@keyframes slide {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 0%; }
+}
+
+/* Estilo para mensaje de bloqueo en pantalla */
+.cash-limit-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(250, 79, 79, 0.95);
+  color: white;
+  padding: 20px 30px;
+  border-radius: 10px;
+  text-align: center;
+  z-index: 10000;
+  font-weight: bold;
+  box-shadow: 0 0 30px rgba(250, 79, 79, 0.5);
+  animation: fadeIn 0.5s ease;
+  max-width: 80%;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -60%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+/* ============================================
+   ESTILOS EXISTENTES (los mantienes)
+   ============================================ */
+
 .pos-total-items {
     background-color: #a0baf0;   /* 🟢 Azul muy claro */
     color: #000;                 /* 🟡 Texto negro */
@@ -8,23 +186,58 @@
     border-radius: 4px;
 }
 
-button.pay-order-button.btn-highlighted {
-  background-color: #fa4f4f !important; /* Amarillo */
-   color: white !important;
-  border: none !important;
-}
-
 .verde-input {
-    font-family:"Lato","Open Sans",sans-serif; color:var(--o-gray-800);
+    font-family:"Lato","Open Sans",sans-serif; 
+    color:var(--o-gray-800);
     background-color: #40eb68 !important; /* verde claro */
 }
 
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
 
-/* button.pay-order-button.btn-primary {
-  background-color: #28a745 !important; /* Verde personalizado 
-  color: white !important;
-  border: none !important;
-} */
+@media (max-width: 768px) {
+  .cash-limit-message {
+    padding: 15px 20px;
+    font-size: 14px;
+    max-width: 90%;
+  }
+  
+  .cash-status-indicator {
+    top: 5px;
+    right: 5px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}
 
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
 
+.text-cash-blocked {
+  color: #fa4f4f !important;
+  font-weight: bold;
+}
 
+.text-cash-warning {
+  color: #ffc107 !important;
+  font-weight: bold;
+}
+
+.text-cash-normal {
+  color: #28a745 !important;
+  font-weight: bold;
+}
+
+.bg-cash-blocked {
+  background-color: #fa4f4f !important;
+}
+
+.bg-cash-warning {
+  background-color: #ffc107 !important;
+}
+
+.bg-cash-normal {
+  background-color: #28a745 !important;
+}
