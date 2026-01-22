@@ -98,9 +98,26 @@ class StockPicking(models.Model):
     # =============================
     @api.model
     def create(self, vals):
+        # ---------------------------------------------------------
+        # LÓGICA DE HERENCIA: Copiar 'who_receive' del origen
+        # ---------------------------------------------------------
+        # Si no se especificó un receptor en la creación y hay un documento origen...
+        if 'who_receive' not in vals and vals.get('origin'):
+            # Buscamos el picking original (La salida del otro almacén)
+            source_picking = self.env['stock.picking'].search([
+                ('name', '=', vals['origin'])
+            ], limit=1, order='id desc')
+            
+            # Si existe y tiene un receptor definido, lo copiamos
+            if source_picking and source_picking.who_receive:
+                vals['who_receive'] = source_picking.who_receive.id
+                _logger.info("Heredando receptor %s del picking origen %s al nuevo picking", 
+                             source_picking.who_receive.name, source_picking.name)
+        # ---------------------------------------------------------
+
         picking = super().create(vals)
+        
         # SOLO la primera vez que se crea el picking incoming
-        # Verificar si es Almacén/Existencias antes de aplicar cambios
         if not picking._is_stock_existencias_destination():
             try:
                 picking._auto_set_destination_on_receipt(first_time_only=True)
