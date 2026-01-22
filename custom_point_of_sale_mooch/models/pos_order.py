@@ -54,6 +54,49 @@ class PosOrder(models.Model):
         store=False
     )
 #####################Fin de campos######################################
+###############CAMPOS NUEVOS PARA EL APARTADO DE ORDENES DE VENTA#######
+    # Definimos el nuevo campo
+    total_cost = fields.Monetary(
+        string='Costo Total',
+        compute='_compute_total_cost',
+        currency_field='currency_id',
+        store=True
+    )
+    warehouse_id = fields.Many2one(
+        'stock.warehouse',
+        string='Almacén',
+        related='session_id.config_id.picking_type_id.warehouse_id',
+        store=True,  # Guardar en BD para permitir agrupar y filtrar por almacén
+        readonly=True
+    )
+    margin = fields.Monetary(
+        string='Margen Ganancia',
+        compute='_compute_margin_metrics',
+        currency_field='currency_id',
+        store=True
+    )
+#####################Fin de campos######################################
+    @api.depends('lines.product_id.standard_price', 'lines.qty', 'amount_total', 'amount_tax')
+    def _compute_margin_metrics(self):
+        for order in self:
+            # 1. Calcular Costo Total
+            cost = sum(line.qty * line.product_id.standard_price for line in order.lines)
+            order.total_cost = cost
+
+            # 2. Calcular Venta Neta (Sin IVA)
+            # amount_total ya incluye impuestos, amount_tax son los impuestos
+            net_sales = order.amount_total - order.amount_tax
+
+            # 3. Calcular Margen (Venta Neta - Costo)
+            order.margin = net_sales - cost
+
+    @api.depends('lines.product_id.standard_price', 'lines.qty')
+    def _compute_total_cost(self):
+        for order in self:
+            # Calculamos la suma del (Costo del producto * Cantidad) para cada línea
+            cost = sum(line.qty * line.product_id.standard_price for line in order.lines)
+            order.total_cost = cost
+
     @api.model
     def get_order_locations(self, order_ids):
         """

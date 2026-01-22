@@ -19,5 +19,45 @@
         </xpath>
       </field>
     </record>
+    <record id="view_pos_order_tree_financial" model="ir.ui.view">
+        <field name="name">pos.order.tree.financial</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_tree"/>
+        <field name="arch" type="xml">
+
+            <!-- 1. Almacén (Después del Cliente/Partner) -->
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="warehouse_id" optional="show" widget="badge"/>
+            </xpath>
+
+            <!-- 2. Agregamos las columnas financieras después del Total -->
+            <xpath expr="//field[@name='amount_total']" position="after">
+                <!-- Margen de Ganancia -->
+                <field name="margin"
+                       sum="Total Margen"
+                       widget="monetary"
+                       optional="show"
+                       decoration-bf="1"
+                       decoration-success="margin &gt; 0"
+                       decoration-danger="margin &lt; 0"/>
+            </xpath>
+            <!-- 3. Agregamos las columnas financieras antes del Total -->
+            <xpath expr="//field[@name='amount_total']" position="before">
+                <!-- Costo Total -->
+                <field name="total_cost"
+                       sum="Total Costo"
+                       widget="monetary"
+                       optional="hide"/>
+
+                <!-- Impuestos (Campo nativo de Odoo) -->
+                <field name="amount_tax"
+                       string="Impuestos (IVA)"
+                       sum="Total Impuestos"
+                       widget="monetary"
+                       optional="show"
+                       decoration-muted="1"/>
+            </xpath>
+        </field>
+    </record>
   </data>
 </odoo>
