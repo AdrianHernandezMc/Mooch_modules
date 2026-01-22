@@ -678,3 +678,15 @@ class PurchaseOrder(models.Model):
             # 3. ¿Llegó incompleto o solo algunas líneas?
             else:
                 order.custom_reception_status = 'Pendiente recibir'
+                
+    def _prepare_picking(self):
+            res = super(PurchaseOrder, self)._prepare_picking()
+            
+            if self.employee_id:
+                # --- CORRECCIÓN AQUÍ ---
+                # ANTES TENÍAS: res['who_receive'] = self.employee_id.name
+                # DEBE SER:
+                res['who_receive'] = self.employee_id.id 
+                # Pasamos el .id porque el campo destino es Many2one (espera un número)
+                
+            return res
