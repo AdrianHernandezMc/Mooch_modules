@@ -30,3 +30,8 @@ class AccountMove(models.Model):
         default=False,
         help='Marcar si esta factura ya ha sido ya tiene completa toda sus notas y complementos.'
     )
+    x_is_documents_complete = fields.Boolean(
+        string='¿Tiene sus documentos completos?',
+        default=False,
+        help='Marcar si esta factura ya ha sido ya tiene sus documentos fisicos completos.'
+    )
