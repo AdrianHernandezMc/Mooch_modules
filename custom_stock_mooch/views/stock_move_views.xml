@@ -37,4 +37,39 @@
 
       </field>
   </record>
+  <record id="view_stock_valuation_layer_tree_inherit_wh_v2" model="ir.ui.view">
+      <field name="name">stock.valuation.layer.tree.inherit.wh.v2</field>
+      <field name="model">stock.valuation.layer</field>
+      <field name="inherit_id" ref="stock_account.stock_valuation_layer_tree"/>
+      <field name="arch" type="xml">
+          
+          <!-- Lo pondremos PRIMERO en la lista para asegurarnos que se vea -->
+          <xpath expr="//field[@name='create_date']" position="before">
+              <field name="warehouse_id" optional="show" widget="badge"/>
+          </xpath>
+
+      </field>
+  </record>
+  <record id="view_stock_valuation_layer_tree_inherit_type" model="ir.ui.view">
+      <field name="name">stock.valuation.layer.tree.inherit.type</field>
+      <field name="model">stock.valuation.layer</field>
+      <field name="inherit_id" ref="stock_account.stock_valuation_layer_tree"/>
+      <field name="arch" type="xml">
+          
+          <!-- Insertar después de la fecha o del almacén -->
+          <xpath expr="//field[@name='create_date']" position="after">
+              
+              <field name="movement_type"
+                      optional="show"
+                      widget="badge"
+                      decoration-success="movement_type == 'purchase'"
+                      decoration-info="movement_type == 'sale'"
+                      decoration-warning="movement_type == 'transfer'"
+                      decoration-muted="movement_type == 'adjustment'"
+                      decoration-danger="movement_type == 'return'"/>
+                      
+          </xpath>
+
+      </field>
+  </record>
 </odoo>
