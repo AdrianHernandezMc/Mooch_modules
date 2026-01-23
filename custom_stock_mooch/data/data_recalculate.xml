@@ -1,0 +1,10 @@
+<odoo>
+    <data noupdate="0">
+        <!-- 
+            Al poner noupdate="0", Odoo intentará ejecutar esto cada vez que actualices el módulo (-u).
+            Como nuestra función Python tiene un filtro (if count > 0), es seguro hacerlo
+            porque si ya están calculados, no hará nada y será rápido.
+        -->
+        <function model="stock.valuation.layer" name="action_recalculate_mooch_fields"/>
+    </data>
+</odoo>
