@@ -10,7 +10,7 @@ class StockPicking(models.Model):
 
     # ---- Tus campos existentes (se dejan tal cual) ----
     who_transfers = fields.Many2one('hr.employee', string='Traslada')
-    who_receive   = fields.Many2one('hr.employee', string='Recibe', required=True)
+    who_receive   = fields.Many2one('hr.employee', string='Recibe', required=False)
     driver        = fields.Many2one('hr.employee', string='Chofer')
     plates        = fields.Char(string='Placas')
     unity         = fields.Char(string='Unidad')
