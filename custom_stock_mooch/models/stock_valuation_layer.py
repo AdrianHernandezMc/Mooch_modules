@@ -1,13 +1,12 @@
 import logging
 from odoo import models, fields, api
 
-
 _logger = logging.getLogger(__name__)
-
 
 class StockValuationLayer(models.Model):
     _inherit = 'stock.valuation.layer'
 
+    # 1. Campo Almacén
     warehouse_id = fields.Many2one(
         'stock.warehouse',
         string='Almacén',
@@ -16,6 +15,7 @@ class StockValuationLayer(models.Model):
         readonly=True
     )
 
+    # 2. Campo Tipo de Operación
     movement_type = fields.Selection([
         ('sale', 'Venta / Salida'),
         ('purchase', 'Compra / Entrada'),
@@ -30,22 +30,29 @@ class StockValuationLayer(models.Model):
                  'stock_move_id.location_dest_id')
     def _compute_warehouse_id(self):
         for layer in self:
-            # 1. Intento principal: Buscar por el tipo de operación (Ventas/Compras/POS)
-            wh = layer.stock_move_id.picking_id.picking_type_id.warehouse_id
+            # --- BLINDAJE CONTRA REGISTROS BORRADOS ---
+            # Verificamos si existe el movimiento antes de intentar leerlo
+            if not layer.stock_move_id or not layer.stock_move_id.exists():
+                layer.warehouse_id = False
+                continue
+            # ------------------------------------------
+
+            # Lógica normal
+            wh = False
+            # Intentamos leer el picking de forma segura
+            if layer.stock_move_id.picking_id:
+                wh = layer.stock_move_id.picking_id.picking_type_id.warehouse_id
             
-            # 2. Si falla (ej. Ajuste de Inventario), buscar por la ubicación
-            if not wh and layer.stock_move_id:
+            # Si falla, buscar por ubicación
+            if not wh:
                 move = layer.stock_move_id
-                # Si entra stock (positivo) o es interno, miramos el destino
                 if layer.quantity >= 0:
                     wh = move.location_dest_id.warehouse_id
-                    # A veces el warehouse_id está en la ubicación padre (View location)
-                    if not wh:
+                    if not wh and move.location_dest_id.location_id:
                          wh = move.location_dest_id.location_id.warehouse_id
-                # Si sale stock (negativo), miramos el origen
                 else:
                     wh = move.location_id.warehouse_id
-                    if not wh:
+                    if not wh and move.location_id.location_id:
                          wh = move.location_id.location_id.warehouse_id
             
             layer.warehouse_id = wh
@@ -54,19 +61,23 @@ class StockValuationLayer(models.Model):
                  'stock_move_id.origin_returned_move_id')
     def _compute_movement_type(self):
         for layer in self:
-            # --- BLINDAJE DE SEGURIDAD ---
+            # --- BLINDAJE CONTRA REGISTROS BORRADOS ---
             if not layer.stock_move_id or not layer.stock_move_id.exists():
-                layer.movement_type = 'adjustment' # Asumimos ajuste si no hay movimiento
+                layer.movement_type = 'adjustment'
                 continue
-            # -----------------------------
+            # ------------------------------------------
 
             move = layer.stock_move_id
             
+            # Usamos hasattr para evitar errores si no hay módulo de fabricación
             if hasattr(move, 'production_id') and move.production_id:
                 layer.movement_type = 'production'
 
             elif move.picking_id:
-                code = move.picking_id.picking_type_id.code 
+                # Lectura segura del código
+                code = False
+                if move.picking_id.picking_type_id:
+                    code = move.picking_id.picking_type_id.code 
                 
                 if move.origin_returned_move_id:
                     layer.movement_type = 'return'
@@ -84,13 +95,10 @@ class StockValuationLayer(models.Model):
     @api.model
     def action_recalculate_mooch_fields(self):
         """
-        Busca registros antiguos sin almacén o tipo y fuerza el cálculo.
-        Se ejecuta automáticamente desde el XML al actualizar el módulo.
+        Recálculo forzado de datos históricos.
         """
         _logger.info(">>> INICIANDO RECÁLCULO DE VALORACIÓN (MOOCH) <<<")
         
-        # Buscamos registros donde warehouse_id O movement_type estén vacíos
-        # El operador '|' significa OR en la notación polaca de Odoo
         records_to_fix = self.search([
             '|', 
             ('warehouse_id', '=', False), 
@@ -101,9 +109,16 @@ class StockValuationLayer(models.Model):
         if count > 0:
             _logger.info(f">>> Se encontraron {count} registros para actualizar.")
             
-            # Ejecutamos los computes manualmente sobre esos registros
-            records_to_fix._compute_warehouse_id()
-            records_to_fix._compute_movement_type()
+            # Iteramos uno por uno en lugar de por lotes para que si uno falla,
+            # no detenga a los demás (Try/Except por registro).
+            for record in records_to_fix:
+                try:
+                    record._compute_warehouse_id()
+                    record._compute_movement_type()
+                except Exception as e:
+                    # Si un registro está muy corrupto, lo saltamos y avisamos en el log
+                    _logger.warning(f"Error calculando Valuation Layer ID {record.id}: {str(e)}")
+                    continue
             
             _logger.info(">>> RECÁLCULO FINALIZADO EXITOSAMENTE <<<")
         else:
