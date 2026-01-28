@@ -7,7 +7,7 @@
             <xpath expr="//page[@name='extra']//group//group[@name='other_infos']" position="after">
                 <group string="Envios" name="send_information">
                     <field name="who_transfers" string="Traslada: " options="{'no_create': True}"/>
-                    <field name="who_receive" string="Recibe: " options="{'no_create': True}"/>
+                    <field name="who_receive" string="Recibe: " options="{'no_create': True}" required="1"/>
                     <field name="driver" string="Chofer: " options="{'no_create': True}"/>
                     <field name="plates" string="Placas: "/>
                     <field name="unity" string="Unidad: "/>

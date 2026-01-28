@@ -14,6 +14,7 @@
         'views/stock_move_price_columns_views.xml',
         'views/stock_transfer_product_selector_wizard_views.xml',
         'data/cron_data.xml',
+        'data/data_recalculate.xml'
     ],
     'installable': True,
     'application': True,

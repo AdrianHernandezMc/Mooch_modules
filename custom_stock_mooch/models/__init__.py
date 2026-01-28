@@ -6,3 +6,5 @@ from . import stock_move_price_columns
 from . import stock_transfer_product_selector_wizard
 from . import stock_move_force_zero
 from . import cron_model
+from . import stock_quant_valuation
+from . import stock_valuation_layer

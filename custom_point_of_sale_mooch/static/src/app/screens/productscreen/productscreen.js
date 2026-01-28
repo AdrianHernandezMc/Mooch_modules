@@ -48,9 +48,6 @@ patch(ProductScreen.prototype, {
             this.pos.sum_cash = async () => await this.sum_cash();
         }
         this.pos.get_cash_out = async () => await this.get_cash_out();
-        
-        // ✅ AÑADIR: Intervalo para monitoreo periódico
-        this.cashCheckInterval = null;
 
         // Alt + P limpias las lineas de la orden
         useHotkey("Alt+t", (ev) => {
@@ -129,6 +126,13 @@ patch(ProductScreen.prototype, {
             clearInterval(this._cashCheckInterval);
             this._cashCheckInterval = null;
             console.log("🛑 Intervalo de verificación de caja detenido");
+        }
+        
+        // ✅ AÑADIR: También limpiar la variable antigua si existe
+        if (this.cashCheckInterval) {
+            clearInterval(this.cashCheckInterval);
+            this.cashCheckInterval = null;
+            console.log("🛑 Intervalo antiguo de caja detenido");
         }
     },
 
@@ -254,16 +258,21 @@ patch(ProductScreen.prototype, {
         // ✅ CORRECCIÓN: Iniciar monitoreo de caja
         this._isComponentAlive = true;
         await this.checkCashLimit();
-        this._startPeriodicCheck();
+        this._updateCheckFrequency(6000);
 
         await this.clear_pay_method();
-        const { updated } =  this.orm.call(
-            "loyalty.card",
-            "sync_source_order_by_posref",
-            [],
-            { limit: 1000 }
-        );
-        console.log("loyalty.cards actualizados:", updated);
+
+        try {
+            const { updated } = await this.orm.call(
+                "loyalty.card",
+                "sync_source_order_by_posref",
+                [],
+                { limit: 1000 }
+            );
+            console.log("loyalty.cards actualizados:", updated);
+        } catch (error) {
+            console.error("Error sincronizando loyalty cards:", error);
+        }
 
         console.log("🔧 CALCULADOR PROPORCIONAL - Verificando líneas de cambios...");
 
@@ -273,53 +282,100 @@ patch(ProductScreen.prototype, {
         }, 1000);
     },
 
-    // ✅ AÑADIR: Método para monitorear caja periódicamente
-    _startPeriodicCheck() {
-        // Limpiar intervalo existente
-        this._cleanupIntervals();
+    _updateCheckFrequency(delay) {
+        // Si el delay actual es el mismo, no hacemos nada para no reiniciar el contador innecesariamente
+        if (this._currentDelay === delay) return;
 
-        // Verificar cada 30 segundos
+        console.log(`⏱️ Actualizando frecuencia de verificación a: ${delay/1000} segundos`);
+        
+        this._cleanupIntervals();
+        this._currentDelay = delay;
+
         this._cashCheckInterval = setInterval(async () => {
             if (!this._isAlive()) {
                 this._cleanupIntervals();
                 return;
             }
-
-            try {
-                await this.checkCashLimit();
-            } catch (error) {
-                console.error("Error en verificación periódica:", error);
-            }
-        }, 30000); // 30 segundos
+            await this.checkCashLimit();
+        }, delay);
     },
 
-    // ✅ AÑADIR: Método para verificar límite de caja
+    _startPeriodicCheck() {
+        // Limpiar cualquier intervalo existente
+        this._cleanupIntervals();
+
+        // Verificar cada 60 segundos (más tiempo para evitar problemas)
+        this._cashCheckInterval = setInterval(async () => {
+            try {
+                // ✅ VERIFICACIÓN ROBUSTA: Si no está vivo, limpiar y salir
+                if (!this._isAlive()) {
+                    console.log("⚠️ Componente no vivo, limpiando intervalo");
+                    this._cleanupIntervals();
+                    return;
+                }
+
+                await this.checkCashLimit();
+            } catch (error) {
+                console.error("Error en monitoreo periódico:", error);
+
+                // Si hay error, verificar si debemos seguir
+                if (!this._isAlive()) {
+                    this._cleanupIntervals();
+                }
+            }
+        }, 60000); // 60 segundos - tiempo más seguro
+    },
+
+    // ✅ VERSIÓN ÚNICA Y CORREGIDA (Reemplaza cualquier otra 'checkCashLimit' que tengas)
     async checkCashLimit() {
-        if (!this._isAlive()) {
-            console.log("⚠️ Componente destruido, omitiendo checkCashLimit");
-            return;
-        }
+        // 1. Si el componente ya no existe, salir sin hacer nada
+        if (!this._isAlive()) return;
+
         try {
             if (this.cashState.checkInProgress) return;
-
             this.cashState.checkInProgress = true;
 
-            const cashTotal = await this.sum_cash();
-            const cashOut = await this.get_cash_out();
-            const cfgId = this.pos?.config?.id;
+            // 2. Obtener totales de forma segura (capturando errores individuales)
+            // Usamos las funciones directas pero protegidas con .catch() aquí mismo
+            const cashTotal = await this.sum_cash().catch(() => 0);
+            const cashOut = await this.get_cash_out().catch(() => 0);
 
+            // 3. Verificación vital antes de llamar al servidor
+            if (!this._isAlive()) {
+                this.cashState.checkInProgress = false;
+                return;
+            }
+
+            const cfgId = this.pos?.config?.id;
             if (!cfgId) {
                 this.cashState.checkInProgress = false;
                 return;
             }
 
-            const withdrawalLimit = await this.orm.call("pos.config", "get_withdrawal", [cfgId], {});
+            // 4. Llamada al servidor para el límite (Protegida)
+            let withdrawalLimit = 0;
+            try {
+                withdrawalLimit = await this.orm.call("pos.config", "get_withdrawal", [cfgId], {});
+            } catch (ormError) {
+                // Si falla aquí, verificamos si es por destrucción
+                const msg = (ormError.message || ormError.toString() || "").toLowerCase();
+                if (msg.includes("destroyed") || msg.includes("component")) {
+                    this.cashState.checkInProgress = false;
+                    return; // Salir en silencio
+                }
+                throw ormError; // Si es otro error, lanzarlo para el catch principal
+            }
 
-            // Aplicar descuento del 10% para advertencia
+            // 5. Verificación final de vida
+            if (!this._isAlive()) {
+                this.cashState.checkInProgress = false;
+                return;
+            }
+
+            // --- Lógica de Negocio ---
             const discounted = withdrawalLimit * 0.9;
             const netCash = cashTotal - cashOut;
 
-            // Actualizar estado
             this.cashState.cashTotal = cashTotal;
             this.cashState.cashOut = cashOut;
             this.cashState.withdrawalLimit = withdrawalLimit;
@@ -328,41 +384,190 @@ patch(ProductScreen.prototype, {
             const shouldBlock = netCash > withdrawalLimit;
 
             this.cashState.isBlocked = shouldBlock;
+            this.pos.bloqueodecaja = shouldBlock; // Compatibilidad global
 
-            // ✅ ACTUALIZAR la variable global para compatibilidad
-            this.pos.bloqueodecaja = shouldBlock;
+            // Solo actualizar UI si el componente sigue vivo
+            if (this._isAlive()) {
+                if (shouldBlock && !wasBlocked) {
+                    await this.showBlockPopup();
+                    if (this._isAlive()) this.disableSalesInterface();
+                } else if (!shouldBlock && wasBlocked) {
+                    if (this._isAlive()) this.enableSalesInterface();
+                }
 
-            // Si se activó el bloqueo
-            if (shouldBlock && !wasBlocked) {
-                console.log("🔴 BLOQUEO ACTIVADO - Efectivo excede límite");
-                await this.showBlockPopup();
-                this.disableSalesInterface();
+                if (netCash >= discounted && netCash <= withdrawalLimit && !this.cashState.warningShown) {
+                    await this.showWarningPopup(netCash, withdrawalLimit);
+                    this.cashState.warningShown = true;
+                } else if (netCash < discounted) {
+                    this.cashState.warningShown = false;
+                }
+
+                if (this._isAlive()) {
+                    this.updatePayButton(netCash, withdrawalLimit, discounted);
+                }
             }
-            // Si se desactivó el bloqueo
-            else if (!shouldBlock && wasBlocked) {
-                console.log("🟢 BLOQUEO DESACTIVADO - Efectivo dentro del límite");
-                this.enableSalesInterface();
-            }
-
-            // Mostrar advertencia cuando se acerca al límite
-            if (netCash >= discounted && netCash <= withdrawalLimit && !this.cashState.warningShown) {
-                await this.showWarningPopup(netCash, withdrawalLimit);
-                this.cashState.warningShown = true;
-            }
-
-            // Resetear advertencia si está por debajo del nivel de advertencia
-            if (netCash < discounted) {
-                this.cashState.warningShown = false;
-            }
-
-            // Actualizar botón de pago
-            this.updatePayButton(netCash, withdrawalLimit, discounted);
 
             this.cashState.checkInProgress = false;
 
         } catch (error) {
-            console.error("Error en checkCashLimit:", error);
             this.cashState.checkInProgress = false;
+
+            // ============================================================
+            // 🛑 FILTRO DE SILENCIO 🛑
+            // ============================================================
+            const msg = (error.message || error.toString() || "").toLowerCase();
+            
+            // Si el mensaje contiene "destroyed", NO IMPRIMIMOS NADA.
+            if (msg.includes("destroyed") || msg.includes("component")) {
+                return;
+            }
+
+            // Solo imprimimos si es un error diferente (ej. fallo de red real)
+            console.error("Error real en checkCashLimit:", error);
+        }
+    },
+
+        async _safeSumCash() {
+        try {
+            if (!this._isAlive()) return 0;
+            return await this.sum_cash();
+        } catch (error) {
+            console.error("Error en _safeSumCash:", error);
+            return 0;
+        }
+    },
+
+    async _safeGetCashOut() {
+        try {
+            if (!this._isAlive()) return 0;
+            return await this.get_cash_out();
+        } catch (error) {
+            console.error("Error en _safeGetCashOut:", error);
+            return 0;
+        }
+    },
+
+    async _safeShowBlockPopup(netCash, limit) {
+        try {
+            if (!this._isAlive() || !this.popup) return;
+            
+            await this.popup.add(ErrorPopup, {
+                title: "❌ VENTAS BLOQUEADAS",
+                body: `El efectivo en caja ha superado el límite permitido.\n\n` +
+                      `Efectivo actual: $${netCash.toFixed(2)}\n` +
+                      `Límite permitido: $${limit.toFixed(2)}\n\n` +
+                      `Realiza un retiro para continuar con las ventas.`,
+                confirmText: "Entendido",
+            });
+        } catch (error) {
+            console.error("Error seguro en showBlockPopup:", error);
+        }
+    },
+
+    async _safeShowWarningPopup(netCash, limit) {
+        try {
+            if (!this._isAlive() || !this.popup) return;
+            
+            const remaining = limit - netCash;
+            await this.popup.add(ErrorPopup, {
+                title: "⚠️ ADVERTENCIA DE LÍMITE",
+                body: `El efectivo en caja se acerca al límite permitido.\n\n` +
+                      `Efectivo actual: $${netCash.toFixed(2)}\n` +
+                      `Límite permitido: $${limit.toFixed(2)}\n` +
+                      `Restante antes del límite: $${remaining.toFixed(2)}\n\n` +
+                      `Considera realizar un retiro pronto.`,
+                confirmText: "Entendido",
+            });
+        } catch (error) {
+            console.error("Error seguro en showWarningPopup:", error);
+        }
+    },
+
+    _safeDisableSalesInterface() {
+        try {
+            if (!this._isAlive()) return;
+            
+            setTimeout(() => {
+                const productButtons = document.querySelectorAll(".product");
+                productButtons.forEach(btn => {
+                    btn.classList.add("disabled-by-cash-limit");
+                });
+                
+                const payButton = document.querySelector("button.pay-order-button");
+                if (payButton) {
+                    payButton.classList.add("disabled-by-cash-limit");
+                    payButton.disabled = true;
+                    payButton.classList.add("btn-highlighted");
+                }
+                
+                let overlay = document.querySelector(".cash-limit-overlay");
+                if (!overlay) {
+                    overlay = document.createElement("div");
+                    overlay.className = "cash-limit-overlay";
+                    overlay.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(250, 79, 79, 0.05);
+                        z-index: 9998;
+                        pointer-events: none;
+                        border: 4px solid #fa4f4f;
+                    `;
+                    document.body.appendChild(overlay);
+                }
+            }, 0);
+        } catch (error) {
+            console.error("Error seguro en disableSalesInterface:", error);
+        }
+    },
+
+    _safeEnableSalesInterface() {
+        try {
+            if (!this._isAlive()) return;
+            
+            setTimeout(() => {
+                const productButtons = document.querySelectorAll(".product");
+                productButtons.forEach(btn => {
+                    btn.classList.remove("disabled-by-cash-limit");
+                });
+                
+                const payButton = document.querySelector("button.pay-order-button");
+                if (payButton) {
+                    payButton.classList.remove("disabled-by-cash-limit");
+                    payButton.disabled = false;
+                    payButton.classList.remove("btn-highlighted");
+                }
+                
+                const overlay = document.querySelector(".cash-limit-overlay");
+                if (overlay) {
+                    overlay.remove();
+                }
+            }, 0);
+        } catch (error) {
+            console.error("Error seguro en enableSalesInterface:", error);
+        }
+    },
+
+    _safeUpdatePayButton(netCash, limit, discounted) {
+        try {
+            if (!this._isAlive()) return;
+
+            setTimeout(() => {
+                const button = document.querySelector("button.pay-order-button");
+                if (!button) return;
+
+                button.classList.remove("btn-highlighted", "btn-warning");
+
+                if (netCash > limit) {
+                    button.classList.add("btn-highlighted");
+                } else if (netCash >= discounted && netCash <= limit) {
+                    button.classList.add("btn-warning");
+                }
+            }, 0);
+        } catch (error) {
+            console.error("Error seguro en updatePayButton:", error);
         }
     },
 
@@ -513,13 +718,16 @@ patch(ProductScreen.prototype, {
     async _addProduct(product, options) {
         // Verificar si la caja está bloqueada
         if (this.cashState.isBlocked) {
-            // ✅ AÑADIR esta verificación:
-            if (this._isAlive() && this.popup) {
-                await this.popup.add(ErrorPopup, {
-                    title: "Venta Bloqueada",
-                    body: "No se pueden agregar productos. El efectivo ha superado el límite. Realiza un retiro para continuar.",
-                    confirmText: "OK",
-                });
+            try {
+                if (this._isAlive() && this.popup) {
+                    await this.popup.add(ErrorPopup, {
+                        title: "Venta Bloqueada",
+                        body: "No se pueden agregar productos. El efectivo ha superado el límite. Realiza un retiro para continuar.",
+                        confirmText: "OK",
+                    });
+                }
+            } catch (error) {
+                console.error("Error en _addProduct bloque:", error);
             }
             return false;
         }
@@ -530,13 +738,16 @@ patch(ProductScreen.prototype, {
     // ✅ AÑADIR: Verificar antes de ir a pago
     async clickPay() {
         if (this.cashState.isBlocked) {
-            // ✅ AÑADIR esta verificación:
-            if (this._isAlive() && this.popup) {
-                await this.popup.add(ErrorPopup, {
-                    title: "Pago Bloqueado",
-                    body: "No se puede proceder al pago. El efectivo ha superado el límite. Realiza un retiro para continuar.",
-                    confirmText: "OK",
-                });
+            try {
+                if (this._isAlive() && this.popup) {
+                    await this.popup.add(ErrorPopup, {
+                        title: "Pago Bloqueado",
+                        body: "No se puede proceder al pago. El efectivo ha superado el límite. Realiza un retiro para continuar.",
+                        confirmText: "OK",
+                    });
+                }
+            } catch (error) {
+                console.error("Error en clickPay bloque:", error);
             }
             return false;
         }
@@ -544,16 +755,34 @@ patch(ProductScreen.prototype, {
         return super.clickPay(...arguments);
     },
 
+    // ✅ AÑADIR: Método para debug
+    async debugCashStatus() {
+        console.log("=== 🔍 DEBUG ESTADO CAJA ===");
+        console.log("Componente vivo:", this._isAlive());
+        console.log("Intervalo activo:", !!this._cashCheckInterval);
+        console.log("Estado cashState:", this.cashState);
+        console.log("POS bloqueodecaja:", this.pos.bloqueodecaja);
+        console.log("==========================");
+
+        return await this.forceCashCheck();
+    },
+
     async forceCashCheck() {
         console.log("🔍 Forzando verificación de caja...");
-        await this.checkCashLimit();
-        return {
-            isBlocked: this.cashState.isBlocked,
-            cashTotal: this.cashState.cashTotal,
-            cashOut: this.cashState.cashOut,
-            netCash: this.cashState.cashTotal - this.cashState.cashOut,
-            limit: this.cashState.withdrawalLimit
-        };
+        try {
+            await this.checkCashLimit();
+            return {
+                isBlocked: this.cashState.isBlocked,
+                cashTotal: this.cashState.cashTotal,
+                cashOut: this.cashState.cashOut,
+                netCash: this.cashState.cashTotal - this.cashState.cashOut,
+                limit: this.cashState.withdrawalLimit,
+                isAlive: this._isAlive()
+            };
+        } catch (error) {
+            console.error("Error en forceCashCheck:", error);
+            return { error: error.message };
+        }
     },
 
     async applyProportionalPriceToChangeLines() {
@@ -883,8 +1112,8 @@ patch(ProductScreen.prototype, {
         }
     },
 
-async clickReembolso(){
-        const { confirmed, payload } = await this.popup.add(MaskedInputPopup,{
+async clickReembolso() {
+        const { confirmed, payload } = await this.popup.add(MaskedInputPopup, {
             title: "Devoluciones y Cancelaciones",
             body: "Ingresa el número de orden:",
             placeholder: "Ej: 00001",
@@ -900,8 +1129,7 @@ async clickReembolso(){
             const orderNumber = String(payload).trim();
             console.log("🔍 Buscando orden:", orderNumber);
 
-            // ✅ PASO 1: Pedir el motivo ANTES de buscar la orden
-            console.log("📝 Solicitando motivo de la operación...");
+            // PASO 1: Pedir el motivo
             const refundReason = await this.getRefundReason();
 
             if (!refundReason || refundReason.trim() === '') {
@@ -916,7 +1144,7 @@ async clickReembolso(){
             // Guardar el motivo temporalmente
             this.pos.currentRefundReason = refundReason;
 
-            // Buscar la orden ORIGINAL usando varios métodos
+            // Buscar la orden ORIGINAL
             let originalOrder = null;
 
             // Método 1: Buscar por nombre exacto
@@ -955,80 +1183,38 @@ async clickReembolso(){
             if (!originalOrder) {
                 await this.popup.add(ErrorPopup, {
                     title: "Orden no encontrada",
-                    body: `No se encontró la orden "${orderNumber}". Verifica el número e intenta nuevamente.`,
+                    body: `No se encontró la orden "${orderNumber}".`,
                 });
                 delete this.pos.currentRefundReason;
                 return;
             }
 
-            // Verificar estado válido
+            // Validaciones de estado y cambios previos
             const validStates = ["paid", "done", "invoiced"];
             if (!validStates.includes(originalOrder.state)) {
-                await this.popup.add(ErrorPopup, {
-                    title: "Orden no válida",
-                    body: `La orden ${originalOrder.name} está en estado "${originalOrder.state}". Solo se pueden reembolsar órdenes pagadas.`,
-                });
+                await this.popup.add(ErrorPopup, { title: "Orden no válida", body: `La orden no está pagada.` });
                 delete this.pos.currentRefundReason;
                 return;
             }
 
-            // Validar cambios existentes
-            const hasExistingChanges = originalOrder.changes_codes &&
-                                    originalOrder.changes_codes.trim() !== "" &&
-                                    originalOrder.changes_codes !== " ";
-
+            const hasExistingChanges = originalOrder.changes_codes && originalOrder.changes_codes.trim() !== "" && originalOrder.changes_codes !== " ";
             if (hasExistingChanges) {
-                await this.popup.add(ErrorPopup, {
-                    title: "Cambios no permitidos",
-                    body: "Esta orden ya tiene cambios realizados. No se pueden realizar reembolsos sobre órdenes con cambios previos.",
-                });
+                await this.popup.add(ErrorPopup, { title: "Cambios no permitidos", body: "Esta orden ya tiene cambios realizados." });
                 delete this.pos.currentRefundReason;
                 return;
             }
 
-            // Validar si es un reembolso
-            const orderName = originalOrder.name || "";
-            const posReference = originalOrder.pos_reference || "";
-
-            if (orderName.includes("REEMBOLSO") ||
-                orderName.includes("DEVOLUCIÓN") ||
-                orderName.includes("REFUND") ||
-                posReference.includes("REEMBOLSO") ||
-                posReference.includes("DEV") ||
-                posReference.includes("REFUND")) {
-
-                await this.popup.add(ErrorPopup, {
-                    title: "Operación no válida",
-                    body: "No se puede reembolsar una orden que ya es un reembolso.",
-                });
-                delete this.pos.currentRefundReason;
-                return;
-            }
-
-            // Validar caché local
             const refundKey = `refund_${originalOrder.id}`;
-            const existingRefund = localStorage.getItem(refundKey);
-
-            if (existingRefund) {
-                const refundDate = new Date(parseInt(existingRefund));
-                await this.popup.add(ErrorPopup, {
-                    title: "Reembolso ya realizado",
-                    body: `Esta orden ya fue reembolsada localmente el ${refundDate.toLocaleString()}.`,
-                });
+            if (localStorage.getItem(refundKey)) {
+                await this.popup.add(ErrorPopup, { title: "Reembolso ya realizado", body: "Esta orden ya fue reembolsada localmente." });
                 delete this.pos.currentRefundReason;
                 return;
             }
 
-            // ✅ AQUÍ ESTÁ EL CAMBIO CLAVE: ConfirmPopup SIN HTML ✅
-            // Usamos template literals (``) y \n para los saltos de línea.
+            // Confirmación
             const { confirmed: finalConfirm } = await this.popup.add(ConfirmPopup, {
                 title: _t("Confirmar Devolución"),
-                body: `Orden: ${originalOrder.name}
-                Total: $${Math.abs(originalOrder.amount_total).toFixed(2)}
-
-                Motivo: ${refundReason}
-
-                ¿Estás seguro de continuar con la devolución?`,
+                body: `Orden: ${originalOrder.name}\nTotal: $${Math.abs(originalOrder.amount_total).toFixed(2)}\n\nMotivo: ${refundReason}\n\n¿Estás seguro?`,
                 confirmText: _t("Sí, devolver"),
                 cancelText: _t("Cancelar")
             });
@@ -1038,25 +1224,16 @@ async clickReembolso(){
                 return;
             }
 
-            // Buscar líneas de la orden
-            console.log("🔍 Buscando líneas de la orden ID:", originalOrder.id);
+            // Buscar líneas
             const orderLines = await this.orm.call("pos.order.line", "search_read", [
                 [["order_id", "=", originalOrder.id]],
-                [
-                    "id", "product_id", "qty", "price_unit", "discount", "price_subtotal",
-                    "tax_ids", "combo_parent_id", "combo_line_ids", "full_product_name"
-                ]
+                ["id", "product_id", "qty", "price_unit", "discount", "price_subtotal", "tax_ids", "combo_parent_id", "combo_line_ids", "full_product_name"]
             ]);
 
             console.log("Líneas encontradas:", orderLines);
 
             if (!orderLines || orderLines.length === 0) {
-                await this.popup.add(ErrorPopup, {
-                    title: "Sin líneas para reembolsar",
-                    body: "La orden no tiene líneas disponibles para reembolso.",
-                });
-                localStorage.removeItem(refundKey);
-                delete this.pos.currentRefundReason;
+                await this.popup.add(ErrorPopup, { title: "Error", body: "Sin líneas para reembolsar." });
                 return;
             }
 
@@ -1066,30 +1243,14 @@ async clickReembolso(){
             // Cargar líneas en toRefundLines
             this.pos.toRefundLines = {};
             for (const line of orderLines) {
-                this.pos.toRefundLines[line.id] = {
-                    qty: line.qty,
-                    orderline: line,
-                    destinationOrderUid: null,
-                };
+                this.pos.toRefundLines[line.id] = { qty: line.qty, orderline: line, destinationOrderUid: null };
             }
 
-            // Obtener partner
-            const partner = originalOrder.partner_id && originalOrder.partner_id[0]
-                ? this.pos.db.get_partner_by_id(originalOrder.partner_id[0])
-                : null;
-
-            console.log("Partner para reembolso:", partner);
-
-            // Obtener detalles reembolsables usando la lógica original
-            const refundableDetails = _super_getRefundableDetails.call(this, partner); 
+            const partner = originalOrder.partner_id && originalOrder.partner_id[0] ? this.pos.db.get_partner_by_id(originalOrder.partner_id[0]) : null;
+            const refundableDetails = _super_getRefundableDetails.call(this, partner);
 
             if (!refundableDetails || refundableDetails.length === 0) {
-                await this.popup.add(ErrorPopup, {
-                    title: "Nada que reembolsar",
-                    body: "No se encontraron líneas válidas para reembolso.",
-                });
-                localStorage.removeItem(refundKey);
-                delete this.pos.currentRefundReason;
+                await this.popup.add(ErrorPopup, { title: "Error", body: "No hay detalles reembolsables." });
                 return;
             }
 
@@ -1101,27 +1262,36 @@ async clickReembolso(){
 
             // ✅ GUARDAR EL MOTIVO EN LA NUEVA ORDEN
             refundOrder.refund_cancel_reason = refundReason;
-
-            if (partner) {
-                refundOrder.set_partner(partner);
-            }
+            if (partner) refundOrder.set_partner(partner);
 
             const originalToRefundLineMap = new Map();
 
-            // ✅ Agregar productos a la orden de reembolso
+            // --- AQUÍ EMPIEZA LA CORRECCIÓN DE IMPUESTOS ---
             for (const detail of refundableDetails) {
                 try {
                     const product = this.pos.db.get_product_by_id(detail.orderline.product_id[0]);
-                    const options = _super_prepareRefundOrderlineOptions(detail);
+                    let options = _super_prepareRefundOrderlineOptions(detail);
 
-                    // ✅ FORZAR pack_lot_lines a array vacío SIEMPRE
-                    if (options) {
-                        options.pack_lot_lines = [];
-                    } else {
-                        options = { pack_lot_lines: [] };
+                    if (options) options.pack_lot_lines = [];
+                    else options = { pack_lot_lines: [] };
+
+                    // 1. Agregar el producto
+                    const refundLine = await refundOrder.add_product(product, options);
+
+                    // 2. CORRECCIÓN DE IVA: Aplicar forzosamente los impuestos originales
+                    if (detail.orderline.tax_ids && detail.orderline.tax_ids.length > 0) {
+                        // Obtenemos los objetos de impuesto reales del POS usando los IDs
+                        const originalTaxes = detail.orderline.tax_ids.map(taxId => this.pos.taxes_by_id[taxId]).filter(Boolean);
+
+                        if (originalTaxes.length > 0) {
+                            // Forzamos los impuestos en la línea nueva
+                            refundLine.set_taxes(originalTaxes);
+
+                            // Opcional: Si el precio sigue saliendo sin IVA, forzar recálculo
+                            // refundLine.set_unit_price(refundLine.get_unit_price());
+                        }
                     }
 
-                    const refundLine = await refundOrder.add_product(product, options);
                     originalToRefundLineMap.set(detail.orderline.id, refundLine);
                     detail.destinationOrderUid = refundOrder.uid;
 
@@ -1130,6 +1300,7 @@ async clickReembolso(){
                     console.error("❌ Error agregando producto:", error, detail);
                 }
             }
+            // --- FIN CORRECCIÓN ---
 
             // Manejo de combos
             for (const detail of refundableDetails) {
@@ -1148,10 +1319,10 @@ async clickReembolso(){
                 }
             }
 
-            // Buscar pagos de la orden original
+            // Pagos negativos
             const payments = await this.orm.call("pos.payment", "search_read", [
                 [["pos_order_id", "=", originalOrder.id]],
-                ["amount", "payment_method_id", "payment_date"]
+                ["amount", "payment_method_id"]
             ]);
 
             console.log("Pagos encontrados:", payments);
@@ -1166,42 +1337,32 @@ async clickReembolso(){
                 }
             }
 
-            // ✅ MARCAR LA ORDEN ORIGINAL COMO REEMBOLSADA EN EL SISTEMA CON EL MOTIVO
+            // Marcar orden original en BD
             try {
                 await this.orm.call("pos.order", "write", [[originalOrder.id], {
                     refund_cancel_reason: refundReason,
                     note: `REEMBOLSADO - ${new Date().toLocaleString()} - Motivo: ${refundReason}`
                 }]);
-                console.log("✅ Orden original marcada como reembolsada con motivo:", refundReason);
-            } catch (error) {
-                console.log("⚠️ No se pudo marcar la orden en BD:", error);
-            }
+            } catch (error) { console.log("⚠️ No se pudo marcar BD:", error); }
 
             // Redirigir a pantalla de pago
             this.pos.Sale_type = "Reembolso";
             this.pos.set_order(refundOrder);
             this.pos.Reembolso = true;
 
-            console.log("✅ Reembolso creado, redirigiendo a pantalla de pago...");
+            console.log("✅ Reembolso creado con impuestos corregidos");
             this.pos.showScreen("PaymentScreen");
 
             // ✅ Limpiar variables temporales
             delete this.pos.currentRefundReason;
-
-            // ✅ Limpiar el localStorage después de 2 horas
-            setTimeout(() => {
-                localStorage.removeItem(refundKey);
-                console.log("🗑️ Limpiada marca temporal de reembolso");
-            }, 2 * 60 * 60 * 1000);
+            setTimeout(() => { localStorage.removeItem(refundKey); }, 2 * 60 * 60 * 1000);
 
         } catch (error) {
-            console.error("❌ ERROR CRÍTICO en clickReembolso:", error);
-            // Limpiar variables temporales en caso de error
+            console.error("❌ ERROR en clickReembolso:", error);
             delete this.pos.currentRefundReason;
 
             await this.popup.add(ErrorPopup, {
-                title: "Error en reembolso",
-                body: `Ocurrió un error inesperado: ${error.message || error}`,
+                title: "Error", body: `Ocurrió un error: ${error.message || error}`,
             });
         }
     },
@@ -1251,34 +1412,84 @@ async clickReembolso(){
     },
 
 
-    async sum_cash(){
-        const sessionId = this.posService.pos_session.id;
-        const cashMethodIds = (this.posService.payment_methods || [])
-            .filter(pm => pm.type === "cash" || pm.is_cash_count)
-            .map(pm => pm.id);
-
-        if (!cashMethodIds.length) {
-            this.cashTotal.value = 0;
-            return;
+    async sum_cash() {
+        // 1. Verificación inicial
+        if (!this._isAlive() || !this.posService || !this.posService.pos_session) {
+            return 0;
         }
 
-        const domain = [
-            ["session_id", "=", sessionId],
-            ["payment_method_id", "in", cashMethodIds],
-        ];
+        try {
+            const sessionId = this.posService.pos_session.id;
+            const cashMethodIds = (this.posService.payment_methods || [])
+                .filter(pm => pm.type === "cash" || pm.is_cash_count)
+                .map(pm => pm.id);
 
-        const total_sale = await this.orm.call(
-            "pos.payment",
-            "read_group",
-            [domain, ["amount:sum"], []],
-            {}
-        );
+            if (!cashMethodIds.length) return 0;
 
-        let total = 0;
-        if (total_sale && total_sale.length) {
-            total = Number(total_sale[0].amount || 0);
+            const domain = [
+                ["session_id", "=", sessionId],
+                ["payment_method_id", "in", cashMethodIds],
+            ];
+
+            // 2. Llamada protegida
+            const total_sale = await this.orm.call(
+                "pos.payment",
+                "read_group",
+                [domain, ["amount:sum"], []],
+                {}
+            );
+
+            // 3. Verificación final antes de usar datos
+            if (!this._isAlive()) return 0;
+
+            return total_sale && total_sale.length ? Number(total_sale[0].amount || 0) : 0;
+
+        } catch (error) {
+            // Silenciar error de "destroyed"
+            if (error.message && (error.message.includes("destroyed") || error.message.includes("component"))) {
+                return 0;
+            }
+            console.error("Error real en sum_cash:", error);
+            return 0;
         }
-        return total
+    },
+
+    async get_cash_out() {
+        // 1. Verificación inicial
+        if (!this._isAlive() || !this.pos || !this.pos.pos_session) {
+            return 0;
+        }
+
+        try {
+            const sessionId = this.pos.pos_session.id;
+            
+            // 2. Llamada protegida
+            const lines = await this.orm.call(
+                "account.bank.statement.line",
+                "search_read",
+                [[["pos_session_id", "=", sessionId]]],
+                { fields: ["amount"] }
+            );
+
+            // 3. Verificación final
+            if (!this._isAlive()) return 0;
+
+            let totalOut = 0;
+            for (const l of lines) {
+                const amt = Number(l.amount) || 0;
+                if (amt < 0) totalOut += Math.abs(amt);
+            }
+
+            return Math.round(totalOut * 100) / 100;
+
+        } catch (error) {
+            // Silenciar error de "destroyed"
+            if (error.message && (error.message.includes("destroyed") || error.message.includes("component"))) {
+                return 0;
+            }
+            console.error("Error real en get_cash_out:", error);
+            return 0;
+        }
     },
 
     // ✅ CORREGIDO: Método getLocalCashTotal actualizado
