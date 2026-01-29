@@ -34,6 +34,19 @@
         </xpath>
 
         <!-- ======================================================= -->
+        <!-- BOTÓN GUARDAR (Solo para stock.quant)                 -->
+        <!-- ======================================================= -->
+        <!-- B) Para Ajustes de Inventario - Antes de Aplicar -->
+        <xpath expr="//button[contains(@class, 'o_apply_page')]" position="before">
+            <button t-if="env.model.canBeProcessed"
+                    class="btn btn-secondary me-2 text-uppercase custom_save_mooch_quant"
+                    t-on-click="onSaveButton">
+                <i class="fa fa-floppy-o me-1"/>
+                <span>Guardar</span>
+            </button>
+        </xpath>
+
+        <!-- ======================================================= -->
         <!-- DESHABILITAR VALIDAR (Solo para stock.picking)          -->
         <!-- ======================================================= -->
         <!-- CAMBIO: Añadimos la condición env.model.resModel === 'stock.picking' -->
@@ -46,12 +59,12 @@
         <!-- ACCIONES ESPECÍFICAS DE AJUSTE DE INVENTARIO (Opcional) -->
         <!-- Si quieres deshabilitar el botón "Apply" de Ajustes:   -->
         <!-- ======================================================= -->
-        <!--
+        
         <xpath expr="//button[contains(@class, 'o_apply_page')]" position="attributes">
             <attribute name="t-att-disabled">true</attribute>
             <attribute name="t-attf-class">btn btn-secondary o_apply_page</attribute>
         </xpath>
-        -->
+       
 
     </t>
 
