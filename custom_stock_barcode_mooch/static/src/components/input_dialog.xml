@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_stock_barcode_mooch.InputDialog">
+        <Dialog title="title">
+            <div class="p-3">
+                <label class="form-label fw-bold">Ingrese el Área / Rack / Pasillo:</label>
+                <input type="text"
+                       class="form-control"
+                       t-model="state.value"
+                       t-ref="autofocus"
+                       placeholder="Ej. Pasillo 5, Rack A..."/>
+                <small class="text-muted">Este nombre se asignará a todos los productos en pantalla.</small>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="_confirm">Guardar y Asignar</button>
+                <button class="btn btn-secondary" t-on-click="_cancel">Cancelar</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

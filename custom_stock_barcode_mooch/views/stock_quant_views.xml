@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- 1. VISTA DE LISTA EDITABLE -->
+        <record id="view_stock_quant_tree_inventory_editable_mooch" model="ir.ui.view">
+            <field name="name">stock.quant.inventory.tree.editable.mooch</field>
+            <field name="model">stock.quant</field>
+            <field name="inherit_id" ref="stock.view_stock_quant_tree_inventory_editable"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='user_id']" position="after">
+                    <field name="quant_rack_area" string="Rack / Área" optional="show"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- 2. VISTA DE BÚSQUEDA (FILTROS Y AGRUPACIÓN) -->
+        <record id="stock_quant_search_view_mooch" model="ir.ui.view">
+            <field name="name">stock.quant.search.mooch</field>
+            <field name="model">stock.quant</field>
+            <field name="inherit_id" ref="stock.quant_search_view"/>
+            <field name="arch" type="xml">
+
+                <!-- A) Agregar campo a la búsqueda rápida -->
+                <xpath expr="//field[@name='product_id']" position="after">
+                    <field name="quant_rack_area" string="Rack / Área"/>
+                </xpath>
+
+                <!-- B) Agregar opción de "Agrupar por" -->
+                <xpath expr="//filter[@name='locationgroup']" position="after">
+                    <filter string="Rack / Área" name="groupby_rack" domain="[]" context="{'group_by': 'quant_rack_area'}"/>
+                </xpath>
+
+            </field>
+        </record>
+
+    </data>
+</odoo>

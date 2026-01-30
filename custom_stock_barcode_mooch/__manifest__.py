@@ -12,11 +12,17 @@
     """,
     'author': 'Mooch',
     'depends': ['stock_barcode', 'web', 'stock'],
-    'data': [],
+    'data': [
+            'views/stock_quant_views.xml',
+            'views/stock_move_line_views.xml',
+        ],
     'assets': {
         'web.assets_backend': [
             'custom_stock_barcode_mooch/static/src/components/main_patch.xml',
             'custom_stock_barcode_mooch/static/src/components/main_patch.js',
+            'custom_stock_barcode_mooch/static/src/components/line_patch.xml',
+            'custom_stock_barcode_mooch/static/src/components/input_dialog.xml',
+            'custom_stock_barcode_mooch/static/src/components/input_dialog.js',
         ],
     },
     'installable': True,
