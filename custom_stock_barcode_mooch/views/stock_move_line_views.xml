@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Heredamos la lista de movimientos de producto (Trazabilidad) -->
+        <record id="view_move_line_tree_mooch" model="ir.ui.view">
+            <field name="name">stock.move.line.tree.mooch</field>
+            <field name="model">stock.move.line</field>
+            <field name="inherit_id" ref="stock.view_move_line_tree"/>
+            <field name="arch" type="xml">
+                <!-- Buscamos la ubicación y agregamos nuestros campos extra -->
+                <xpath expr="//field[@name='location_id']" position="after">
+                    <field name="quant_rack_area" string="Rack / Área" optional="show"/>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

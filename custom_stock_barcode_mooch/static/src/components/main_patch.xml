@@ -3,15 +3,11 @@
 
     <t t-name="custom_stock_barcode_mooch.MainComponent" t-inherit="stock_barcode.MainComponent" t-inherit-mode="extension">
         
-        <!-- ======================================================= -->
-        <!-- BARRA DE CONTEO TOTAL (Universal)                       -->
-        <!-- ======================================================= -->
-        <!-- Se mantiene siempre, porque es información útil en ambos -->
+        <!-- 1. BARRA DE TOTALES (Universal) -->
         <xpath expr="//div[contains(@class, 'o_action_buttons')]" position="before">
             <div t-if="env.model.canBeProcessed"
                  class="d-flex justify-content-center align-items-center py-2 border-top bg-100"
                  style="font-size: 1.3rem;">
-                
                 <div class="fw-bold text-primary">
                     <i class="fa fa-cubes me-2"/>
                     <span class="text-dark">Total: </span>
@@ -21,50 +17,46 @@
         </xpath>
 
         <!-- ======================================================= -->
-        <!-- BOTÓN GUARDAR (Solo para stock.picking)                 -->
+        <!-- CASO 1: TRASLADOS (stock.picking)                       -->
         <!-- ======================================================= -->
-        <!-- CAMBIO: Añadimos la condición env.model.resModel === 'stock.picking' -->
+
+        <!-- A) Botón GUARDAR SIMPLE (Sin Popup) -->
         <xpath expr="//button[contains(@class, 'o_validate_page')]" position="before">
             <button t-if="env.model.resModel === 'stock.picking'"
-                    class="btn btn-secondary me-2 text-uppercase custom_save_mooch"
-                    t-on-click="onSaveButton">
+                    class="btn btn-secondary me-2 text-uppercase custom_save_simple"
+                    t-on-click="onSaveSimple">
                 <i class="fa fa-floppy-o me-1"/>
                 <span>Guardar</span>
             </button>
         </xpath>
 
-        <!-- ======================================================= -->
-        <!-- BOTÓN GUARDAR (Solo para stock.quant)                 -->
-        <!-- ======================================================= -->
-        <!-- B) Para Ajustes de Inventario - Antes de Aplicar -->
-        <xpath expr="//button[contains(@class, 'o_apply_page')]" position="before">
-            <button t-if="env.model.canBeProcessed"
-                    class="btn btn-secondary me-2 text-uppercase custom_save_mooch_quant"
-                    t-on-click="onSaveButton">
-                <i class="fa fa-floppy-o me-1"/>
-                <span>Guardar</span>
-            </button>
-        </xpath>
-
-        <!-- ======================================================= -->
-        <!-- DESHABILITAR VALIDAR (Solo para stock.picking)          -->
-        <!-- ======================================================= -->
-        <!-- CAMBIO: Añadimos la condición env.model.resModel === 'stock.picking' -->
+        <!-- B) Deshabilitar VALIDAR -->
         <xpath expr="//button[contains(@class, 'o_validate_page')]" position="attributes">
-            <attribute name="t-att-disabled">true</attribute>
-            <attribute name="t-attf-class">btn btn-secondary o_validate_page</attribute>
+            <!-- Solo deshabilitamos si es picking, aunque el botón suele ser exclusivo de picking -->
+            <attribute name="t-att-disabled">env.model.resModel === 'stock.picking' ? true : false</attribute>
+            <attribute name="t-attf-class">{{ env.model.resModel === 'stock.picking' ? 'btn btn-secondary o_validate_page' : 'btn btn-success o_validate_page' }}</attribute>
         </xpath>
 
+
         <!-- ======================================================= -->
-        <!-- ACCIONES ESPECÍFICAS DE AJUSTE DE INVENTARIO (Opcional) -->
-        <!-- Si quieres deshabilitar el botón "Apply" de Ajustes:   -->
+        <!-- CASO 2: INVENTARIO (stock.quant)                        -->
         <!-- ======================================================= -->
-        
+
+        <!-- A) Botón GUARDAR CON POPUP -->
+        <!-- <xpath expr="//button[contains(@class, 'o_apply_page')]" position="before">
+            <button t-if="env.model.resModel === 'stock.quant'"
+                    class="btn btn-secondary me-2 text-uppercase custom_save_popup"
+                    t-on-click="onSaveWithPopup">
+                <i class="fa fa-floppy-o me-1"/>
+                <span>Guardar</span>
+            </button>
+        </xpath> -->
+
+        <!-- B) Interceptar Botón APLICAR (Para pedir popup antes de validar) -->
         <xpath expr="//button[contains(@class, 'o_apply_page')]" position="attributes">
-            <attribute name="t-att-disabled">true</attribute>
-            <attribute name="t-attf-class">btn btn-secondary o_apply_page</attribute>
+            <!-- Cambiamos el click para que pase por nuestra validación -->
+            <attribute name="t-on-click">onApplyWithPopup</attribute>
         </xpath>
-       
 
     </t>
 

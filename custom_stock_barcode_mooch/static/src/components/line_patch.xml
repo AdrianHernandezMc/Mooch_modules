@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_stock_barcode_mooch.LineComponent" t-inherit="stock_barcode.LineComponent" t-inherit-mode="extension">
+        <xpath expr="//t[@t-call='stock_barcode.LineTitle']" position="after">
+            <!-- CAMBIO: Usamos 'quant_rack_area' -->
+            <div t-if="line.quant_rack_area" class="d-flex align-items-center mt-1" style="color: #008784;">
+                <i class="fa fa-map-marker me-2"/>
+                <small class="fw-bold text-uppercase">
+                    Rack: <t t-esc="line.quant_rack_area"/>
+                </small>
+            </div>
+        </xpath>
+    </t>
+</templates>
