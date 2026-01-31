@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Categoría para organizar los permisos en Ajustes -->
+        <record model="ir.module.category" id="module_category_purchase_restrictions">
+            <field name="name">Restricciones de Compras</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <!-- Grupo A: Solo ve Recepciones -->
+        <record id="group_purchase_user_a" model="res.groups">
+            <field name="name">Usuario A: Solo Almacén Recepciones</field>
+            <field name="category_id" ref="module_category_purchase_restrictions"/>
+        </record>
+
+        <!-- Grupo C: Ve todo MENOS Recepciones -->
+        <record id="group_purchase_user_c" model="res.groups">
+            <field name="name">Usuario C: Todo EXCEPTO Almacén Recepciones</field>
+            <field name="category_id" ref="module_category_purchase_restrictions"/>
+        </record>
+    </data>
+</odoo>
