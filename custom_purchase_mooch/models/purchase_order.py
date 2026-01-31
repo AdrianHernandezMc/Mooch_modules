@@ -93,6 +93,14 @@ class PurchaseOrder(models.Model):
         store=True  # Importante para ordenar y agrupar
     )
 
+    # Extendemos el campo para cambiar su comportamiento
+    picking_type_id = fields.Many2one(
+        'stock.picking.type',
+        'Deliver To',
+        required=True,
+        domain=lambda self: self._get_picking_type_domain()
+    )
+
     # =========================
     #        COMPUTES
     # =========================
@@ -690,3 +698,50 @@ class PurchaseOrder(models.Model):
                 # Pasamos el .id porque el campo destino es Many2one (espera un número)
                 
             return res
+
+    # 1. Definimos la función que calcula el valor por defecto (El que sale al crear)
+    @api.model
+    def _get_default_picking_type(self):
+        # Obtenemos el mismo dominio (filtro) que usamos para la lista
+        domain = self._get_picking_type_domain()
+        
+        # Agregamos seguridad extra: que sea de la compañía actual
+        company_id = self.env.context.get('company_id') or self.env.company.id
+        domain += [('company_id', 'in', [company_id, False])]
+        
+        # Buscamos el PRIMER tipo de operación que cumpla con las reglas del usuario
+        picking_type = self.env['stock.picking.type'].search(domain, limit=1)
+        
+        return picking_type.id if picking_type else False
+
+    # 2. Definimos la función que filtra la lista desplegable
+    @api.model
+    def _get_picking_type_domain(self):
+        user = self.env.user
+        # Empezamos diciendo: solo recepciones (incoming)
+        domain = [('code', '=', 'incoming')] 
+
+        # --- LÓGICA DE USUARIOS ---
+        
+        # Si es Usuario A -> Solo busca los que tengan "Almacen" en el nombre del almacén
+        if user.has_group('custom_purchase_mooch.group_purchase_user_a'):
+            domain += [('warehouse_id.name', 'ilike', 'Almacen')]
+        
+        # Si es Usuario C -> Busca cualquiera MENOS los que tengan "Almacen"
+        elif user.has_group('custom_purchase_mooch.group_purchase_user_c'):
+            domain += [('warehouse_id.name', 'not ilike', 'Almacen')]
+        
+        # Si es Usuario B (o admin), no agrega nada extra, así que ve todo.
+        
+        return domain
+
+    # 3. Sobreescribimos el campo para inyectarle el Dominio y el Default
+    picking_type_id = fields.Many2one(
+        'stock.picking.type', 
+        'Deliver To', 
+        required=True,
+        # Aquí conectamos la función de la lista desplegable
+        domain=lambda self: self._get_picking_type_domain(),
+        # Aquí conectamos la función del valor por defecto
+        default=_get_default_picking_type
+    )

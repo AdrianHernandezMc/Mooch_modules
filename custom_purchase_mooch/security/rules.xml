@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- REGLA USUARIO A: Solo ver EXACTAMENTE 'Almacen: Recepciones' -->
+        <record id="rule_picking_type_restrict_user_a" model="ir.rule">
+            <field name="name">Compras: Solo Recepciones Almacen</field>
+            <field name="model_id" ref="stock.model_stock_picking_type"/>
+            <field name="groups" eval="[(4, ref('custom_purchase_mooch.group_purchase_user_a'))]"/>
+            <!-- CORRECCIÓN: Usamos '=' para que sea exacto, o filtramos por almacén -->
+            <field name="domain_force">[('warehouse_id.name', 'ilike', 'Almacen'), ('code', '=', 'incoming')]</field>
+        </record>
+
+        <!-- REGLA USUARIO C: Ver TODO MENOS 'Almacen: Recepciones' -->
+        <record id="rule_picking_type_restrict_user_c" model="ir.rule">
+            <field name="name">Compras: Todo MENOS Almacen</field>
+            <field name="model_id" ref="stock.model_stock_picking_type"/>
+            <field name="groups" eval="[(4, ref('custom_purchase_mooch.group_purchase_user_c'))]"/>
+            <!-- CORRECCIÓN: Usamos 'not ilike' sobre el nombre del almacén -->
+            <field name="domain_force">[('warehouse_id.name', 'not ilike', 'Almacen'), ('code', '=', 'incoming')]</field>
+        </record>
+    </data>
+</odoo>
