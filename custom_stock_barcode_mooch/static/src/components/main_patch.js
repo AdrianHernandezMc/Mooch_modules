@@ -58,11 +58,21 @@ patch(MainComponent.prototype, {
                     this.env.services.notification.add(_t("El Rack es obligatorio."), { type: 'danger' });
                     return;
                 }
+                
+                // Intentamos escribir
                 const success = await this._assignAreaToAllLines(areaName);
 
                 if (success && shouldApply) {
                     console.log(">>> Ejecutando Apply...");
+                    // 2. Ejecutamos la validación
                     await this.env.model.apply();
+                    
+                    // 3. SOLUCIÓN: Notificamos y sacamos al usuario al menú principal
+                    this.env.services.notification.add(_t("Inventario Validado Correctamente."), { type: 'success' });
+                    
+                    // Esta línea simula presionar el botón "Atrás" (<) de la app
+                    this.env.config.historyBack(); 
+
                 } else if (success) {
                     this.env.services.notification.add(_t("Información guardada."), { type: 'success' });
                 }
