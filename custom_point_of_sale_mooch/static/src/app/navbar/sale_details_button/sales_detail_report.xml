@@ -35,36 +35,91 @@
                     </div>
                 </div>
 
-                <!-- 2. RESUMEN VENTA -->
+                <!-- 2. DETALLE DE VENTAS -->
                 <div style="border-bottom: 2px solid black; margin-bottom: 3px;"></div>
-                <div style="font-size: 24px; text-align: center;">RESUMEN VENTA</div>
+                <div style="font-size: 24px; text-align: center;">VENTA</div>
                 <div style="border-bottom: 2px solid black; margin-bottom: 5px;"></div>
 
+                <!-- Lista de métodos de pago -->
+                <!-- 1. PRIMERO EFECTIVO -->
                 <t t-foreach="payments" t-as="payment" t-key="payment_index">
-                    <div style="display: flex; justify-content: space-between; font-size: 20px">
-                        <span t-esc="payment['name'].substr(0,12)" />
-                        <span t-esc="formatCurrency(payment['total'] || 0, false)" />
-                    </div>
+                    <t t-set="p_name" t-value="payment['name'].toLowerCase()"/>
+                    <t t-if="p_name.includes('efectivo') or p_name.includes('cash')">
+                        <div style="display: flex; justify-content: space-between; font-size: 20px">
+                            <span t-esc="payment['name'].substr(0,15)" />
+                            <span t-esc="formatCurrency(payment['total'] || 0, false)" />
+                        </div>
+                    </t>
                 </t>
 
+                <!-- 2. SEGUNDO DÉBITO -->
+                <t t-foreach="payments" t-as="payment" t-key="payment_index">
+                    <t t-set="p_name" t-value="payment['name'].toLowerCase()"/>
+                    <t t-if="p_name.includes('débito') or p_name.includes('debito')">
+                        <div style="display: flex; justify-content: space-between; font-size: 20px">
+                            <span t-esc="payment['name'].substr(0,15)" />
+                            <span t-esc="formatCurrency(payment['total'] || 0, false)" />
+                        </div>
+                    </t>
+                </t>
+
+                <!-- 3. TERCERO CRÉDITO -->
+                <t t-foreach="payments" t-as="payment" t-key="payment_index">
+                    <t t-set="p_name" t-value="payment['name'].toLowerCase()"/>
+                    <t t-if="p_name.includes('crédito') or p_name.includes('credito')">
+                        <div style="display: flex; justify-content: space-between; font-size: 20px">
+                            <span t-esc="payment['name'].substr(0,15)" />
+                            <span t-esc="formatCurrency(payment['total'] || 0, false)" />
+                        </div>
+                    </t>
+                </t>
+
+                <!-- 4. EL RESTO (Lo que no sea ni efectivo, ni debito, ni credito) -->
+                <t t-foreach="payments" t-as="payment" t-key="payment_index">
+                    <t t-set="p_name" t-value="payment['name'].toLowerCase()"/>
+                    <t t-if="!p_name.includes('efectivo') and !p_name.includes('cash') and !p_name.includes('débito') and !p_name.includes('debito') and !p_name.includes('crédito') and !p_name.includes('credito')">
+                        <div style="display: flex; justify-content: space-between; font-size: 20px">
+                            <span t-esc="payment['name'].substr(0,15)" />
+                            <span t-esc="formatCurrency(payment['total'] || 0, false)" />
+                        </div>
+                    </t>
+                </t>
+
+                <!-- Separador punteado -->
                 <div style="border-top: 1px dashed black; margin-top: 5px; margin-bottom: 5px;"></div>
 
+                <!-- ========================================== -->
+                <!--      DESGLOSE DE IVA (ANTES DEL TOTAL)     -->
+                <!-- ========================================== -->
+                <t t-if="taxes">
+                    <t t-foreach="taxes" t-as="tax" t-key="tax_index">
+                        <div style="display: flex; justify-content: space-between; font-size: 18px; color: #444;">
+                            <!-- Le puse un color un poco más gris para diferenciar que es desglose -->
+                            <span> Impuesto <t t-esc="tax['name']" />:</span>
+                            <span t-esc="formatCurrency(tax['tax_amount'], false)" />
+                        </div>
+                    </t>
+                    <!-- Pequeño espacio antes del total -->
+                    <div style="margin-bottom: 5px;"></div>
+                </t>
+                <!-- ========================================== -->
+
                 <!-- TOTAL GENERAL -->
-                <div style="border-top: 3px solid black; margin-top: 3px; padding-top: 2px; display: flex; justify-content: space-between; font-size: 24px; font-weight: 900;">
-                    <span>TOTAL:</span>
+                <div style="border-top: 3px solid black; margin-top: 2px; padding-top: 5px; display: flex; justify-content: space-between; font-size: 26px; font-weight: 900;">
+                    <span>TOTAL VENTA:</span>
                     <span t-esc="formatCurrency(total_products_incl || 0, false)" />
                 </div>
 
                 <!-- TOTAL T.P.V. (Solo Tarjetas) -->
                 <t t-if="total_tpv and total_tpv > 0">
-                    <div style="display: flex; justify-content: space-between; font-size: 20px; font-weight: bold; margin-top: 5px;">
-                        <span>TOTAL T.P.V.(Solo Tarjetas):</span>
+                    <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; margin-top: 2px;">
+                        <span>(Tarjetas):</span>
                         <span t-esc="formatCurrency(total_tpv || 0, false)" />
                     </div>
                 </t>
                 <br/>
 
-                <!-- 3. DEDUCCIONES VENTA -->
+                <!-- 3. DEDUCCIONES -->
                 <div style="border-bottom: 2px solid black; margin-bottom: 3px;"></div>
                 <div style="font-size: 24px; text-align: center;">DEDUCCIONES</div>
                 <div style="border-bottom: 2px solid black; margin-bottom: 5px;"></div>
@@ -79,9 +134,7 @@
                     <span t-esc="formatCurrency(disc_total || 0, false)"/>
                 </div>
 
-                <div style="border-top: 1px dashed black; margin-top: 5px; margin-bottom: 5px;"></div>
-
-                <div style="border-top: 3px solid black; margin-top: 3px; padding-top: 2px; display: flex; justify-content: space-between; font-size: 24px; font-weight: 900;">
+                <div style="border-top: 3px solid black; margin-top: 5px; padding-top: 2px; display: flex; justify-content: space-between; font-size: 24px; font-weight: 900;">
                     <span>TOTAL DEDUCCIONES:</span>
                     <span t-esc="formatCurrency(deduction_total || 0, false)"/>
                 </div>
@@ -146,10 +199,6 @@
                 <div style="border-bottom: 2px solid black; margin-bottom: 5px;"></div>
 
                 <t t-if="is_z_report">
-                    <!-- <div style="display: flex; justify-content: space-between; font-size: 20px;">
-                        <span>(+) Fondo Inicial:</span>
-                        <span t-esc="formatCurrency(opening_cash || 0, false)"/>
-                    </div> -->
                     <div style="display: flex; justify-content: space-between; font-size: 20px;">
                         <span>(+) Ventas Efectivo:</span>
                         <span t-esc="formatCurrency(total_cash_sales || 0, false)"/>
