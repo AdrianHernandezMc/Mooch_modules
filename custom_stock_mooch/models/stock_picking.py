@@ -543,3 +543,76 @@ class StockPicking(models.Model):
             # Marcar que ya inicializamos en 0
             if not p.purchase_qty_zeroed:
                 p.purchase_qty_zeroed = True
+
+    @api.onchange('move_ids_without_package')
+    def _onchange_update_source_location_header(self):
+        """
+        Cuando se agregan productos (líneas), verifica el departamento del primer producto.
+        Si coincide con una sub-ubicación del origen actual, cambia el ORIGEN DEL PICKING.
+        Ejemplo: Origen TLAJO -> Agrego Mochila -> Origen cambia a TLAJO/ACCESORIOS.
+        """
+        # 1. Validaciones básicas
+        if self.picking_type_code == 'incoming': 
+            return # No tocar recepciones, esas tienen su propia lógica
+        
+        if not self.move_ids_without_package:
+            return
+
+        # Tomamos el primer producto de la lista para decidir la zona
+        first_line = self.move_ids_without_package[0]
+        product = first_line.product_id
+        
+        if not product or not self.location_id:
+            return
+
+        # 2. Obtener nombre del Departamento (tu lógica de 2 dígitos)
+        code = product.default_code or ''
+        if len(code) < 2:
+            return
+
+        prefix = code[:2]
+        PARAM = self.env['barcode.parameter.line']
+        dept_record = PARAM.search([
+            ('parameter_id.name', '=', 'Departamento'),
+            ('codigo', '=', prefix),
+        ], limit=1)
+
+        if not dept_record or not dept_record.nombre:
+            return
+            
+        dept_name = dept_record.nombre.strip() # Ej: "ACCESORIOS"
+
+        # 3. Verificar si el origen actual YA es el correcto para no ciclar
+        # Si ya estoy en ".../ACCESORIOS", no hago nada.
+        if dept_name.lower() in self.location_id.name.lower():
+            return
+
+        # 4. Buscar la sub-ubicación correcta
+        # IMPORTANTE: Buscamos partiendo de la ubicación padre real. 
+        # Si el origen actual es TLAJO, buscamos hijos de TLAJO.
+        Location = self.env['stock.location']
+        
+        # Primero intentamos buscar hijo directo del actual location_id
+        target_location = Location.search([
+            ('location_id', '=', self.location_id.id), 
+            ('name', 'ilike', dept_name),
+            ('usage', '=', 'internal')
+        ], limit=1)
+
+        # Si no lo encontramos, tal vez location_id ya era una vista padre (ej. Tlajomulco)
+        # O si queremos ser muy agresivos, buscamos por nombre completo
+        if not target_location:
+            target_location = Location.search([
+                ('id', 'child_of', self.location_id.id),
+                ('name', 'ilike', dept_name),
+                ('usage', '=', 'internal')
+            ], limit=1)
+
+        # 5. CAMBIAR EL ENCABEZADO Y LAS LÍNEAS
+        if target_location:
+            # Cambiamos el origen del documento (Picking)
+            self.location_id = target_location.id
+            
+            # Forzamos que las líneas existentes también se actualicen al nuevo origen
+            for move in self.move_ids_without_package:
+                move.location_id = target_location.id
